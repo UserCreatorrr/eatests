@@ -1,10 +1,5 @@
 const BASE_URL = process.env.TSPOONLAB_BASE_URL || 'https://app.tspoonlab.com/recipes/api'
 
-export interface TSpoonLabAuth {
-  token: string
-  costCenters: CostCenter[]
-}
-
 export interface CostCenter {
   id: string
   name: string
@@ -20,73 +15,27 @@ export interface Vendor {
   [key: string]: unknown
 }
 
-export interface PurchaseOrder {
-  id: string
-  date?: string
-  total?: number
-  status?: string
-  vendorId?: string
-  vendorName?: string
-  lines?: unknown[]
-  [key: string]: unknown
-}
-
-export interface PurchaseDelivery {
-  id: string
-  date?: string
-  total?: number
-  status?: string
-  vendorId?: string
-  vendorName?: string
-  lines?: unknown[]
-  [key: string]: unknown
-}
-
-export interface PurchaseInvoice {
-  id: string
-  date?: string
-  total?: number
-  status?: string
-  vendorId?: string
-  vendorName?: string
-  lines?: unknown[]
-  [key: string]: unknown
-}
-
-export interface SalesDelivery {
-  id: string
-  date?: string
-  total?: number
-  status?: string
-  lines?: unknown[]
-  [key: string]: unknown
-}
-
-export interface SalesInvoice {
-  id: string
-  date?: string
-  total?: number
-  status?: string
-  lines?: unknown[]
-  [key: string]: unknown
-}
+type DataItem = Record<string, unknown>
 
 function buildHeaders(token: string, costCenterId?: string): HeadersInit {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
+    'rememberme': token,
   }
   if (costCenterId) {
-    headers['idOrderCenter'] = costCenterId
+    headers['order'] = costCenterId
   }
   return headers
 }
 
 export async function tspoonlabLogin(username: string, password: string): Promise<string> {
+  // TSpoonLab login uses form-encoded body, not JSON
+  const body = new URLSearchParams({ username, password })
+
   const response = await fetch(`${BASE_URL}/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
   })
 
   if (!response.ok) {
@@ -94,115 +43,70 @@ export async function tspoonlabLogin(username: string, password: string): Promis
     throw new Error(`Login failed (${response.status}): ${text}`)
   }
 
-  const data = await response.json()
-  // Token may be in different fields depending on API response
-  return data.token || data.access_token || data.authToken || data.jwt || JSON.stringify(data)
+  // Token is returned in the response header as "rememberme"
+  const token = response.headers.get('rememberme')
+  if (!token) {
+    // Fallback: try to parse from body
+    const text = await response.text()
+    try {
+      const data = JSON.parse(text)
+      const t = data.token || data.rememberme || data.access_token
+      if (t) return t
+    } catch { /* ignore */ }
+    throw new Error('Login succeeded but no token found in response headers')
+  }
+
+  return token
 }
 
 export async function getCostCenters(token: string): Promise<CostCenter[]> {
-  const response = await fetch(`${BASE_URL}/costCenters`, {
-    headers: buildHeaders(token),
-  })
+  const endpoints = ['/costCenters', '/orderCenters', '/centers', '/user/centers']
 
-  if (!response.ok) {
-    // Try alternative endpoints
-    const alt = await fetch(`${BASE_URL}/orderCenters`, {
-      headers: buildHeaders(token),
-    })
-    if (!alt.ok) return []
-    const data = await alt.json()
-    return Array.isArray(data) ? data : data.data || data.items || []
+  for (const ep of endpoints) {
+    try {
+      const response = await fetch(`${BASE_URL}${ep}`, {
+        headers: buildHeaders(token),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        const list = Array.isArray(data) ? data : data.data || data.items || data.content || []
+        if (list.length > 0) return list
+      }
+    } catch { /* try next */ }
   }
-
-  const data = await response.json()
-  return Array.isArray(data) ? data : data.data || data.items || []
+  return []
 }
 
 export async function getVendors(token: string, costCenterId: string, page = 0): Promise<Vendor[]> {
   const response = await fetch(`${BASE_URL}/listVendorsPaged?page=${page}&size=200`, {
     headers: buildHeaders(token, costCenterId),
   })
-
   if (!response.ok) return []
   const data = await response.json()
   return Array.isArray(data) ? data : data.content || data.data || data.items || []
 }
 
-// ---- PURCHASES ----
-
-export async function getPurchaseOrders(
-  token: string,
-  costCenterId: string,
-  startDate: string,
-  endDate: string
-): Promise<PurchaseOrder[]> {
+async function fetchPending(token: string, costCenterId: string, path: string, startDate: string, endDate: string): Promise<DataItem[]> {
   const params = new URLSearchParams({ startDate, endDate, includeInternal: 'true' })
-  const response = await fetch(`${BASE_URL}/integration/purchases/orders/pending?${params}`, {
+  const response = await fetch(`${BASE_URL}${path}?${params}`, {
     headers: buildHeaders(token, costCenterId),
   })
   if (!response.ok) return []
   const data = await response.json()
-  return Array.isArray(data) ? data : data.data || data.items || []
+  return Array.isArray(data) ? data : data.data || data.items || data.content || []
 }
 
-export async function getPurchaseDeliveries(
-  token: string,
-  costCenterId: string,
-  startDate: string,
-  endDate: string
-): Promise<PurchaseDelivery[]> {
-  const params = new URLSearchParams({ startDate, endDate, includeInternal: 'true' })
-  const response = await fetch(`${BASE_URL}/integration/purchases/deliveries/pending?${params}`, {
-    headers: buildHeaders(token, costCenterId),
-  })
-  if (!response.ok) return []
-  const data = await response.json()
-  return Array.isArray(data) ? data : data.data || data.items || []
-}
+export const getPurchaseOrders = (token: string, costCenterId: string, startDate: string, endDate: string) =>
+  fetchPending(token, costCenterId, '/integration/purchases/orders/pending', startDate, endDate)
 
-export async function getPurchaseInvoices(
-  token: string,
-  costCenterId: string,
-  startDate: string,
-  endDate: string
-): Promise<PurchaseInvoice[]> {
-  const params = new URLSearchParams({ startDate, endDate, includeInternal: 'true', onlyValidated: 'false' })
-  const response = await fetch(`${BASE_URL}/integration/purchases/invoices/pending?${params}`, {
-    headers: buildHeaders(token, costCenterId),
-  })
-  if (!response.ok) return []
-  const data = await response.json()
-  return Array.isArray(data) ? data : data.data || data.items || []
-}
+export const getPurchaseDeliveries = (token: string, costCenterId: string, startDate: string, endDate: string) =>
+  fetchPending(token, costCenterId, '/integration/purchases/deliveries/pending', startDate, endDate)
 
-// ---- SALES ----
+export const getPurchaseInvoices = (token: string, costCenterId: string, startDate: string, endDate: string) =>
+  fetchPending(token, costCenterId, '/integration/purchases/invoices/pending', startDate, endDate)
 
-export async function getSalesDeliveries(
-  token: string,
-  costCenterId: string,
-  startDate: string,
-  endDate: string
-): Promise<SalesDelivery[]> {
-  const params = new URLSearchParams({ startDate, endDate, includeInternal: 'true' })
-  const response = await fetch(`${BASE_URL}/integration/sales/deliveries/pending?${params}`, {
-    headers: buildHeaders(token, costCenterId),
-  })
-  if (!response.ok) return []
-  const data = await response.json()
-  return Array.isArray(data) ? data : data.data || data.items || []
-}
+export const getSalesDeliveries = (token: string, costCenterId: string, startDate: string, endDate: string) =>
+  fetchPending(token, costCenterId, '/integration/sales/deliveries/pending', startDate, endDate)
 
-export async function getSalesInvoices(
-  token: string,
-  costCenterId: string,
-  startDate: string,
-  endDate: string
-): Promise<SalesInvoice[]> {
-  const params = new URLSearchParams({ startDate, endDate, includeInternal: 'true' })
-  const response = await fetch(`${BASE_URL}/integration/sales/invoices/pending?${params}`, {
-    headers: buildHeaders(token, costCenterId),
-  })
-  if (!response.ok) return []
-  const data = await response.json()
-  return Array.isArray(data) ? data : data.data || data.items || []
-}
+export const getSalesInvoices = (token: string, costCenterId: string, startDate: string, endDate: string) =>
+  fetchPending(token, costCenterId, '/integration/sales/invoices/pending', startDate, endDate)

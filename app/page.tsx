@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-type MigrationStatus = 'idle' | 'loading' | 'polling' | 'done' | 'error'
+type MigrationStatus = 'idle' | 'loading' | 'done' | 'error'
 
 interface MigrationDetails {
   costCentersFound?: number
@@ -24,7 +24,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [status, setStatus] = useState<MigrationStatus>('idle')
   const [error, setError] = useState('')
-  const [migrationId, setMigrationId] = useState('')
   const [progress, setProgress] = useState('')
   const [details, setDetails] = useState<MigrationDetails | null>(null)
 
@@ -32,7 +31,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setStatus('loading')
-    setProgress('Conectando con TSpoonLab...')
+    setProgress('Conectando con TSpoonLab e importando datos...')
 
     try {
       const res = await fetch('/api/migrate', {
@@ -47,42 +46,12 @@ export default function LoginPage() {
         throw new Error(data.error || 'Error al conectar')
       }
 
-      setMigrationId(data.migrationId)
-      setStatus('polling')
-      setProgress('Migración iniciada. Importando datos...')
-      pollStatus(data.migrationId)
+      setStatus('done')
+      setDetails(data.details as MigrationDetails)
     } catch (err) {
       setStatus('error')
       setError((err as Error).message)
     }
-  }
-
-  function pollStatus(id: string) {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/migrate/status/${id}`)
-        const data = await res.json()
-
-        if (data.status === 'completed') {
-          clearInterval(interval)
-          setStatus('done')
-          setDetails(data.details as MigrationDetails)
-          setProgress('¡Migración completada!')
-        } else if (data.status === 'error') {
-          clearInterval(interval)
-          setStatus('error')
-          setError(data.error || 'Error durante la migración')
-        } else {
-          const centers = data.details?.centers
-          if (centers) {
-            const count = Object.keys(centers).length
-            setProgress(`Importando datos... ${count} centros de coste procesados`)
-          }
-        }
-      } catch {
-        // Keep polling
-      }
-    }, 3000)
   }
 
   return (
@@ -158,7 +127,7 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
                     required
-                    disabled={status === 'loading' || status === 'polling'}
+                    disabled={status === 'loading'}
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-50 disabled:text-slate-400 transition"
                   />
                 </div>
@@ -173,7 +142,7 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    disabled={status === 'loading' || status === 'polling'}
+                    disabled={status === 'loading'}
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-50 disabled:text-slate-400 transition"
                   />
                 </div>
@@ -187,7 +156,7 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                {(status === 'loading' || status === 'polling') && (
+                {(status === 'loading') && (
                   <div className="bg-blue-50 border border-blue-100 text-blue-700 text-sm px-4 py-3 rounded-xl flex items-center gap-3">
                     <svg className="w-4 h-4 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -199,10 +168,10 @@ export default function LoginPage() {
 
                 <button
                   type="submit"
-                  disabled={status === 'loading' || status === 'polling'}
+                  disabled={status === 'loading'}
                   className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
-                  {status === 'loading' || status === 'polling' ? (
+                  {status === 'loading' ? (
                     <>
                       <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

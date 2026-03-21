@@ -52,7 +52,6 @@ function extractStatus(item: Record<string, unknown>): string {
 
 async function upsertBatch(table: string, rows: Record<string, unknown>[]) {
   if (rows.length === 0) return 0
-  // Process in chunks of 100
   for (let i = 0; i < rows.length; i += 100) {
     const chunk = rows.slice(i, i + 100)
     await supabaseAdmin.from(table).upsert(chunk, { onConflict: 'id' })
@@ -62,18 +61,10 @@ async function upsertBatch(table: string, rows: Record<string, unknown>[]) {
 
 async function migrateCostCenter(token: string, center: CostCenter, dates: { startDate: string; endDate: string }) {
   const centerId = String(center.id)
-  const stats = {
-    vendors: 0,
-    purchaseOrders: 0,
-    purchaseDeliveries: 0,
-    purchaseInvoices: 0,
-    salesDeliveries: 0,
-    salesInvoices: 0,
-  }
+  const stats = { vendors: 0, purchaseOrders: 0, purchaseDeliveries: 0, purchaseInvoices: 0, salesDeliveries: 0, salesInvoices: 0 }
 
-  // Vendors
   const vendors = await getVendors(token, centerId)
-  const vendorRows = vendors.map((v) => ({
+  stats.vendors = await upsertBatch('vendors', vendors.map((v) => ({
     id: String(v.id || v._id),
     cost_center_id: centerId,
     name: String(v.name || v.vendorName || ''),
@@ -82,98 +73,43 @@ async function migrateCostCenter(token: string, center: CostCenter, dates: { sta
     address: String(v.address || ''),
     raw_data: v,
     updated_at: new Date().toISOString(),
-  }))
-  stats.vendors = await upsertBatch('vendors', vendorRows)
+  })))
 
-  // Purchase Orders
+  const mapItem = (item: Record<string, unknown>, extra?: Record<string, unknown>) => ({
+    id: extractId(item),
+    cost_center_id: centerId,
+    ...extra,
+    date: extractDate(item),
+    total: extractTotal(item),
+    status: extractStatus(item),
+    raw_data: item,
+    updated_at: new Date().toISOString(),
+  })
+
+  const purchaseExtra = (item: Record<string, unknown>) => ({
+    vendor_id: extractVendorId(item),
+    vendor_name: extractVendorName(item),
+  })
+
   const orders = await getPurchaseOrders(token, centerId, dates.startDate, dates.endDate)
-  const orderRows = orders.map((o) => {
-    const item = o as Record<string, unknown>
-    return {
-      id: extractId(item),
-      cost_center_id: centerId,
-      vendor_id: extractVendorId(item),
-      vendor_name: extractVendorName(item),
-      date: extractDate(item),
-      total: extractTotal(item),
-      status: extractStatus(item),
-      raw_data: item,
-      updated_at: new Date().toISOString(),
-    }
-  })
-  stats.purchaseOrders = await upsertBatch('purchase_orders', orderRows)
+  stats.purchaseOrders = await upsertBatch('purchase_orders', orders.map((o) => mapItem(o, purchaseExtra(o))))
 
-  // Purchase Deliveries (albaranes)
   const deliveries = await getPurchaseDeliveries(token, centerId, dates.startDate, dates.endDate)
-  const deliveryRows = deliveries.map((d) => {
-    const item = d as Record<string, unknown>
-    return {
-      id: extractId(item),
-      cost_center_id: centerId,
-      vendor_id: extractVendorId(item),
-      vendor_name: extractVendorName(item),
-      date: extractDate(item),
-      total: extractTotal(item),
-      status: extractStatus(item),
-      raw_data: item,
-      updated_at: new Date().toISOString(),
-    }
-  })
-  stats.purchaseDeliveries = await upsertBatch('purchase_deliveries', deliveryRows)
+  stats.purchaseDeliveries = await upsertBatch('purchase_deliveries', deliveries.map((d) => mapItem(d, purchaseExtra(d))))
 
-  // Purchase Invoices
   const invoices = await getPurchaseInvoices(token, centerId, dates.startDate, dates.endDate)
-  const invoiceRows = invoices.map((inv) => {
-    const item = inv as Record<string, unknown>
-    return {
-      id: extractId(item),
-      cost_center_id: centerId,
-      vendor_id: extractVendorId(item),
-      vendor_name: extractVendorName(item),
-      date: extractDate(item),
-      total: extractTotal(item),
-      status: extractStatus(item),
-      raw_data: item,
-      updated_at: new Date().toISOString(),
-    }
-  })
-  stats.purchaseInvoices = await upsertBatch('purchase_invoices', invoiceRows)
+  stats.purchaseInvoices = await upsertBatch('purchase_invoices', invoices.map((inv) => mapItem(inv, purchaseExtra(inv))))
 
-  // Sales Deliveries
   const salesDels = await getSalesDeliveries(token, centerId, dates.startDate, dates.endDate)
-  const salesDelRows = salesDels.map((d) => {
-    const item = d as Record<string, unknown>
-    return {
-      id: extractId(item),
-      cost_center_id: centerId,
-      date: extractDate(item),
-      total: extractTotal(item),
-      status: extractStatus(item),
-      raw_data: item,
-      updated_at: new Date().toISOString(),
-    }
-  })
-  stats.salesDeliveries = await upsertBatch('sales_deliveries', salesDelRows)
+  stats.salesDeliveries = await upsertBatch('sales_deliveries', salesDels.map((d) => mapItem(d)))
 
-  // Sales Invoices
   const salesInvs = await getSalesInvoices(token, centerId, dates.startDate, dates.endDate)
-  const salesInvRows = salesInvs.map((inv) => {
-    const item = inv as Record<string, unknown>
-    return {
-      id: extractId(item),
-      cost_center_id: centerId,
-      date: extractDate(item),
-      total: extractTotal(item),
-      status: extractStatus(item),
-      raw_data: item,
-      updated_at: new Date().toISOString(),
-    }
-  })
-  stats.salesInvoices = await upsertBatch('sales_invoices', salesInvRows)
+  stats.salesInvoices = await upsertBatch('sales_invoices', salesInvs.map((inv) => mapItem(inv)))
 
   return stats
 }
 
+// Run migration synchronously and return result directly
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
@@ -182,39 +118,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email y contraseña requeridos' }, { status: 400 })
     }
 
-    // Create migration log
-    const { data: logData } = await supabaseAdmin
-      .from('migration_logs')
-      .insert({ tspoonlab_email: email, status: 'running' })
-      .select()
-      .single()
+    const dates = getDateRange()
+    const details: Record<string, unknown> = {}
 
-    const logId = logData?.id
-
-    // Start migration (async - return log ID immediately)
-    // Run in background
-    runMigration(email, password, logId).catch(console.error)
-
-    return NextResponse.json({
-      success: true,
-      migrationId: logId,
-      message: 'Migración iniciada. Puede tomar varios minutos.',
-    })
-  } catch (error) {
-    console.error('Migration error:', error)
-    return NextResponse.json(
-      { error: 'Error al iniciar la migración: ' + (error as Error).message },
-      { status: 500 }
-    )
-  }
-}
-
-async function runMigration(email: string, password: string, logId: string | undefined) {
-  const dates = getDateRange()
-  const details: Record<string, unknown> = {}
-
-  try {
-    // 1. Login to TSpoonLab
+    // 1. Login
     const token = await tspoonlabLogin(email, password)
     details.loginSuccess = true
 
@@ -223,47 +130,35 @@ async function runMigration(email: string, password: string, logId: string | und
     details.costCentersFound = costCenters.length
 
     // 3. Save cost centers
-    const centerRows = costCenters.map((c) => ({
+    await upsertBatch('cost_centers', costCenters.map((c) => ({
       id: String(c.id),
       name: String(c.name || c.description || c.label || `Centro ${c.id}`),
       raw_data: c,
       updated_at: new Date().toISOString(),
-    }))
-    await upsertBatch('cost_centers', centerRows)
+    })))
 
     // 4. Migrate each cost center
     details.centers = {}
     for (const center of costCenters) {
       const stats = await migrateCostCenter(token, center, dates)
-      ;(details.centers as Record<string, unknown>)[String(center.id)] = {
-        name: center.name,
-        ...stats,
-      }
+      ;(details.centers as Record<string, unknown>)[String(center.id)] = { name: center.name, ...stats }
     }
 
-    // 5. Update log as completed
-    if (logId) {
-      await supabaseAdmin
-        .from('migration_logs')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          details,
-        })
-        .eq('id', logId)
-    }
+    // 5. Save migration log
+    await supabaseAdmin.from('migration_logs').insert({
+      tspoonlab_email: email,
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      details,
+    })
+
+    return NextResponse.json({ success: true, details })
+
   } catch (error) {
-    console.error('Migration failed:', error)
-    if (logId) {
-      await supabaseAdmin
-        .from('migration_logs')
-        .update({
-          status: 'error',
-          completed_at: new Date().toISOString(),
-          error: (error as Error).message,
-          details,
-        })
-        .eq('id', logId)
-    }
+    console.error('Migration error:', error)
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 500 }
+    )
   }
 }

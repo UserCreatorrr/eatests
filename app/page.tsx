@@ -6,16 +6,19 @@ import { useRouter } from 'next/navigation'
 type MigrationStatus = 'idle' | 'loading' | 'done' | 'error'
 
 interface MigrationDetails {
-  costCentersFound?: number
-  centers?: Record<string, {
-    name: string
-    vendors: number
-    purchaseOrders: number
-    purchaseDeliveries: number
-    purchaseInvoices: number
-    salesDeliveries: number
-    salesInvoices: number
-  }>
+  migration_id?: string
+  cost_center?: string
+  total_proveedores?: number
+  total_vendor_details?: number
+  total_pedidos_compra?: number
+  total_albaranes_compra?: number
+  total_facturas_compra?: number
+  total_albaranes_venta?: number
+  total_facturas_venta?: number
+  total_lista_pedidos?: number
+  total_ingredientes?: number
+  total_herramientas?: number
+  message?: string
 }
 
 export default function LoginPage() {
@@ -31,7 +34,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setStatus('loading')
-    setProgress('Conectando con TSpoonLab e importando datos...')
+    setProgress('Iniciando migración vía n8n... Esto puede tardar varios minutos.')
 
     try {
       const res = await fetch('/api/migrate', {
@@ -79,26 +82,34 @@ export default function LoginPage() {
                 </svg>
               </div>
               <h2 className="text-xl font-bold text-slate-900 mb-2">¡Migración completada!</h2>
-              <p className="text-slate-500 mb-6">Todos tus datos de TSpoonLab han sido importados a EatEsts.</p>
+              <p className="text-slate-500 mb-6">
+                {details?.cost_center
+                  ? `Centro: ${details.cost_center}`
+                  : 'Todos tus datos han sido importados a EatEsts.'}
+              </p>
 
-              {details?.centers && (
-                <div className="text-left bg-slate-50 rounded-xl p-4 mb-6 space-y-3">
-                  <p className="text-sm font-semibold text-slate-700">
-                    {details.costCentersFound} centros de coste importados:
-                  </p>
-                  {Object.values(details.centers).map((center, i) => (
-                    <div key={i} className="text-sm">
-                      <p className="font-medium text-slate-800">{center.name}</p>
-                      <div className="grid grid-cols-3 gap-1 mt-1">
-                        <span className="text-slate-500">{center.vendors} proveedores</span>
-                        <span className="text-slate-500">{center.purchaseOrders} pedidos</span>
-                        <span className="text-slate-500">{center.purchaseDeliveries} albaranes</span>
-                        <span className="text-slate-500">{center.purchaseInvoices} facturas compra</span>
-                        <span className="text-slate-500">{center.salesDeliveries} alb. venta</span>
-                        <span className="text-slate-500">{center.salesInvoices} fact. venta</span>
+              {details && !details.message && (
+                <div className="text-left bg-slate-50 rounded-xl p-4 mb-6">
+                  <p className="text-sm font-semibold text-slate-700 mb-3">Datos importados:</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {[
+                      ['Proveedores', details.total_proveedores],
+                      ['Detalles proveedor', details.total_vendor_details],
+                      ['Pedidos compra', details.total_pedidos_compra],
+                      ['Albaranes compra', details.total_albaranes_compra],
+                      ['Facturas compra', details.total_facturas_compra],
+                      ['Albaranes venta', details.total_albaranes_venta],
+                      ['Facturas venta', details.total_facturas_venta],
+                      ['Lista pedidos', details.total_lista_pedidos],
+                      ['Ingredientes', details.total_ingredientes],
+                      ['Herramientas', details.total_herramientas],
+                    ].filter(([, v]) => v !== undefined).map(([label, value]) => (
+                      <div key={label as string} className="flex justify-between bg-white rounded-lg px-3 py-2 border border-slate-100">
+                        <span className="text-slate-500">{label as string}</span>
+                        <span className="font-semibold text-slate-800">{value as number}</span>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -113,7 +124,7 @@ export default function LoginPage() {
             <>
               <h2 className="text-xl font-bold text-slate-900 mb-1">Importar desde TSpoonLab</h2>
               <p className="text-slate-500 text-sm mb-6">
-                Introduce tus credenciales de TSpoonLab para migrar todos tus datos a EatEsts.
+                Inicia la migración de datos desde TSpoonLab a EatEsts vía n8n.
               </p>
 
               <form onSubmit={handleImport} className="space-y-4">

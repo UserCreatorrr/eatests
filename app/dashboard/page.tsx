@@ -1,62 +1,52 @@
 import { supabaseAdmin } from '@/lib/supabase'
 
-async function getStats() {
-  const [
-    { count: costCenters },
-    { count: vendors },
-    { count: purchaseOrders },
-    { count: purchaseDeliveries },
-    { count: purchaseInvoices },
-    { count: salesDeliveries },
-    { count: salesInvoices },
-    { data: recentMigration },
-  ] = await Promise.all([
-    supabaseAdmin.from('cost_centers').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('vendors').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('purchase_orders').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('purchase_deliveries').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('purchase_invoices').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('sales_deliveries').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('sales_invoices').select('*', { count: 'exact', head: true }),
-    supabaseAdmin
-      .from('migration_logs')
-      .select('*')
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .single(),
-  ])
-
-  // Total purchase invoices amount
-  const { data: purchaseTotals } = await supabaseAdmin
-    .from('purchase_invoices')
-    .select('total')
-    .not('total', 'is', null)
-
-  const totalPurchases = purchaseTotals?.reduce((sum, row) => sum + (row.total || 0), 0) || 0
-
-  const { data: salesTotals } = await supabaseAdmin
-    .from('sales_invoices')
-    .select('total')
-    .not('total', 'is', null)
-
-  const totalSales = salesTotals?.reduce((sum, row) => sum + (row.total || 0), 0) || 0
-
-  return {
-    costCenters: costCenters || 0,
-    vendors: vendors || 0,
-    purchaseOrders: purchaseOrders || 0,
-    purchaseDeliveries: purchaseDeliveries || 0,
-    purchaseInvoices: purchaseInvoices || 0,
-    salesDeliveries: salesDeliveries || 0,
-    salesInvoices: salesInvoices || 0,
-    totalPurchases,
-    totalSales,
-    recentMigration,
-  }
-}
-
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
+}
+
+async function getStats() {
+  const [
+    { count: proveedores },
+    { count: pedidosCompra },
+    { count: albaranesCompra },
+    { count: facturasCompra },
+    { count: albaranesVenta },
+    { count: facturasVenta },
+    { count: ingredientes },
+    { count: herramientas },
+    { count: listaPedidos },
+    { data: purchaseTotals },
+    { data: salesTotals },
+  ] = await Promise.all([
+    supabaseAdmin.from('tspoonlab_proveedores').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_pedidos_compra').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_albaranes_compra').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_facturas_compra').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_albaranes_venta').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_facturas_venta').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_ingredientes').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_herramientas').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_lista_pedidos').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_facturas_compra').select('total').not('total', 'is', null),
+    supabaseAdmin.from('tspoonlab_facturas_venta').select('total').not('total', 'is', null),
+  ])
+
+  const totalPurchases = (purchaseTotals || []).reduce((sum, row) => sum + (row.total || 0), 0)
+  const totalSales = (salesTotals || []).reduce((sum, row) => sum + (row.total || 0), 0)
+
+  return {
+    proveedores: proveedores || 0,
+    pedidosCompra: pedidosCompra || 0,
+    albaranesCompra: albaranesCompra || 0,
+    facturasCompra: facturasCompra || 0,
+    albaranesVenta: albaranesVenta || 0,
+    facturasVenta: facturasVenta || 0,
+    ingredientes: ingredientes || 0,
+    herramientas: herramientas || 0,
+    listaPedidos: listaPedidos || 0,
+    totalPurchases,
+    totalSales,
+  }
 }
 
 export default async function DashboardPage() {
@@ -64,20 +54,8 @@ export default async function DashboardPage() {
 
   const statCards = [
     {
-      label: 'Centros de Coste',
-      value: stats.costCenters,
-      color: 'text-purple-600',
-      bg: 'bg-purple-50',
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      ),
-    },
-    {
       label: 'Proveedores',
-      value: stats.vendors,
+      value: stats.proveedores,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
       icon: (
@@ -88,8 +66,8 @@ export default async function DashboardPage() {
       ),
     },
     {
-      label: 'Pedidos de Compra',
-      value: stats.purchaseOrders,
+      label: 'Pedidos Compra',
+      value: stats.pedidosCompra,
       color: 'text-amber-600',
       bg: 'bg-amber-50',
       icon: (
@@ -101,7 +79,7 @@ export default async function DashboardPage() {
     },
     {
       label: 'Albaranes Compra',
-      value: stats.purchaseDeliveries,
+      value: stats.albaranesCompra,
       color: 'text-orange-600',
       bg: 'bg-orange-50',
       icon: (
@@ -113,7 +91,7 @@ export default async function DashboardPage() {
     },
     {
       label: 'Facturas Compra',
-      value: stats.purchaseInvoices,
+      value: stats.facturasCompra,
       color: 'text-red-600',
       bg: 'bg-red-50',
       icon: (
@@ -125,7 +103,7 @@ export default async function DashboardPage() {
     },
     {
       label: 'Albaranes Venta',
-      value: stats.salesDeliveries,
+      value: stats.albaranesVenta,
       color: 'text-green-600',
       bg: 'bg-green-50',
       icon: (
@@ -137,7 +115,7 @@ export default async function DashboardPage() {
     },
     {
       label: 'Facturas Venta',
-      value: stats.salesInvoices,
+      value: stats.facturasVenta,
       color: 'text-teal-600',
       bg: 'bg-teal-50',
       icon: (
@@ -147,7 +125,48 @@ export default async function DashboardPage() {
         </svg>
       ),
     },
+    {
+      label: 'Ingredientes',
+      value: stats.ingredientes,
+      color: 'text-lime-600',
+      bg: 'bg-lime-50',
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Herramientas',
+      value: stats.herramientas,
+      color: 'text-slate-600',
+      bg: 'bg-slate-100',
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Lista Pedidos',
+      value: stats.listaPedidos,
+      color: 'text-indigo-600',
+      bg: 'bg-indigo-50',
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+        </svg>
+      ),
+    },
   ]
+
+  const totalRecords = stats.proveedores + stats.pedidosCompra + stats.albaranesCompra +
+    stats.facturasCompra + stats.albaranesVenta + stats.facturasVenta +
+    stats.ingredientes + stats.herramientas + stats.listaPedidos
 
   return (
     <div className="p-8">
@@ -155,23 +174,6 @@ export default async function DashboardPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Panel de Control</h1>
         <p className="text-slate-500 mt-1">Resumen de tu actividad gastronómica</p>
-        {stats.recentMigration && (
-          <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${
-            stats.recentMigration.status === 'completed'
-              ? 'bg-green-50 text-green-700'
-              : stats.recentMigration.status === 'running'
-              ? 'bg-blue-50 text-blue-700'
-              : 'bg-slate-50 text-slate-600'
-          }`}>
-            <div className={`w-2 h-2 rounded-full ${
-              stats.recentMigration.status === 'completed' ? 'bg-green-500'
-              : stats.recentMigration.status === 'running' ? 'bg-blue-500 animate-pulse'
-              : 'bg-slate-400'
-            }`} />
-            Última migración: {stats.recentMigration.status === 'completed' ? 'Completada' : stats.recentMigration.status === 'running' ? 'En progreso' : stats.recentMigration.status}
-            {stats.recentMigration.tspoonlab_email && ` · ${stats.recentMigration.tspoonlab_email}`}
-          </div>
-        )}
       </div>
 
       {/* Financials */}
@@ -187,7 +189,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {statCards.map((card) => (
           <div key={card.label} className="stat-card">
             <div className={`w-10 h-10 ${card.bg} ${card.color} rounded-xl flex items-center justify-center mb-3`}>
@@ -200,7 +202,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Empty state */}
-      {stats.costCenters === 0 && (
+      {totalRecords === 0 && (
         <div className="mt-12 text-center py-16 bg-white rounded-2xl border border-slate-100">
           <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

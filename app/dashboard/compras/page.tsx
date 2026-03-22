@@ -1,43 +1,38 @@
 import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase'
 
+function formatCurrency(amount: number | null) {
+  if (amount === null || amount === undefined) return '-'
+  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
+}
+
 async function getComprasStats() {
   const [
     { count: orders },
     { count: deliveries },
     { count: invoices },
-    { data: recentDeliveries },
+    { data: recentFacturas },
   ] = await Promise.all([
-    supabaseAdmin.from('purchase_orders').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('purchase_deliveries').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('purchase_invoices').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_pedidos_compra').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_albaranes_compra').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('tspoonlab_facturas_compra').select('*', { count: 'exact', head: true }),
     supabaseAdmin
-      .from('purchase_deliveries')
-      .select('*, cost_centers(name)')
-      .order('date', { ascending: false })
+      .from('tspoonlab_facturas_compra')
+      .select('id, invoice_num, vendor, date_invoice, total')
+      .order('date_invoice', { ascending: false })
       .limit(10),
   ])
 
-  return { orders, deliveries, invoices, recentDeliveries: recentDeliveries || [] }
-}
-
-function formatDate(date: string | null) {
-  if (!date) return '-'
-  return new Date(date).toLocaleDateString('es-ES')
-}
-
-function formatCurrency(amount: number | null) {
-  if (!amount) return '-'
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
+  return { orders, deliveries, invoices, recentFacturas: recentFacturas || [] }
 }
 
 export default async function ComprasPage() {
-  const { orders, deliveries, invoices, recentDeliveries } = await getComprasStats()
+  const { orders, deliveries, invoices, recentFacturas } = await getComprasStats()
 
   const sections = [
-    { label: 'Pedidos', count: orders || 0, href: '/dashboard/compras/pedidos', color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Albaranes', count: deliveries || 0, href: '/dashboard/compras/albaranes', color: 'text-orange-600', bg: 'bg-orange-50' },
-    { label: 'Facturas', count: invoices || 0, href: '/dashboard/compras/facturas', color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'Pedidos', count: orders || 0, href: '/dashboard/compras/pedidos', color: 'text-amber-600' },
+    { label: 'Albaranes', count: deliveries || 0, href: '/dashboard/compras/albaranes', color: 'text-orange-600' },
+    { label: 'Facturas', count: invoices || 0, href: '/dashboard/compras/facturas', color: 'text-red-600' },
   ]
 
   return (
@@ -57,40 +52,31 @@ export default async function ComprasPage() {
         ))}
       </div>
 
-      {/* Recent deliveries */}
+      {/* Recent facturas compra */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100">
         <div className="px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800">Últimos albaranes</h2>
+          <h2 className="font-semibold text-slate-800">Últimas facturas de compra</h2>
         </div>
-        {recentDeliveries.length === 0 ? (
+        {recentFacturas.length === 0 ? (
           <div className="p-12 text-center text-slate-400">Sin datos importados</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="px-6 py-4">ID</th>
+                  <th className="px-6 py-4">Nº Factura</th>
                   <th className="px-6 py-4">Proveedor</th>
                   <th className="px-6 py-4">Fecha</th>
                   <th className="px-6 py-4">Total</th>
-                  <th className="px-6 py-4">Estado</th>
-                  <th className="px-6 py-4">Centro</th>
                 </tr>
               </thead>
               <tbody>
-                {recentDeliveries.map((d) => (
-                  <tr key={d.id} className="hover:bg-slate-50">
-                    <td className="px-6 font-mono text-xs text-slate-500">{String(d.id).slice(0, 8)}...</td>
-                    <td className="px-6 font-medium text-slate-700">{d.vendor_name || '-'}</td>
-                    <td className="px-6 text-slate-500">{formatDate(d.date)}</td>
-                    <td className="px-6 font-semibold text-slate-800">{formatCurrency(d.total)}</td>
-                    <td className="px-6">
-                      <span className={`badge ${d.status === 'processed' ? 'badge-green' : d.status === 'pending' ? 'badge-yellow' : 'badge-gray'}`}>
-                        {d.status || 'pendiente'}
-                      </span>
-                    </td>
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    <td className="px-6 text-slate-500">{(d as any).cost_centers?.name || '-'}</td>
+                {recentFacturas.map((f) => (
+                  <tr key={f.id} className="hover:bg-slate-50">
+                    <td className="px-6 font-mono text-sm text-slate-600">{f.invoice_num || '-'}</td>
+                    <td className="px-6 font-medium text-slate-700">{f.vendor || '-'}</td>
+                    <td className="px-6 text-slate-500">{f.date_invoice || '-'}</td>
+                    <td className="px-6 font-semibold text-red-600">{formatCurrency(f.total)}</td>
                   </tr>
                 ))}
               </tbody>

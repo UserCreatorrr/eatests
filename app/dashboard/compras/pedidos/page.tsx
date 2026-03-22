@@ -1,16 +1,21 @@
 import { supabaseAdmin } from '@/lib/supabase'
-import { formatDate, formatCurrency, StatusBadge } from '@/components/DataTable'
+
+function formatCurrency(amount: number | null) {
+  if (amount === null || amount === undefined) return '-'
+  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
+}
 
 async function getData() {
   const { data, count } = await supabaseAdmin
-    .from('purchase_orders')
-    .select('*, cost_centers(name)', { count: 'exact' })
-    .order('date', { ascending: false })
-    .limit(200)
+    .from('tspoonlab_pedidos_compra')
+    .select('id, num_order, vendor, date_order, date_reception, total, sent_by', { count: 'exact' })
+    .order('date_order', { ascending: false })
+    .limit(500)
+
   return { rows: data || [], count: count || 0 }
 }
 
-export default async function PedidosPage() {
+export default async function PedidosCompraPage() {
   const { rows, count } = await getData()
 
   return (
@@ -19,33 +24,38 @@ export default async function PedidosPage() {
         <h1 className="text-2xl font-bold text-slate-900">Pedidos de Compra</h1>
         <p className="text-slate-500 mt-1">{count.toLocaleString('es-ES')} pedidos</p>
       </div>
+
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         {rows.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">Sin pedidos importados</div>
+          <div className="p-12 text-center text-slate-400">
+            <svg className="w-12 h-12 mx-auto mb-3 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p>Sin pedidos de compra importados</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="px-6 py-4">ID</th>
+                  <th className="px-6 py-4">Nº Pedido</th>
                   <th className="px-6 py-4">Proveedor</th>
                   <th className="px-6 py-4">Fecha</th>
+                  <th className="px-6 py-4">Fecha Recepción</th>
                   <th className="px-6 py-4">Total</th>
-                  <th className="px-6 py-4">Estado</th>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  <th className="px-6 py-4">Centro</th>
+                  <th className="px-6 py-4">Enviado por</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50">
-                    <td className="px-6 font-mono text-xs text-slate-400">{String(row.id).slice(0, 10)}</td>
-                    <td className="px-6 font-medium text-slate-700">{row.vendor_name || '-'}</td>
-                    <td className="px-6 text-slate-500">{formatDate(row.date)}</td>
-                    <td className="px-6 font-semibold">{formatCurrency(row.total)}</td>
-                    <td className="px-6"><StatusBadge status={row.status} /></td>
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    <td className="px-6 text-slate-500">{(row as any).cost_centers?.name || '-'}</td>
+                    <td className="px-6 font-mono text-sm text-slate-600">{row.num_order || '-'}</td>
+                    <td className="px-6 font-medium text-slate-700">{row.vendor || '-'}</td>
+                    <td className="px-6 text-slate-500">{row.date_order || '-'}</td>
+                    <td className="px-6 text-slate-500">{row.date_reception || '-'}</td>
+                    <td className="px-6 font-semibold text-amber-600">{formatCurrency(row.total)}</td>
+                    <td className="px-6 text-slate-500">{row.sent_by || '-'}</td>
                   </tr>
                 ))}
               </tbody>

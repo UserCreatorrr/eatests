@@ -22,12 +22,12 @@ export default async function AlbaranesVentaPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-display font-semibold text-brand-dark">Albaranes de Venta</h1>
-        <p className="text-sm font-mono text-brand-dark/50 mt-1">{count.toLocaleString('es-ES')} albaranes</p>
+      <div className="page-header">
+        <h1 className="page-title">Albaranes de Venta</h1>
+        <p className="page-subtitle">{count.toLocaleString('es-ES')} albaranes</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-brand-border overflow-hidden">
+      <div className="table-wrap">
         {rows.length === 0 ? (
           <div className="p-12 text-center text-brand-dark/40">
             <svg className="w-12 h-12 mx-auto mb-3 text-brand-dark/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -57,8 +57,8 @@ export default async function AlbaranesVentaPage() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="hover:bg-brand-bg">
-                    <td className="px-6 font-mono text-sm text-brand-dark/70">{row.invoice_num || '-'}</td>
-                    <td className="px-6 font-medium text-brand-dark">{row.customer || '-'}</td>
+                    <td className="px-6 col-mono">{row.invoice_num || '-'}</td>
+                    <td className="px-6 col-main">{row.customer || '-'}</td>
                     <td className="px-6 text-brand-dark/70">{row.customer_code || '-'}</td>
                     <td className="px-6 text-brand-dark/70">{row.customer_type || '-'}</td>
                     <td className="px-6 text-brand-dark/70">{row.nif || '-'}</td>
@@ -69,7 +69,7 @@ export default async function AlbaranesVentaPage() {
                       {[row.address, row.cp, row.city].filter(Boolean).join(', ') || '-'}
                     </td>
                     <td className="px-6 text-brand-dark/70">{formatDate(row.date_delivery)}</td>
-                    <td className="px-6 font-semibold text-brand-dark">{formatCurrency(row.base)}</td>
+                    <td className="px-6 col-amount">{formatCurrency(row.base)}</td>
                   </tr>
                 ))}
               </tbody>

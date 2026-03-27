@@ -22,12 +22,12 @@ export default async function AlbaranesCompraPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-display font-semibold text-brand-dark">Albaranes de Compra</h1>
-        <p className="text-sm font-mono text-brand-dark/50 mt-1">{count.toLocaleString('es-ES')} albaranes</p>
+      <div className="page-header">
+        <h1 className="page-title">Albaranes de Compra</h1>
+        <p className="page-subtitle">{count.toLocaleString('es-ES')} albaranes</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-brand-border overflow-hidden">
+      <div className="table-wrap">
         {rows.length === 0 ? (
           <div className="p-12 text-center text-brand-dark/40">
             <svg className="w-12 h-12 mx-auto mb-3 text-brand-dark/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -60,8 +60,8 @@ export default async function AlbaranesCompraPage() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="hover:bg-brand-bg">
-                    <td className="px-6 font-mono text-sm text-brand-dark/70">{row.delivery_num || '-'}</td>
-                    <td className="px-6 font-medium text-brand-dark">{row.vendor || '-'}</td>
+                    <td className="px-6 col-mono">{row.delivery_num || '-'}</td>
+                    <td className="px-6 col-main">{row.vendor || '-'}</td>
                     <td className="px-6 text-brand-dark/70">{row.code_vendor || '-'}</td>
                     <td className="px-6 text-brand-dark/70">{row.nif || '-'}</td>
                     <td className="px-6 text-brand-dark/70">{row.delivery_for || '-'}</td>
@@ -71,7 +71,7 @@ export default async function AlbaranesCompraPage() {
                     <td className="px-6 text-brand-dark/70">{row.received_by || '-'}</td>
                     <td className="px-6 text-brand-dark/70">{formatCurrency(row.base)}</td>
                     <td className="px-6 text-brand-dark/70">{formatCurrency(row.taxes)}</td>
-                    <td className="px-6 font-semibold text-brand-dark">{formatCurrency(row.total)}</td>
+                    <td className="px-6 col-amount">{formatCurrency(row.total)}</td>
                     <td className="px-6 text-brand-dark/70">{row.cost_type || '-'}</td>
                     <td className="px-6 text-brand-dark/70">{row.vendor_type || '-'}</td>
                   </tr>

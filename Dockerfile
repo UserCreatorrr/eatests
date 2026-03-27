@@ -7,6 +7,7 @@ RUN npm ci
 
 COPY . .
 
+# Build-time args (baked into client-side bundle)
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG SUPABASE_SERVICE_ROLE_KEY
@@ -25,4 +26,6 @@ RUN npm run build
 
 EXPOSE 3000
 
+# SUPABASE_URL can be overridden at runtime for server-side calls
+# Set to internal Docker hostname, e.g. http://kong:8000
 CMD ["npm", "run", "start"]

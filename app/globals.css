@@ -2,10 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Brand Fonts ─────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/Chillax-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/Chillax-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  src: url('/fonts/DMMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  src: url('/fonts/DMMono-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ─── Design Tokens ───────────────────────────────────────────── */
 :root {
-  --brand: #1a73e8;
-  --brand-dark: #1557b0;
-  --brand-light: #e8f0fe;
+  --brand-dark:    #3d3834;
+  --brand-darker:  #2a2522;
+  --brand-green:   #19f973;
+  --brand-cream:   #dfd5c9;
+  --brand-bg:      #f5f2ee;
+  --brand-surface: #ffffff;
+  --brand-border:  #e8e2db;
 }
 
 * {
@@ -13,45 +51,56 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background-color: #f8fafc;
-  color: #1e293b;
+  font-family: 'DM Mono', monospace;
+  background-color: var(--brand-bg);
+  color: var(--brand-dark);
+  -webkit-font-smoothing: antialiased;
 }
 
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Chillax', sans-serif;
+}
+
+/* ─── Sidebar ─────────────────────────────────────────────────── */
 .sidebar-link {
-  @apply flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 font-medium text-sm;
+  @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-brand-cream/70 hover:bg-white/10 hover:text-brand-green transition-colors duration-150 font-mono text-sm;
 }
 
 .sidebar-link.active {
-  @apply bg-blue-50 text-blue-700;
+  @apply bg-brand-green/10 text-brand-green;
 }
 
+/* ─── Cards ───────────────────────────────────────────────────── */
 .stat-card {
-  @apply bg-white rounded-xl p-6 shadow-sm border border-slate-100;
+  @apply bg-white rounded-xl p-6 shadow-sm border border-brand-border;
 }
 
+/* ─── Tables ──────────────────────────────────────────────────── */
 .data-table {
   @apply w-full text-sm;
 }
 
 .data-table th {
-  @apply text-left text-xs font-semibold text-slate-500 uppercase tracking-wide pb-3 border-b border-slate-100;
+  @apply text-left text-xs font-semibold text-brand-dark/50 uppercase tracking-widest pb-3 border-b border-brand-border;
+  font-family: 'DM Mono', monospace;
 }
 
 .data-table td {
-  @apply py-3 border-b border-slate-50 text-slate-700;
+  @apply py-3 border-b border-brand-border/50 text-brand-dark/80;
 }
 
 .data-table tr:last-child td {
   @apply border-0;
 }
 
+/* ─── Badges ──────────────────────────────────────────────────── */
 .badge {
   @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  font-family: 'DM Mono', monospace;
 }
 
 .badge-green {
-  @apply bg-green-50 text-green-700;
+  @apply bg-brand-green/10 text-brand-green;
 }
 
 .badge-yellow {
@@ -63,5 +112,5 @@ body {
 }
 
 .badge-gray {
-  @apply bg-slate-100 text-slate-600;
+  @apply bg-brand-cream/30 text-brand-dark/60;
 }

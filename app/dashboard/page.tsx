@@ -56,8 +56,8 @@ export default async function DashboardPage() {
     {
       label: 'Proveedores',
       value: stats.proveedores,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50',
+      color: 'text-brand-green',
+      bg: 'bg-brand-green/10',
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -172,19 +172,19 @@ export default async function DashboardPage() {
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Panel de Control</h1>
-        <p className="text-slate-500 mt-1">Resumen de tu actividad gastronómica</p>
+        <h1 className="text-2xl font-display font-semibold text-brand-dark">Panel de Control</h1>
+        <p className="text-sm font-mono text-brand-dark/50 mt-1">Resumen de tu actividad gastronómica</p>
       </div>
 
       {/* Financials */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="stat-card border-l-4 border-l-red-400">
-          <p className="text-sm text-slate-500 mb-1">Total Compras (facturas)</p>
-          <p className="text-3xl font-bold text-slate-900">{formatCurrency(stats.totalPurchases)}</p>
+          <p className="text-sm text-brand-dark/50 mb-1">Total Compras (facturas)</p>
+          <p className="text-3xl font-display font-semibold text-brand-dark">{formatCurrency(stats.totalPurchases)}</p>
         </div>
-        <div className="stat-card border-l-4 border-l-green-400">
-          <p className="text-sm text-slate-500 mb-1">Total Ventas (facturas)</p>
-          <p className="text-3xl font-bold text-slate-900">{formatCurrency(stats.totalSales)}</p>
+        <div className="stat-card border-l-4 border-l-brand-green">
+          <p className="text-sm text-brand-dark/50 mb-1">Total Ventas (facturas)</p>
+          <p className="text-3xl font-display font-semibold text-brand-dark">{formatCurrency(stats.totalSales)}</p>
         </div>
       </div>
 
@@ -195,8 +195,8 @@ export default async function DashboardPage() {
             <div className={`w-10 h-10 ${card.bg} ${card.color} rounded-xl flex items-center justify-center mb-3`}>
               {card.icon}
             </div>
-            <p className="text-2xl font-bold text-slate-900">{card.value.toLocaleString('es-ES')}</p>
-            <p className="text-sm text-slate-500 mt-1">{card.label}</p>
+            <p className="text-2xl font-display font-semibold text-brand-dark">{card.value.toLocaleString('es-ES')}</p>
+            <p className="text-xs font-mono text-brand-dark/50 mt-1">{card.label}</p>
           </div>
         ))}
       </div>
@@ -210,11 +210,11 @@ export default async function DashboardPage() {
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-slate-800 mb-2">Sin datos importados</h3>
-          <p className="text-slate-500 mb-6">Importa tus datos desde TSpoonLab para comenzar.</p>
+          <h3 className="text-lg font-display font-semibold text-brand-dark mb-2">Sin datos importados</h3>
+          <p className="text-brand-dark/50 mb-6">Importa tus datos desde TSpoonLab para comenzar.</p>
           <a
             href="/"
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors"
+            className="inline-flex items-center gap-2 font-mono font-semibold px-6 py-3 rounded-xl transition-colors text-sm" style={{ backgroundColor: '#19f973', color: '#2a2522' }}
           >
             Importar desde TSpoonLab
           </a>

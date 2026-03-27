@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'EatEsts - Gestión Gastronómica',
+  title: 'MarginBite — Gestión Gastronómica',
   description: 'Plataforma de gestión para restaurantes y hostelería',
 }
 

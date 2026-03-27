@@ -9,19 +9,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          900: '#0c4a6e',
-        },
         brand: {
-          DEFAULT: '#1a73e8',
-          dark: '#1557b0',
-          light: '#e8f0fe',
-        }
+          dark: '#3d3834',
+          green: '#19f973',
+          cream: '#dfd5c9',
+          darker: '#2a2522',
+          'green-dim': '#0fcc5e',
+        },
+      },
+      fontFamily: {
+        display: ['Chillax', 'sans-serif'],
+        mono: ['DM Mono', 'monospace'],
       },
     },
   },

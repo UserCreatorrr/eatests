@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -58,39 +59,33 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "#3d3834" }}>
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4 shadow-lg">
-            <svg className="w-9 h-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900">EatEsts</h1>
-          <p className="text-slate-500 mt-1">Gestión Gastronómica</p>
+          <img src="/logos/logo-negative.svg" alt="MarginBite" className="h-10 w-auto mx-auto mb-5" />
+          <p className="text-sm font-mono" style={{ color: "#dfd5c9", opacity: 0.45 }}>Gestión Gastronómica</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="rounded-2xl p-8 border" style={{ backgroundColor: "#2a2522", borderColor: "rgba(255,255,255,0.08)" }}>
           {status === 'done' ? (
             <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "rgba(25,249,115,0.12)" }}>
+                <svg className="w-7 h-7" style={{ color: "#19f973" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">¡Migración completada!</h2>
-              <p className="text-slate-500 mb-6">
+              <h2 className="text-xl font-display font-semibold mb-2" style={{ color: "#dfd5c9" }}>¡Migración completada!</h2>
+              <p className="text-sm font-mono mb-6" style={{ color: "#dfd5c9", opacity: 0.45 }}>
                 {details?.cost_center
                   ? `Centro: ${details.cost_center}`
-                  : 'Todos tus datos han sido importados a EatEsts.'}
+                  : 'Todos tus datos han sido importados correctamente.'}
               </p>
 
               {details && !details.message && (
-                <div className="text-left bg-slate-50 rounded-xl p-4 mb-6">
-                  <p className="text-sm font-semibold text-slate-700 mb-3">Datos importados:</p>
+                <div className="text-left rounded-xl p-4 mb-6" style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <p className="text-xs font-mono font-semibold mb-3" style={{ color: "#dfd5c9", opacity: 0.4, letterSpacing: "0.1em", textTransform: "uppercase" }}>Datos importados:</p>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {[
                       ['Proveedores', details.total_proveedores],
@@ -104,9 +99,9 @@ export default function LoginPage() {
                       ['Ingredientes', details.total_ingredientes],
                       ['Herramientas', details.total_herramientas],
                     ].filter(([, v]) => v !== undefined).map(([label, value]) => (
-                      <div key={label as string} className="flex justify-between bg-white rounded-lg px-3 py-2 border border-slate-100">
-                        <span className="text-slate-500">{label as string}</span>
-                        <span className="font-semibold text-slate-800">{value as number}</span>
+                      <div key={label as string} className="flex justify-between rounded-lg px-3 py-2" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <span className="font-mono text-xs" style={{ color: "#dfd5c9", opacity: 0.45 }}>{label as string}</span>
+                        <span className="font-mono text-xs font-semibold" style={{ color: "#dfd5c9" }}>{value as number}</span>
                       </div>
                     ))}
                   </div>
@@ -115,21 +110,21 @@ export default function LoginPage() {
 
               <button
                 onClick={() => router.push('/dashboard')}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors"
+                className="w-full font-mono font-semibold py-3 px-6 rounded-xl transition-all text-sm" style={{ backgroundColor: "#19f973", color: "#2a2522" }}
               >
                 Ir al Dashboard →
               </button>
             </div>
           ) : (
             <>
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Importar desde TSpoonLab</h2>
-              <p className="text-slate-500 text-sm mb-6">
-                Inicia la migración de datos desde TSpoonLab a EatEsts vía n8n.
+              <h2 className="text-lg font-display font-semibold mb-1" style={{ color: "#dfd5c9" }}>Importar desde TSpoonLab</h2>
+              <p className="text-xs font-mono mb-6" style={{ color: "#dfd5c9", opacity: 0.38 }}>
+                Inicia la migración de datos desde TSpoonLab vía n8n.
               </p>
 
               <form onSubmit={handleImport} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="block text-xs font-mono mb-1.5" style={{ color: "#dfd5c9", opacity: 0.5, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                     Email de TSpoonLab
                   </label>
                   <input
@@ -139,12 +134,12 @@ export default function LoginPage() {
                     placeholder="tu@email.com"
                     required
                     disabled={status === 'loading'}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-50 disabled:text-slate-400 transition"
+                    className="w-full px-4 py-3 rounded-xl text-sm font-mono outline-none transition-all disabled:opacity-40" style={{ backgroundColor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#dfd5c9" }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="block text-xs font-mono mb-1.5" style={{ color: "#dfd5c9", opacity: 0.5, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                     Contraseña
                   </label>
                   <input
@@ -154,12 +149,12 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     required
                     disabled={status === 'loading'}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-50 disabled:text-slate-400 transition"
+                    className="w-full px-4 py-3 rounded-xl text-sm font-mono outline-none transition-all disabled:opacity-40" style={{ backgroundColor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#dfd5c9" }}
                   />
                 </div>
 
                 {error && (
-                  <div className="bg-red-50 border border-red-100 text-red-700 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
+                  <div className="text-xs font-mono px-4 py-3 rounded-xl flex items-center gap-2" style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5" }}>
                     <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
@@ -168,7 +163,7 @@ export default function LoginPage() {
                 )}
 
                 {(status === 'loading') && (
-                  <div className="bg-blue-50 border border-blue-100 text-blue-700 text-sm px-4 py-3 rounded-xl flex items-center gap-3">
+                  <div className="text-xs font-mono px-4 py-3 rounded-xl flex items-center gap-3" style={{ backgroundColor: "rgba(25,249,115,0.07)", border: "1px solid rgba(25,249,115,0.15)", color: "#19f973" }}>
                     <svg className="w-4 h-4 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -180,7 +175,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={status === 'loading'}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  className="w-full font-mono font-semibold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed" style={{ backgroundColor: "#19f973", color: "#2a2522" }}
                 >
                   {status === 'loading' ? (
                     <>
@@ -201,14 +196,14 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-                <p className="text-xs text-slate-400">
+              <div className="mt-6 pt-5 border-t text-center" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                <p className="text-xs font-mono" style={{ color: "#dfd5c9", opacity: 0.28 }}>
                   Tus credenciales se usan solo para la importación y no se almacenan.
                 </p>
                 {status === 'idle' && (
                   <button
                     onClick={() => router.push('/dashboard')}
-                    className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    className="mt-3 text-xs font-mono" style={{ color: "#19f973", opacity: 0.65 }}
                   >
                     Ir al dashboard sin importar →
                   </button>

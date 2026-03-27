@@ -1,33 +1,33 @@
 import { supabaseAdmin } from '@/lib/supabase'
 
-async function getProveedores() {
-  const { data } = await supabaseAdmin
-    .from('tspoonlab_proveedores')
-    .select('id, migration_id, codi, descr, descr_type, id_type, defecte, has_other')
+async function getData() {
+  const { data, count } = await supabaseAdmin
+    .from('tspoonlab_vendor_details')
+    .select('id, migration_id, codi, descr, nif, comment, mail_cc, web, creditor, address, city, cp', { count: 'exact' })
     .order('descr')
     .limit(1000)
 
-  return data || []
+  return { rows: data || [], count: count || 0 }
 }
 
-export default async function ProveedoresPage() {
-  const proveedores = await getProveedores()
+export default async function VendorDetallesPage() {
+  const { rows, count } = await getData()
 
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-display font-semibold text-brand-dark">Proveedores</h1>
-        <p className="text-sm font-mono text-brand-dark/50 mt-1">{proveedores.length.toLocaleString('es-ES')} proveedores importados</p>
+        <h1 className="text-2xl font-display font-semibold text-brand-dark">Detalles de Proveedores</h1>
+        <p className="text-sm font-mono text-brand-dark/50 mt-1">{count.toLocaleString('es-ES')} registros importados</p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-brand-border overflow-hidden">
-        {proveedores.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="p-12 text-center text-brand-dark/40">
             <svg className="w-12 h-12 mx-auto mb-3 text-brand-dark/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <p>No hay proveedores importados todavía</p>
+            <p>No hay detalles de proveedores importados todavía</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -36,33 +36,33 @@ export default async function ProveedoresPage() {
                 <tr>
                   <th className="px-6 py-4">Código</th>
                   <th className="px-6 py-4">Nombre</th>
-                  <th className="px-6 py-4">Tipo</th>
-                  <th className="px-6 py-4">NIF type</th>
-                  <th className="px-6 py-4">Defecto</th>
-                  <th className="px-6 py-4">Otros</th>
+                  <th className="px-6 py-4">NIF</th>
+                  <th className="px-6 py-4">Dirección</th>
+                  <th className="px-6 py-4">Email CC</th>
+                  <th className="px-6 py-4">Web</th>
+                  <th className="px-6 py-4">Acreedor</th>
+                  <th className="px-6 py-4">Comentario</th>
                 </tr>
               </thead>
               <tbody>
-                {proveedores.map((row) => (
+                {rows.map((row) => (
                   <tr key={row.id} className="hover:bg-brand-bg">
                     <td className="px-6 font-mono text-sm text-brand-dark/60">{row.codi || '-'}</td>
                     <td className="px-6 font-medium text-brand-dark">{row.descr || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.descr_type || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.id_type || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{row.nif || '-'}</td>
+                    <td className="px-6 text-brand-dark/70 text-sm">
+                      {[row.address, row.cp, row.city].filter(Boolean).join(', ') || '-'}
+                    </td>
+                    <td className="px-6 text-brand-dark/70">{row.mail_cc || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{row.web || '-'}</td>
                     <td className="px-6">
-                      {row.defecte ? (
+                      {row.creditor ? (
                         <span className="badge badge-green">Sí</span>
                       ) : (
                         <span className="badge badge-blue">No</span>
                       )}
                     </td>
-                    <td className="px-6">
-                      {row.has_other ? (
-                        <span className="badge badge-green">Sí</span>
-                      ) : (
-                        <span className="badge badge-blue">No</span>
-                      )}
-                    </td>
+                    <td className="px-6 text-brand-dark/60 text-sm max-w-xs truncate">{row.comment || '-'}</td>
                   </tr>
                 ))}
               </tbody>

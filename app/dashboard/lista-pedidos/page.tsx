@@ -1,20 +1,22 @@
 import { supabaseAdmin } from '@/lib/supabase'
 
-async function getData() {
-  const { data, count } = await supabaseAdmin
-    .from('tspoonlab_lista_pedidos')
-    .select('id, descr, year, month, pending_send, pending_receive', { count: 'exact' })
-    .order('year', { ascending: false })
-    .order('month', { ascending: false })
-    .limit(200)
-
-  return { rows: data || [], count: count || 0 }
-}
+const formatDate = (v: string | null) => v ? new Date(v).toLocaleDateString('es-ES') : '-'
 
 const MONTH_NAMES: Record<number, string> = {
   1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
   5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
   9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre',
+}
+
+async function getData() {
+  const { data, count } = await supabaseAdmin
+    .from('tspoonlab_lista_pedidos')
+    .select('id, migration_id, descr, data, year, month, pending_send, pending_receive', { count: 'exact' })
+    .order('year', { ascending: false })
+    .order('month', { ascending: false })
+    .limit(1000)
+
+  return { rows: data || [], count: count || 0 }
 }
 
 export default async function ListaPedidosPage() {
@@ -23,14 +25,14 @@ export default async function ListaPedidosPage() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Lista de Pedidos</h1>
-        <p className="text-slate-500 mt-1">{count.toLocaleString('es-ES')} registros importados</p>
+        <h1 className="text-2xl font-display font-semibold text-brand-dark">Lista de Pedidos</h1>
+        <p className="text-sm font-mono text-brand-dark/50 mt-1">{count.toLocaleString('es-ES')} registros importados</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-brand-border overflow-hidden">
         {rows.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-            <svg className="w-12 h-12 mx-auto mb-3 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="p-12 text-center text-brand-dark/40">
+            <svg className="w-12 h-12 mx-auto mb-3 text-brand-dark/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
@@ -42,6 +44,7 @@ export default async function ListaPedidosPage() {
               <thead>
                 <tr>
                   <th className="px-6 py-4">Nombre</th>
+                  <th className="px-6 py-4">Fecha</th>
                   <th className="px-6 py-4">Año</th>
                   <th className="px-6 py-4">Mes</th>
                   <th className="px-6 py-4">Pendiente Envío</th>
@@ -50,10 +53,11 @@ export default async function ListaPedidosPage() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50">
-                    <td className="px-6 font-medium text-slate-800">{row.descr || '-'}</td>
-                    <td className="px-6 text-slate-600">{row.year ?? '-'}</td>
-                    <td className="px-6 text-slate-500">
+                  <tr key={row.id} className="hover:bg-brand-bg">
+                    <td className="px-6 font-medium text-brand-dark">{row.descr || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{formatDate(row.data)}</td>
+                    <td className="px-6 text-brand-dark/70">{row.year ?? '-'}</td>
+                    <td className="px-6 text-brand-dark/70">
                       {row.month ? (MONTH_NAMES[row.month] ?? row.month) : '-'}
                     </td>
                     <td className="px-6">
@@ -62,7 +66,7 @@ export default async function ListaPedidosPage() {
                           {row.pending_send}
                         </span>
                       ) : (
-                        <span className="text-slate-400">-</span>
+                        <span className="text-brand-dark/40">-</span>
                       )}
                     </td>
                     <td className="px-6">
@@ -71,7 +75,7 @@ export default async function ListaPedidosPage() {
                           {row.pending_receive}
                         </span>
                       ) : (
-                        <span className="text-slate-400">-</span>
+                        <span className="text-brand-dark/40">-</span>
                       )}
                     </td>
                   </tr>

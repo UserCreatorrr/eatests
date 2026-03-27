@@ -18,6 +18,10 @@ const navItems = [
   {
     href: '/dashboard/proveedores',
     label: 'Proveedores',
+    children: [
+      { href: '/dashboard/proveedores', label: 'Lista' },
+      { href: '/dashboard/proveedores/detalles', label: 'Detalles' },
+    ],
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}

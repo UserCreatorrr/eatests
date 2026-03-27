@@ -5,12 +5,14 @@ function formatCurrency(amount: number | null) {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
 }
 
+const formatDate = (v: string | null) => v ? new Date(v).toLocaleDateString('es-ES') : '-'
+
 async function getData() {
   const { data, count } = await supabaseAdmin
     .from('tspoonlab_pedidos_compra')
-    .select('id, num_order, vendor, date_order, date_reception, total, sent_by', { count: 'exact' })
+    .select('id, migration_id, num_order, id_vendor, vendor, code_vendor, nif, date_order, date_formatted, date_reception, date_reception_formatted, sent_by, total', { count: 'exact' })
     .order('date_order', { ascending: false })
-    .limit(500)
+    .limit(1000)
 
   return { rows: data || [], count: count || 0 }
 }
@@ -21,14 +23,14 @@ export default async function PedidosCompraPage() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Pedidos de Compra</h1>
-        <p className="text-slate-500 mt-1">{count.toLocaleString('es-ES')} pedidos</p>
+        <h1 className="text-2xl font-display font-semibold text-brand-dark">Pedidos de Compra</h1>
+        <p className="text-sm font-mono text-brand-dark/50 mt-1">{count.toLocaleString('es-ES')} pedidos</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-brand-border overflow-hidden">
         {rows.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-            <svg className="w-12 h-12 mx-auto mb-3 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="p-12 text-center text-brand-dark/40">
+            <svg className="w-12 h-12 mx-auto mb-3 text-brand-dark/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
@@ -41,21 +43,25 @@ export default async function PedidosCompraPage() {
                 <tr>
                   <th className="px-6 py-4">Nº Pedido</th>
                   <th className="px-6 py-4">Proveedor</th>
-                  <th className="px-6 py-4">Fecha</th>
+                  <th className="px-6 py-4">Cód.Proveedor</th>
+                  <th className="px-6 py-4">NIF</th>
+                  <th className="px-6 py-4">Fecha Pedido</th>
                   <th className="px-6 py-4">Fecha Recepción</th>
-                  <th className="px-6 py-4">Total</th>
                   <th className="px-6 py-4">Enviado por</th>
+                  <th className="px-6 py-4">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50">
-                    <td className="px-6 font-mono text-sm text-slate-600">{row.num_order || '-'}</td>
-                    <td className="px-6 font-medium text-slate-700">{row.vendor || '-'}</td>
-                    <td className="px-6 text-slate-500">{row.date_order || '-'}</td>
-                    <td className="px-6 text-slate-500">{row.date_reception || '-'}</td>
-                    <td className="px-6 font-semibold text-amber-600">{formatCurrency(row.total)}</td>
-                    <td className="px-6 text-slate-500">{row.sent_by || '-'}</td>
+                  <tr key={row.id} className="hover:bg-brand-bg">
+                    <td className="px-6 font-mono text-sm text-brand-dark/70">{row.num_order || '-'}</td>
+                    <td className="px-6 font-medium text-brand-dark">{row.vendor || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{row.code_vendor || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{row.nif || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{formatDate(row.date_order)}</td>
+                    <td className="px-6 text-brand-dark/70">{formatDate(row.date_reception)}</td>
+                    <td className="px-6 text-brand-dark/70">{row.sent_by || '-'}</td>
+                    <td className="px-6 font-semibold text-brand-dark">{formatCurrency(row.total)}</td>
                   </tr>
                 ))}
               </tbody>

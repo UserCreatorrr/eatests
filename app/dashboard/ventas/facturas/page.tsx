@@ -5,12 +5,14 @@ function formatCurrency(amount: number | null) {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
 }
 
+const formatDate = (v: string | null) => v ? new Date(v).toLocaleDateString('es-ES') : '-'
+
 async function getData() {
   const { data, count } = await supabaseAdmin
     .from('tspoonlab_facturas_venta')
-    .select('id, invoice_num, customer, date_invoice, date_due, base, taxes, total, paid', { count: 'exact' })
+    .select('id, migration_id, id_customer, customer, code_customer, account_customer, nif, document_num, invoice_num, paid, comment, date_invoice, date_accounting, date_due, code_payment_type, total, base, taxes', { count: 'exact' })
     .order('date_invoice', { ascending: false })
-    .limit(500)
+    .limit(1000)
 
   return { rows: data || [], count: count || 0 }
 }
@@ -21,14 +23,14 @@ export default async function FacturasVentaPage() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Facturas de Venta</h1>
-        <p className="text-slate-500 mt-1">{count.toLocaleString('es-ES')} facturas</p>
+        <h1 className="text-2xl font-display font-semibold text-brand-dark">Facturas de Venta</h1>
+        <p className="text-sm font-mono text-brand-dark/50 mt-1">{count.toLocaleString('es-ES')} facturas</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-brand-border overflow-hidden">
         {rows.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-            <svg className="w-12 h-12 mx-auto mb-3 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="p-12 text-center text-brand-dark/40">
+            <svg className="w-12 h-12 mx-auto mb-3 text-brand-dark/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
             </svg>
@@ -40,25 +42,38 @@ export default async function FacturasVentaPage() {
               <thead>
                 <tr>
                   <th className="px-6 py-4">Nº Factura</th>
+                  <th className="px-6 py-4">Nº Doc</th>
                   <th className="px-6 py-4">Cliente</th>
+                  <th className="px-6 py-4">Cód.Cliente</th>
+                  <th className="px-6 py-4">NIF</th>
+                  <th className="px-6 py-4">Cta.Contable</th>
                   <th className="px-6 py-4">Fecha</th>
+                  <th className="px-6 py-4">Contabilización</th>
                   <th className="px-6 py-4">Vencimiento</th>
+                  <th className="px-6 py-4">Pago</th>
                   <th className="px-6 py-4">Base</th>
                   <th className="px-6 py-4">IVA</th>
                   <th className="px-6 py-4">Total</th>
                   <th className="px-6 py-4">Pagada</th>
+                  <th className="px-6 py-4">Comentario</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50">
-                    <td className="px-6 font-mono text-sm text-slate-600">{row.invoice_num || '-'}</td>
-                    <td className="px-6 font-medium text-slate-700">{row.customer || '-'}</td>
-                    <td className="px-6 text-slate-500">{row.date_invoice || '-'}</td>
-                    <td className="px-6 text-slate-500">{row.date_due || '-'}</td>
-                    <td className="px-6 text-slate-600">{formatCurrency(row.base)}</td>
-                    <td className="px-6 text-slate-600">{formatCurrency(row.taxes)}</td>
-                    <td className="px-6 font-semibold text-teal-600">{formatCurrency(row.total)}</td>
+                  <tr key={row.id} className="hover:bg-brand-bg">
+                    <td className="px-6 font-mono text-sm text-brand-dark/70">{row.invoice_num || '-'}</td>
+                    <td className="px-6 font-mono text-sm text-brand-dark/70">{row.document_num || '-'}</td>
+                    <td className="px-6 font-medium text-brand-dark">{row.customer || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{row.code_customer || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{row.nif || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{row.account_customer || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{formatDate(row.date_invoice)}</td>
+                    <td className="px-6 text-brand-dark/70">{formatDate(row.date_accounting)}</td>
+                    <td className="px-6 text-brand-dark/70">{formatDate(row.date_due)}</td>
+                    <td className="px-6 text-brand-dark/70">{row.code_payment_type || '-'}</td>
+                    <td className="px-6 text-brand-dark/70">{formatCurrency(row.base)}</td>
+                    <td className="px-6 text-brand-dark/70">{formatCurrency(row.taxes)}</td>
+                    <td className="px-6 font-semibold text-brand-dark">{formatCurrency(row.total)}</td>
                     <td className="px-6">
                       {row.paid ? (
                         <span className="badge badge-green">Sí</span>
@@ -66,6 +81,7 @@ export default async function FacturasVentaPage() {
                         <span className="badge badge-red">No</span>
                       )}
                     </td>
+                    <td className="px-6 text-brand-dark/60 text-sm max-w-xs truncate">{row.comment || '-'}</td>
                   </tr>
                 ))}
               </tbody>

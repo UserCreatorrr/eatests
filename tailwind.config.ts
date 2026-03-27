@@ -15,6 +15,8 @@ const config: Config = {
           cream: '#dfd5c9',
           darker: '#2a2522',
           'green-dim': '#0fcc5e',
+          border: '#e8e2db',
+          bg: '#f5f2ee',
         },
       },
       fontFamily: {

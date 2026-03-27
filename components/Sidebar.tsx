@@ -168,7 +168,7 @@ export default function Sidebar() {
             href="/"
             style={{
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
             gap: '6px',
               fontFamily: "'DM Mono', monospace",
               fontSize: '10px',

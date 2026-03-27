@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { supabaseAdmin } from '@/lib/supabase'
 
 const formatDate = (v: string | null) => v ? new Date(v).toLocaleDateString('es-ES') : '-'

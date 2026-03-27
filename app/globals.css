@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Brand Fonts ─────────────────────────────────────────────── */
+/* ─── Fonts ───────────────────────────────────────────────────── */
 @font-face {
   font-family: 'Chillax';
   src: url('/fonts/Chillax-Regular.otf') format('opentype');
@@ -10,7 +10,6 @@
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
   font-family: 'Chillax';
   src: url('/fonts/Chillax-Semibold.otf') format('opentype');
@@ -18,7 +17,6 @@
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
   font-family: 'DM Mono';
   src: url('/fonts/DMMono-Regular.ttf') format('truetype');
@@ -26,7 +24,6 @@
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
   font-family: 'DM Mono';
   src: url('/fonts/DMMono-Italic.ttf') format('truetype');
@@ -35,82 +32,172 @@
   font-display: swap;
 }
 
-/* ─── Design Tokens ───────────────────────────────────────────── */
+/* ─── Tokens ──────────────────────────────────────────────────── */
 :root {
-  --brand-dark:    #3d3834;
-  --brand-darker:  #2a2522;
-  --brand-green:   #19f973;
-  --brand-cream:   #dfd5c9;
-  --brand-bg:      #f5f2ee;
-  --brand-surface: #ffffff;
-  --brand-border:  #e8e2db;
+  --dark:    #3d3834;
+  --darker:  #2a2522;
+  --green:   #19f973;
+  --green-d: #0fcc5e;
+  --cream:   #dfd5c9;
+  --bg:      #f5f2ee;
+  --surface: #ffffff;
+  --border:  #e8e2db;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   font-family: 'DM Mono', monospace;
-  background-color: var(--brand-bg);
-  color: var(--brand-dark);
+  background-color: var(--bg);
+  color: var(--dark);
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Chillax', sans-serif;
+  font-weight: 600;
 }
 
 /* ─── Sidebar ─────────────────────────────────────────────────── */
 .sidebar-link {
-  @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-brand-cream/70 hover:bg-white/10 hover:text-brand-green transition-colors duration-150 font-mono text-sm;
+  @apply flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-150 text-sm font-mono;
+  color: rgba(223, 213, 201, 0.55);
+}
+.sidebar-link:hover {
+  background: rgba(255,255,255,0.07);
+  color: #19f973;
+}
+.sidebar-link.active {
+  background: rgba(25, 249, 115, 0.12);
+  color: #19f973;
 }
 
-.sidebar-link.active {
-  @apply bg-brand-green/10 text-brand-green;
+/* ─── Page sections ───────────────────────────────────────────── */
+.page-header {
+  @apply mb-8 pb-6 border-b;
+  border-color: var(--border);
+}
+.page-title {
+  font-family: 'Chillax', sans-serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: var(--dark);
+  line-height: 1.2;
+}
+.page-subtitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: rgba(61, 56, 52, 0.5);
+  margin-top: 0.25rem;
 }
 
 /* ─── Cards ───────────────────────────────────────────────────── */
 .stat-card {
-  @apply bg-white rounded-xl p-6 shadow-sm border border-brand-border;
+  @apply bg-white rounded-xl p-6 shadow-sm;
+  border: 1px solid var(--border);
+}
+.stat-card-dark {
+  background: var(--dark);
+  @apply rounded-xl p-6;
+}
+.stat-value {
+  font-family: 'Chillax', sans-serif;
+  font-weight: 600;
 }
 
 /* ─── Tables ──────────────────────────────────────────────────── */
+.table-wrap {
+  @apply bg-white rounded-xl overflow-hidden shadow-sm;
+  border: 1px solid var(--border);
+}
 .data-table {
   @apply w-full text-sm;
 }
-
+.data-table thead {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
 .data-table th {
-  @apply text-left text-xs font-semibold text-brand-dark/50 uppercase tracking-widest pb-3 border-b border-brand-border;
   font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: rgba(61, 56, 52, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  @apply text-left px-5 py-3;
 }
-
 .data-table td {
-  @apply py-3 border-b border-brand-border/50 text-brand-dark/80;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  color: rgba(61, 56, 52, 0.8);
+  @apply px-5 py-3;
+  border-bottom: 1px solid rgba(232, 226, 219, 0.6);
 }
-
-.data-table tr:last-child td {
-  @apply border-0;
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.data-table tbody tr:hover td {
+  background: var(--bg);
+}
+.data-table td.col-main {
+  font-weight: 500;
+  color: var(--dark);
+}
+.data-table td.col-mono {
+  font-family: 'DM Mono', monospace;
+  color: rgba(61,56,52,0.5);
+  font-size: 0.72rem;
+}
+.data-table td.col-amount {
+  font-family: 'Chillax', sans-serif;
+  font-weight: 600;
+  color: var(--dark);
 }
 
 /* ─── Badges ──────────────────────────────────────────────────── */
 .badge {
-  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
   font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
+.badge-green  { background: rgba(25,249,115,0.12); color: #0fcc5e; }
+.badge-red    { background: rgba(239,68,68,0.08);  color: #dc2626; }
+.badge-yellow { background: rgba(245,158,11,0.1);  color: #b45309; }
+.badge-blue   { background: rgba(59,130,246,0.08); color: #1d4ed8; }
+.badge-gray   { background: rgba(61,56,52,0.07);   color: rgba(61,56,52,0.6); }
+.badge-dark   { background: var(--dark); color: var(--cream); }
 
-.badge-green {
-  @apply bg-brand-green/10 text-brand-green;
+/* ─── Buttons ─────────────────────────────────────────────────── */
+.btn-green {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--green);
+  color: var(--darker);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.65rem 1.25rem;
+  border-radius: 10px;
+  transition: background 0.15s;
+  border: none;
+  cursor: pointer;
 }
+.btn-green:hover { background: var(--green-d); }
 
-.badge-yellow {
-  @apply bg-yellow-50 text-yellow-700;
+/* ─── Empty state ─────────────────────────────────────────────── */
+.empty-state {
+  @apply p-16 text-center;
 }
-
-.badge-blue {
-  @apply bg-blue-50 text-blue-700;
-}
-
-.badge-gray {
-  @apply bg-brand-cream/30 text-brand-dark/60;
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 1rem;
+  opacity: 0.25;
 }

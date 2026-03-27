@@ -40,18 +40,15 @@ export async function POST(req: NextRequest) {
 
   const ingList = (ctx.ingredientes as any[]).map(i =>
     `• ${i.descr} [${i.type || 'N/A'}] ${i.unit || ''}${i.cost ? ' - ' + i.cost + '€' : ' - sin coste'}`
-  ).join('
-')
+  ).join('\n')
 
   const provList = (ctx.proveedores as any[]).map(p =>
     `• ${p.codi || ''} ${p.descr} [${p.descr_type || 'N/A'}]`
-  ).join('
-')
+  ).join('\n')
 
   const orderList = (ctx.recentOrders as any[]).map(o =>
     `• ${o.vendor} | ${o.date_order} | ${o.total ? o.total + '€' : '-'}`
-  ).join('
-')
+  ).join('\n')
 
   const systemPrompt = `Eres el asistente de cocina IA de un restaurante profesional. Ayudas con la gestion diaria: ingredientes, pedidos, albaranes, costes.
 
@@ -68,7 +65,7 @@ ULTIMOS PEDIDOS:
 ${orderList}
 
 REGLAS:
-- Responde SIEMPRE en español, directo y practico
+- Responde SIEMPRE en espanol, directo y practico
 - FOTO de albaran: extrae proveedor, productos, cantidades y precios en tabla markdown
 - Nota de voz: confirma lo que entendiste y ofrece acciones
 - Sugiere cantidades de pedido basandote en historico

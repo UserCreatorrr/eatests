@@ -1,2 +1,10 @@
 import OpenAI from 'openai'
-export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+let _openai: OpenAI | null = null
+
+export const openai = new Proxy({} as OpenAI, {
+  get(_, prop) {
+    if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    return (_openai as unknown as Record<string | symbol, unknown>)[prop]
+  },
+})

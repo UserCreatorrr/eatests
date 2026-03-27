@@ -1,4 +1,5 @@
 import Sidebar from '@/components/Sidebar'
+import AIChatPanel from '@/components/AIChatPanel'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,6 +8,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 overflow-auto min-w-0">
         {children}
       </main>
+      <AIChatPanel />
     </div>
   )
 }

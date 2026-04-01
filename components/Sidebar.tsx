@@ -95,7 +95,7 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="w-60 flex flex-col min-h-screen flex-shrink-0" style={{ backgroundColor: '#3d3834' }}>
+    <aside className="w-60 flex flex-col min-h-screen flex-shrink-0" style={{ backgroundColor: '#3d3834', backgroundImage: "url('/logos/GRID_NEGATIVE.png')", backgroundRepeat: 'repeat', backgroundSize: '400px 400px' }}>
       <div className="px-5 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <Image
           src="/logos/logo-bicolor-negative.svg"

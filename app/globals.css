@@ -49,6 +49,9 @@
 body {
   font-family: 'DM Mono', monospace;
   background-color: var(--bg);
+  background-image: url('/logos/GRID_POSITIVIE.png');
+  background-repeat: repeat;
+  background-size: 400px 400px;
   color: var(--dark);
   -webkit-font-smoothing: antialiased;
 }

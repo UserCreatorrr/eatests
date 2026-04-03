@@ -115,7 +115,7 @@ export default function KitchenChat() {
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f5f2ee', backgroundImage: "url('/logos/GRID_POSITIVIE.png')", backgroundRepeat: 'repeat', backgroundSize: '400px 400px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f5f2ee' }}>
 
       {/* Header */}
       <div style={{ flexShrink: 0, padding: '32px 40px 16px' }}>

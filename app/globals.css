@@ -58,29 +58,6 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
 }
 
-/* ─── Main grid background ────────────────────────────────────── */
-.main-grid {
-  position: relative;
-  background-color: var(--bg);
-}
-.main-grid::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 240px; /* sidebar width */
-  background-image: url('/logos/GRID_POSITIVIE.png');
-  background-repeat: repeat;
-  background-size: 400px 400px;
-  opacity: 0.045;
-  pointer-events: none;
-  z-index: 0;
-}
-.main-grid > * {
-  position: relative;
-  z-index: 1;
-}
 
 /* ─── Sidebar ─────────────────────────────────────────────────── */
 .sidebar-link {

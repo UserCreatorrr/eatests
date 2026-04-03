@@ -4,7 +4,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex" style={{ backgroundColor: '#f5f2ee', minHeight: '100vh' }}>
       <Sidebar />
-      <main className="flex-1 min-w-0 overflow-hidden" style={{ backgroundImage: "url('/logos/GRID_POSITIVIE.png')", backgroundRepeat: 'repeat', backgroundSize: '400px 400px' }}>{children}</main>
+      <main className="flex-1 min-w-0 overflow-hidden main-grid">{children}</main>
     </div>
   )
 }

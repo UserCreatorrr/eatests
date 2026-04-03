@@ -117,24 +117,16 @@ export default function KitchenChat() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f5f2ee' }}>
 
-      {/* Header */}
-      <div style={{ flexShrink: 0, padding: '32px 40px 16px' }}>
-        <div style={{ maxWidth: '720px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: '22px', color: '#3d3834', margin: 0 }}>
-              Asistente de Cocina
-            </h1>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#3d3834', opacity: 0.4, marginTop: 3 }}>
-              GPT-4o mini &middot; Whisper-1 &middot; Vision de albaranes
-            </p>
-          </div>
-          {messages.length > 0 && (
+
+      {messages.length > 0 && (
+        <div style={{ flexShrink: 0, padding: '16px 40px 0', display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ maxWidth: '720px', width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
             <button onClick={() => setMessages([])} style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#3d3834', opacity: 0.4, background: 'none', border: 'none', cursor: 'pointer' }}>
               Nueva conversacion
             </button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 40px 16px' }}>

@@ -78,24 +78,24 @@ const tools: any[] = [
   },
 ]
 
-async function executeTool(name: string, args: any, userId: string, baseUrl: string): Promise<string> {
-  const entityMap: Record<string, string> = {
+async function executeTool(name: string, args: any, userId: string): Promise<string> {
+  const tableMap: Record<string, string> = {
     crear_ingrediente: 'ingredientes',
     crear_proveedor: 'proveedores',
-    crear_pedido: 'pedidos-compra',
+    crear_pedido: 'pedidos_compra',
+    crear_herramienta: 'herramientas',
+    crear_albaran: 'albaranes_compra',
   }
-  const entity = entityMap[name]
-  if (!entity) return 'Herramienta no reconocida'
+  const table = tableMap[name]
+  if (!table) return 'Herramienta no reconocida'
 
   try {
-    const res = await fetch(`${baseUrl}/api/data/${entity}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Cookie: `mb_session=${userId}` },
-      body: JSON.stringify(args),
-    })
-    const json = await res.json()
-    if (!res.ok) return `Error: ${json.error}`
-    return `Creado con id ${json.id}`
+    const { id: _id, user_id: _uid, ...fields } = args
+    const columns = ['user_id', ...Object.keys(fields)]
+    const values = [userId, ...Object.values(fields)]
+    const placeholders = columns.map(() => '?').join(', ')
+    const result = db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`).run(...values)
+    return `Creado en ${table} con id ${result.lastInsertRowid}`
   } catch (e: any) {
     return `Error: ${e.message}`
   }
@@ -167,11 +167,10 @@ REGLAS:
 
   // Handle function calls
   if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
-    const origin = new URL(req.url).origin
     const results: string[] = []
     for (const toolCall of choice.message.tool_calls) {
       const args = JSON.parse(toolCall.function.arguments)
-      const result = await executeTool(toolCall.function.name, args, user?.id ?? '', origin)
+      const result = await executeTool(toolCall.function.name, args, user?.id ?? '')
       results.push(`${toolCall.function.name}: ${result}`)
     }
 

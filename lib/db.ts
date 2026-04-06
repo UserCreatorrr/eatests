@@ -197,15 +197,12 @@ function initSchema(db: Database.Database) {
     );
   `)
 
-  // Seed hardcoded admin user
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get('pabloperez@visualandgrowth.es')
-  if (!existing) {
-    const hash = bcrypt.hashSync('Marginbites2026+', 10)
-    db.prepare(`
-      INSERT INTO users (id, email, password_hash, name)
-      VALUES ('pablo-admin', 'pabloperez@visualandgrowth.es', ?, 'Pablo Perez')
-    `).run(hash)
-  }
+  // Seed hardcoded admin user - INSERT OR IGNORE makes this safe to run multiple times
+  const hash = bcrypt.hashSync('Marginbites2026+', 10)
+  db.prepare(`
+    INSERT OR IGNORE INTO users (id, email, password_hash, name)
+    VALUES ('pablo-admin', 'pabloperez@visualandgrowth.es', ?, 'Pablo Perez')
+  `).run(hash)
 }
 
 function getDb(): Database.Database {
@@ -216,7 +213,17 @@ function getDb(): Database.Database {
   return global._db
 }
 
-export default getDb()
+// Lazy proxy: the DB is only opened when a method is first called (at request time, not at import time)
+// This prevents Next.js from failing during 'Collecting page data' at build time
+const db = new Proxy({} as Database.Database, {
+  get(_target, prop) {
+    const instance = getDb()
+    const val = (instance as any)[prop]
+    return typeof val === 'function' ? val.bind(instance) : val
+  },
+})
+
+export default db
 
 export type User = {
   id: string

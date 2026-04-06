@@ -1,33 +1,33 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import db from '@/lib/db'
+
+const TABLE_MAP: Record<string, string> = {
+  tspoonlab_proveedores: 'proveedores',
+  tspoonlab_pedidos_compra: 'pedidos_compra',
+  tspoonlab_albaranes_compra: 'albaranes_compra',
+  tspoonlab_facturas_compra: 'facturas_compra',
+  tspoonlab_albaranes_venta: 'albaranes_venta',
+  tspoonlab_facturas_venta: 'facturas_venta',
+  tspoonlab_ingredientes: 'ingredientes',
+  tspoonlab_herramientas: 'herramientas',
+  tspoonlab_lista_pedidos: 'lista_pedidos',
+}
 
 export async function GET() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'NOT SET'
-
-  const tables = [
-    'tspoonlab_proveedores',
-    'tspoonlab_pedidos_compra',
-    'tspoonlab_albaranes_compra',
-    'tspoonlab_facturas_compra',
-    'tspoonlab_albaranes_venta',
-    'tspoonlab_facturas_venta',
-    'tspoonlab_ingredientes',
-    'tspoonlab_herramientas',
-    'tspoonlab_lista_pedidos',
-  ]
-
   const counts: Record<string, number | string> = {}
 
-  for (const table of tables) {
-    const { count, error } = await supabaseAdmin
-      .from(table)
-      .select('*', { count: 'exact', head: true })
-    counts[table] = error ? `ERROR: ${error.message}` : (count ?? 0)
+  for (const [key, table] of Object.entries(TABLE_MAP)) {
+    try {
+      const row = db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get() as any
+      counts[key] = row?.c ?? 0
+    } catch (e: any) {
+      counts[key] = `ERROR: ${e.message}`
+    }
   }
 
   return NextResponse.json({
     status: 'ok',
-    supabase_url: url,
+    backend: 'sqlite',
     tables: counts,
   })
 }

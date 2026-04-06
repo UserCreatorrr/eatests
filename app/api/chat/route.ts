@@ -1,42 +1,31 @@
 import { openai } from '@/lib/openai'
-import { supabaseAdmin } from '@/lib/supabase'
+import db from '@/lib/db'
+import { getUserFromRequest } from '@/lib/auth'
 import { NextRequest } from 'next/server'
 
-async function getKitchenContext() {
-  const [
-    { count: nIngredientes },
-    { count: nProveedores },
-    { count: nPedidos },
-    { count: nAlbaranes },
-    { count: nHerramientas },
-  ] = await Promise.all([
-    supabaseAdmin.from('tspoonlab_ingredientes').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('tspoonlab_proveedores').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('tspoonlab_pedidos_compra').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('tspoonlab_albaranes_compra').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('tspoonlab_herramientas').select('*', { count: 'exact', head: true }),
-  ])
+function getKitchenContext(userId: string) {
+  const nIngredientes = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id = ?').get(userId) as any)?.c ?? 0
+  const nProveedores = (db.prepare('SELECT COUNT(*) as c FROM proveedores WHERE user_id = ?').get(userId) as any)?.c ?? 0
+  const nPedidos = (db.prepare('SELECT COUNT(*) as c FROM pedidos_compra WHERE user_id = ?').get(userId) as any)?.c ?? 0
+  const nAlbaranes = (db.prepare('SELECT COUNT(*) as c FROM albaranes_compra WHERE user_id = ?').get(userId) as any)?.c ?? 0
+  const nHerramientas = (db.prepare('SELECT COUNT(*) as c FROM herramientas WHERE user_id = ?').get(userId) as any)?.c ?? 0
 
-  const [{ data: ingredientes }, { data: proveedores }, { data: recentOrders }] = await Promise.all([
-    supabaseAdmin.from('tspoonlab_ingredientes').select('descr, type, unit, cost').order('descr').limit(80),
-    supabaseAdmin.from('tspoonlab_proveedores').select('codi, descr, descr_type').order('descr').limit(40),
-    supabaseAdmin.from('tspoonlab_pedidos_compra')
-      .select('num_order, vendor, date_order, total')
-      .order('date_order', { ascending: false })
-      .limit(10),
-  ])
+  const ingredientes = db.prepare('SELECT descr, type, unit, cost FROM ingredientes WHERE user_id = ? ORDER BY descr LIMIT 80').all(userId)
+  const proveedores = db.prepare('SELECT codi, descr, descr_type FROM proveedores WHERE user_id = ? ORDER BY descr LIMIT 40').all(userId)
+  const recentOrders = db.prepare('SELECT num_order, vendor, date_order, total FROM pedidos_compra WHERE user_id = ? ORDER BY date_order DESC LIMIT 10').all(userId)
 
   return {
     counts: { nIngredientes, nProveedores, nPedidos, nAlbaranes, nHerramientas },
-    ingredientes: ingredientes || [],
-    proveedores: proveedores || [],
-    recentOrders: recentOrders || [],
+    ingredientes,
+    proveedores,
+    recentOrders,
   }
 }
 
 export async function POST(req: NextRequest) {
+  const user = await getUserFromRequest(req)
   const { messages, image } = await req.json()
-  const ctx = await getKitchenContext()
+  const ctx = getKitchenContext(user?.id ?? '')
 
   const ingList = (ctx.ingredientes as any[]).map(i =>
     `• ${i.descr} [${i.type || 'N/A'}] ${i.unit || ''}${i.cost ? ' - ' + i.cost + '€' : ' - sin coste'}`

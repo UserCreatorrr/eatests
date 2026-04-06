@@ -149,14 +149,8 @@ export default function Sidebar() {
 }
 
 function SidebarUser() {
-  const supabase = typeof window !== 'undefined'
-    ? (require('@/lib/supabase-browser').createSupabaseBrowserClient)()
-    : null
-
   async function signOut() {
-    const { createSupabaseBrowserClient } = await import('@/lib/supabase-browser')
-    const sb = createSupabaseBrowserClient()
-    await sb.auth.signOut()
+    await fetch('/api/auth/logout', { method: 'POST' })
     window.location.href = '/login'
   }
 

@@ -13,8 +13,8 @@ function getKitchenContext(userId: string) {
   const nHerramientas = (db.prepare('SELECT COUNT(*) as c FROM herramientas WHERE user_id = ?').get(userId) as any)?.c ?? 0
 
   const ingredientes = db.prepare('SELECT descr, type, unit, cost FROM ingredientes WHERE user_id = ? ORDER BY descr LIMIT 80').all(userId)
-  const proveedores = db.prepare('SELECT codi, descr, descrType FROM proveedores WHERE user_id = ? ORDER BY descr LIMIT 40').all(userId)
-  const recentOrders = db.prepare('SELECT numOrder, vendor, dateOrder, total FROM pedidos_compra WHERE user_id = ? ORDER BY dateOrder DESC LIMIT 10').all(userId)
+  const proveedores = db.prepare('SELECT codi, descr, descr_type FROM proveedores WHERE user_id = ? ORDER BY descr LIMIT 40').all(userId)
+  const recentOrders = db.prepare('SELECT num_order, vendor, date_order, total FROM pedidos_compra WHERE user_id = ? ORDER BY date_order DESC LIMIT 10').all(userId)
 
   return {
     counts: { nIngredientes, nProveedores, nPedidos, nAlbaranes, nHerramientas },
@@ -111,11 +111,11 @@ export async function POST(req: NextRequest) {
   ).join('\n')
 
   const provList = (ctx.proveedores as any[]).map(p =>
-    `• ${p.codi || ''} ${p.descr} [${p.descrType || 'N/A'}]`
+    `• ${p.codi || ''} ${p.descr} [${p.descr_type || 'N/A'}]`
   ).join('\n')
 
   const orderList = (ctx.recentOrders as any[]).map(o =>
-    `• ${o.vendor} | ${o.dateOrder ? new Date(o.dateOrder).toLocaleDateString('es-ES') : '-'} | ${o.total ? o.total + '\u20ac' : '-'}`
+    `• ${o.vendor} | ${o.date_order || '-'} | ${o.total ? o.total + '\u20ac' : '-'}`
   ).join('\n')
 
   const systemPrompt = `Eres el asistente de cocina IA de un restaurante profesional. Ayudas con la gestion diaria: ingredientes, pedidos, albaranes, costes.

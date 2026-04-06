@@ -7,7 +7,6 @@ const DB_PATH =
   process.env.DB_PATH ||
   (process.env.NODE_ENV === 'production' ? '/data/marginbites.db' : './marginbites.db')
 
-// Ensure the directory exists before opening (needed at build time and runtime)
 fs.mkdirSync(path.dirname(path.resolve(DB_PATH)), { recursive: true })
 
 declare global {
@@ -15,14 +14,13 @@ declare global {
   var _db: Database.Database | undefined
 }
 
-// Bump this number whenever the schema changes to trigger a rebuild of entity tables
-const SCHEMA_VERSION = 2
+// Bump when schema changes — triggers drop+recreate of entity tables
+const SCHEMA_VERSION = 3
 
 function initSchema(db: Database.Database) {
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
 
-  // Users table — never dropped
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id            TEXT PRIMARY KEY,
@@ -30,15 +28,12 @@ function initSchema(db: Database.Database) {
       password_hash TEXT,
       name          TEXT,
       google_id     TEXT UNIQUE,
+      avatar        TEXT,
       created_at    TEXT DEFAULT (datetime('now'))
     );
-
-    CREATE TABLE IF NOT EXISTS _schema_version (
-      version INTEGER NOT NULL
-    );
+    CREATE TABLE IF NOT EXISTS _schema_version (version INTEGER NOT NULL);
   `)
 
-  // Check schema version and rebuild entity tables if outdated
   const row = db.prepare('SELECT version FROM _schema_version LIMIT 1').get() as { version: number } | undefined
   if (!row || row.version < SCHEMA_VERSION) {
     db.exec(`
@@ -58,44 +53,44 @@ function initSchema(db: Database.Database) {
     `)
   }
 
-  // Entity tables — column names match TSpoonLab camelCase exactly
+  // Column names match EXACTLY what node "12. Preparar Payload" sends to /api/ingest
   db.exec(`
     CREATE TABLE IF NOT EXISTS ingredientes (
-      id        TEXT PRIMARY KEY,
-      user_id   TEXT NOT NULL REFERENCES users(id),
-      codi      TEXT,
-      descr     TEXT,
-      type      TEXT,
-      hasData   INTEGER,
-      unit      TEXT,
-      idUnit    INTEGER,
-      cost      REAL,
-      color     TEXT
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT NOT NULL REFERENCES users(id),
+      codi       TEXT,
+      descr      TEXT,
+      type       TEXT,
+      has_data   INTEGER,
+      unit       TEXT,
+      id_unit    INTEGER,
+      cost       REAL,
+      color      TEXT
     );
 
     CREATE TABLE IF NOT EXISTS herramientas (
-      id        TEXT PRIMARY KEY,
-      user_id   TEXT NOT NULL REFERENCES users(id),
-      codi      TEXT,
-      descr     TEXT,
-      type      TEXT,
-      hasData   INTEGER,
-      unit      TEXT,
-      idUnit    INTEGER,
-      cost      REAL
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT NOT NULL REFERENCES users(id),
+      codi       TEXT,
+      descr      TEXT,
+      type       TEXT,
+      has_data   INTEGER,
+      unit       TEXT,
+      id_unit    INTEGER,
+      cost       REAL
     );
 
     CREATE TABLE IF NOT EXISTS proveedores (
-      id          TEXT PRIMARY KEY,
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id     TEXT NOT NULL REFERENCES users(id),
       codi        TEXT,
       descr       TEXT,
       defecte     INTEGER,
-      descrType   TEXT,
-      idType      TEXT,
-      hasOther    INTEGER,
+      descr_type  TEXT,
+      id_type     TEXT,
+      has_other   INTEGER,
       nif         TEXT,
-      altDescr    TEXT,
+      alt_descr   TEXT,
       comment     TEXT,
       address     TEXT,
       city        TEXT,
@@ -103,9 +98,9 @@ function initSchema(db: Database.Database) {
       contact     TEXT,
       phone       TEXT,
       mail        TEXT,
-      contactAux  TEXT,
-      phoneAux    TEXT,
-      mailAux     TEXT,
+      contact_aux TEXT,
+      phone_aux   TEXT,
+      mail_aux    TEXT,
       mailcc      TEXT,
       web         TEXT,
       locked      INTEGER,
@@ -113,80 +108,73 @@ function initSchema(db: Database.Database) {
     );
 
     CREATE TABLE IF NOT EXISTS proveedores_detalle (
-      id          TEXT PRIMARY KEY,
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id     TEXT NOT NULL REFERENCES users(id),
       codi        TEXT,
       descr       TEXT,
       nif         TEXT,
-      altDescr    TEXT,
       comment     TEXT,
-      deliveryComment TEXT,
-      mailcc      TEXT,
+      mail_cc     TEXT,
       web         TEXT,
+      creditor    INTEGER,
       address     TEXT,
       city        TEXT,
-      cp          TEXT,
-      contact     TEXT,
-      phone       TEXT,
-      mail        TEXT,
-      contactAux  TEXT,
-      phoneAux    TEXT,
-      mailAux     TEXT
+      cp          TEXT
     );
 
     CREATE TABLE IF NOT EXISTS lista_pedidos (
-      id              TEXT PRIMARY KEY,
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id         TEXT NOT NULL REFERENCES users(id),
       descr           TEXT,
       data            TEXT,
       defecte         INTEGER,
       year            INTEGER,
       month           INTEGER,
-      pendingSend     INTEGER,
-      pendingReceive  INTEGER,
+      pending_send    INTEGER,
+      pending_receive INTEGER,
       locked          INTEGER,
       replicated      INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS pedidos_compra (
-      id              TEXT PRIMARY KEY,
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id         TEXT NOT NULL REFERENCES users(id),
-      numOrder        TEXT,
+      num_order       TEXT,
       vendor          TEXT,
-      codeVendor      TEXT,
+      code_vendor     TEXT,
       nif             TEXT,
-      dateOrder       INTEGER,
-      dateReception   INTEGER,
-      sentBy          TEXT,
+      date_order      TEXT,
+      date_reception  TEXT,
+      sent_by         TEXT,
       total           REAL
     );
 
     CREATE TABLE IF NOT EXISTS albaranes_compra (
-      id              TEXT PRIMARY KEY,
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id         TEXT NOT NULL REFERENCES users(id),
+      delivery_num    TEXT,
       vendor          TEXT,
-      deliveryNum     TEXT,
+      code_vendor     TEXT,
       nif             TEXT,
-      date            INTEGER,
-      dateFormatted   TEXT,
-      dateSent        INTEGER,
-      dateSentFormatted TEXT,
-      sentBy          TEXT,
-      receivedBy      TEXT,
+      delivery_for    TEXT,
+      date_delivery   TEXT,
+      date_sent       TEXT,
+      sent_by         TEXT,
+      received_by     TEXT,
       base            REAL,
       taxes           REAL,
       total           REAL,
-      costType        TEXT,
-      codeCostType    TEXT
+      cost_type       TEXT,
+      vendor_type     TEXT
     );
 
     CREATE TABLE IF NOT EXISTS albaranes_venta (
-      id              TEXT PRIMARY KEY,
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id         TEXT NOT NULL REFERENCES users(id),
-      idCustomer      TEXT,
+      invoice_num     TEXT,
       customer        TEXT,
-      customerCode    TEXT,
-      customerType    TEXT,
+      customer_code   TEXT,
+      customer_type   TEXT,
       nif             TEXT,
       contact         TEXT,
       phone           TEXT,
@@ -194,73 +182,66 @@ function initSchema(db: Database.Database) {
       address         TEXT,
       cp              TEXT,
       city            TEXT,
-      invoiceNum      TEXT,
-      date            INTEGER,
+      date_delivery   TEXT,
       base            REAL
     );
 
     CREATE TABLE IF NOT EXISTS facturas_compra (
-      id                TEXT PRIMARY KEY,
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id           TEXT NOT NULL REFERENCES users(id),
-      idVendor          TEXT,
+      invoice_num       TEXT,
+      document_num      TEXT,
       vendor            TEXT,
-      codeVendor        TEXT,
-      accountVendor     TEXT,
+      code_vendor       TEXT,
       nif               TEXT,
-      documentNum       TEXT,
-      invoiceNum        TEXT,
+      account_vendor    TEXT,
+      date_invoice      TEXT,
+      date_accounting   TEXT,
+      date_due          TEXT,
+      code_payment_type TEXT,
+      base              REAL,
+      taxes             REAL,
+      total             REAL,
       paid              INTEGER,
       validated         INTEGER,
-      comment           TEXT,
-      date              INTEGER,
-      dateAccounting    INTEGER,
-      dateDue           INTEGER,
-      codePaymentType   TEXT,
-      total             REAL,
-      base              REAL,
-      taxes             REAL
+      comment           TEXT
     );
 
     CREATE TABLE IF NOT EXISTS facturas_venta (
-      id                TEXT PRIMARY KEY,
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id           TEXT NOT NULL REFERENCES users(id),
-      idCustomer        TEXT,
+      invoice_num       TEXT,
+      document_num      TEXT,
       customer          TEXT,
-      codeCustomer      TEXT,
-      accountCustomer   TEXT,
+      code_customer     TEXT,
       nif               TEXT,
-      documentNum       TEXT,
-      invoiceNum        TEXT,
-      paid              INTEGER,
-      comment           TEXT,
-      date              INTEGER,
-      dateAccounting    INTEGER,
-      dateDue           INTEGER,
-      codePaymentType   TEXT,
-      total             REAL,
+      account_customer  TEXT,
+      date_invoice      TEXT,
+      date_accounting   TEXT,
+      date_due          TEXT,
+      code_payment_type TEXT,
       base              REAL,
-      taxes             REAL
+      taxes             REAL,
+      total             REAL,
+      paid              INTEGER,
+      comment           TEXT
     );
 
     CREATE TABLE IF NOT EXISTS escandallo_receta (
-      id           TEXT PRIMARY KEY,
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id      TEXT NOT NULL REFERENCES users(id),
       nombre       TEXT,
       categoria    TEXT,
       descripcion  TEXT,
       raciones     INTEGER,
-      precioVenta  REAL,
+      precio_venta REAL,
       ingredientes TEXT,
-      mermaPct     REAL,
+      merma_pct    REAL,
       notas        TEXT,
       activo       INTEGER DEFAULT 1
     );
   `)
 
-  // Add avatar column to users if it doesn't exist (safe migration)
-  try { db.exec(`ALTER TABLE users ADD COLUMN avatar TEXT`) } catch {}
-
-  // Seed admin user
   const hash = bcrypt.hashSync('Marginbites2026+', 10)
   db.prepare(`
     INSERT OR IGNORE INTO users (id, email, password_hash, name)
@@ -276,7 +257,6 @@ function getDb(): Database.Database {
   return global._db
 }
 
-// Lazy proxy: DB only opens on first method call (not at import time / build time)
 const db = new Proxy({} as Database.Database, {
   get(_target, prop) {
     const instance = getDb()
@@ -292,5 +272,6 @@ export type User = {
   email: string
   name: string | null
   google_id: string | null
+  avatar: string | null
   created_at: string
 }

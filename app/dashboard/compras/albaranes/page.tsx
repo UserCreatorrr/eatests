@@ -1,19 +1,21 @@
 'use client'
-
 import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
 
 const fields: FieldDef[] = [
+  { key: 'delivery_num', label: 'Nº Albaran' },
   { key: 'vendor', label: 'Proveedor' },
-  { key: 'deliveryNum', label: 'Nº Albaran' },
+  { key: 'code_vendor', label: 'Cod. Proveedor' },
   { key: 'nif', label: 'NIF' },
-  { key: 'date', label: 'Fecha (timestamp ms)', type: 'number' },
-  { key: 'sentBy', label: 'Enviado por' },
-  { key: 'receivedBy', label: 'Recibido por' },
+  { key: 'delivery_for', label: 'Entregado para' },
+  { key: 'date_delivery', label: 'Fecha Entrega' },
+  { key: 'date_sent', label: 'Fecha Envio' },
+  { key: 'sent_by', label: 'Enviado por' },
+  { key: 'received_by', label: 'Recibido por' },
   { key: 'base', label: 'Base (EUR)', type: 'number' },
   { key: 'taxes', label: 'IVA (EUR)', type: 'number' },
   { key: 'total', label: 'Total (EUR)', type: 'number' },
-  { key: 'costType', label: 'Tipo coste' },
-  { key: 'codeCostType', label: 'Cod. coste' },
+  { key: 'cost_type', label: 'Tipo coste' },
+  { key: 'vendor_type', label: 'Tipo proveedor' },
 ]
 
 function fmt(v: number | null) {
@@ -21,22 +23,18 @@ function fmt(v: number | null) {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
 }
 
-function fmtDate(ts: number | null) {
-  if (!ts) return '-'
-  return new Date(ts).toLocaleDateString('es-ES')
-}
-
 const columns: ColDef[] = [
-  { label: 'Nº Albaran', render: r => r.deliveryNum || '-', className: 'col-mono' },
+  { label: 'Nº Albaran', render: r => r.delivery_num || '-', className: 'col-mono' },
   { label: 'Proveedor', render: r => r.vendor || '-', className: 'col-main' },
   { label: 'NIF', render: r => r.nif || '-', className: 'col-mono' },
-  { label: 'Fecha', render: r => r.dateFormatted || fmtDate(r.date) },
-  { label: 'Enviado por', render: r => r.sentBy || '-' },
-  { label: 'Recibido por', render: r => r.receivedBy || '-' },
+  { label: 'Para', render: r => r.delivery_for || '-' },
+  { label: 'Fecha Entrega', render: r => r.date_delivery || '-' },
+  { label: 'Enviado por', render: r => r.sent_by || '-' },
+  { label: 'Recibido por', render: r => r.received_by || '-' },
   { label: 'Base', render: r => fmt(r.base) },
   { label: 'IVA', render: r => fmt(r.taxes) },
   { label: 'Total', render: r => fmt(r.total), className: 'col-amount' },
-  { label: 'Tipo coste', render: r => r.costType || '-' },
+  { label: 'Tipo coste', render: r => r.cost_type || '-' },
 ]
 
 export default function AlbaranesCompraPage() {

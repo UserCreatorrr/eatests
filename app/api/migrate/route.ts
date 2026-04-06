@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 const N8N_WEBHOOK_URL =
   process.env.N8N_WEBHOOK_URL ||
-  'https://esencia-paradise-n8n.rh6pum.easypanel.host/webhook-test/34f8720f-8faa-416c-bb5e-f4ea1d54686f'
+  'https://esencia-paradise-n8n.rh6pum.easypanel.host/webhook/34f8720f-8faa-416c-bb5e-f4ea1d54686f'
 
 export async function POST(req: NextRequest) {
   const user = await getUserFromRequest(req)

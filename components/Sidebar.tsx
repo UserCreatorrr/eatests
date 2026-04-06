@@ -88,6 +88,15 @@ const navItems = [
     ),
   },
   {
+    href: '/dashboard/analytics',
+    label: 'Analytics',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 16v-4M11 16V8M15 16v-6M19 16V6" />
+      </svg>
+    ),
+  },
+  {
     href: '/dashboard/alertas',
     label: 'Alertas',
     icon: (

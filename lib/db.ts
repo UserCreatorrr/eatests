@@ -241,6 +241,18 @@ function initSchema(db: Database.Database) {
       activo       INTEGER DEFAULT 1
     );
 
+    CREATE TABLE IF NOT EXISTS escandallo_lineas (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      receta_id       INTEGER NOT NULL,
+      user_id         TEXT NOT NULL REFERENCES users(id),
+      ingrediente_id  INTEGER,
+      nombre_libre    TEXT,
+      cantidad        REAL NOT NULL DEFAULT 0,
+      unidad          TEXT,
+      coste_unitario  REAL,
+      created_at      TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS notifications (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id    TEXT NOT NULL REFERENCES users(id),

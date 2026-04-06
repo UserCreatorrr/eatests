@@ -1,61 +1,39 @@
-export const dynamic = 'force-dynamic'
+'use client'
 
-import { requireServerUser } from '@/lib/auth'
-import db from '@/lib/db'
+import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
 
-function formatCurrency(amount: number | null) {
-  if (amount === null || amount === undefined) return '-'
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
+const fields: FieldDef[] = [
+  { key: 'invoice_num', label: 'Nº Albaran' },
+  { key: 'customer', label: 'Cliente' },
+  { key: 'customer_code', label: 'Cod. Cliente' },
+  { key: 'customer_type', label: 'Tipo cliente' },
+  { key: 'nif', label: 'NIF' },
+  { key: 'contact', label: 'Contacto' },
+  { key: 'phone', label: 'Telefono' },
+  { key: 'mail', label: 'Email' },
+  { key: 'address', label: 'Direccion' },
+  { key: 'cp', label: 'CP' },
+  { key: 'city', label: 'Ciudad' },
+  { key: 'date_delivery', label: 'Fecha Entrega', type: 'date' },
+  { key: 'base', label: 'Base (EUR)', type: 'number' },
+]
+
+function fmt(v: number | null) {
+  if (v == null) return '-'
+  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
 }
 
-type Row = {
-  id: number; invoice_num: string | null; customer: string | null; customer_code: string | null
-  customer_type: string | null; nif: string | null; contact: string | null
-  phone: string | null; mail: string | null; address: string | null
-  cp: string | null; city: string | null; date_delivery: string | null; base: number | null
-}
+const columns: ColDef[] = [
+  { label: 'Nº Albaran', render: r => r.invoice_num || '-', className: 'col-mono' },
+  { label: 'Cliente', render: r => r.customer || '-', className: 'col-main' },
+  { label: 'Tipo', render: r => r.customer_type || '-' },
+  { label: 'NIF', render: r => r.nif || '-', className: 'col-mono' },
+  { label: 'Contacto', render: r => r.contact || '-' },
+  { label: 'Ciudad', render: r => [r.city, r.cp].filter(Boolean).join(' ') || '-' },
+  { label: 'Fecha', render: r => r.date_delivery || '-' },
+  { label: 'Base', render: r => fmt(r.base), className: 'col-amount' },
+]
 
-export default async function AlbaranesVentaPage() {
-  const user = await requireServerUser()
-  const rows = db.prepare('SELECT * FROM albaranes_venta WHERE user_id = ? ORDER BY date_delivery DESC').all(user.id) as Row[]
-
-  return (
-    <div className="p-8">
-      <div className="page-header">
-        <h1 className="page-title">Albaranes de Venta</h1>
-        <p className="page-subtitle">{rows.length.toLocaleString('es-ES')} albaranes</p>
-      </div>
-
-      <div className="table-wrap">
-        {rows.length === 0 ? (
-          <div className="empty-state"><p className="page-subtitle">Sin albaranes importados.</p></div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Nº Albaran</th><th>Cliente</th><th>Tipo</th>
-                  <th>NIF</th><th>Contacto</th><th>Ciudad</th><th>Fecha</th><th>Base</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(row => (
-                  <tr key={row.id}>
-                    <td className="col-mono">{row.invoice_num || '-'}</td>
-                    <td className="col-main">{row.customer || '-'}</td>
-                    <td>{row.customer_type || '-'}</td>
-                    <td className="col-mono">{row.nif || '-'}</td>
-                    <td>{row.contact || '-'}</td>
-                    <td>{[row.city, row.cp].filter(Boolean).join(' ') || '-'}</td>
-                    <td>{row.date_delivery || '-'}</td>
-                    <td className="col-amount">{formatCurrency(row.base)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  )
+export default function AlbaranesVentaPage() {
+  return <CRUDPage title="Albaranes de Venta" entity="albaranes-venta" fields={fields} columns={columns} />
 }

@@ -3,6 +3,8 @@ import { randomUUID } from 'crypto'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 const ALLOWED_TABLES = new Set([
   'ingredientes',
   'herramientas',
@@ -67,14 +69,17 @@ export async function POST(
   }
 
   const body = await req.json()
-  const { user_id: _skip, id: _id, ...fields } = body
+  const { user_id: _skip, ...fields } = body
+
+  // Generate a UUID if no id provided (user-created records)
+  if (!fields.id) fields.id = randomUUID()
 
   const columns = ['user_id', ...Object.keys(fields)]
   const values = [user.id, ...Object.values(fields)]
   const placeholders = columns.map(() => '?').join(', ')
 
-  const stmt = db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`)
-  const result = stmt.run(...values)
+  const stmt = db.prepare(`INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`)
+  stmt.run(...values)
 
-  return NextResponse.json({ ok: true, id: result.lastInsertRowid })
+  return NextResponse.json({ ok: true, id: fields.id })
 }

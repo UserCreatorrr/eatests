@@ -11,7 +11,7 @@ const fields: FieldDef[] = [
   { key: 'color', label: 'Color' },
 ]
 
-function formatCurrency(v: number | null) {
+function fmt(v: number | null) {
   if (v == null) return '-'
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
 }
@@ -20,8 +20,9 @@ const columns: ColDef[] = [
   { label: 'Codigo', render: r => r.codi || '-', className: 'col-mono' },
   { label: 'Nombre', render: r => r.descr || '-', className: 'col-main' },
   { label: 'Tipo', render: r => r.type || '-' },
+  { label: 'Con datos', render: r => r.hasData ? <span className="badge badge-green">Si</span> : <span className="badge badge-gray">No</span> },
   { label: 'Unidad', render: r => r.unit || '-' },
-  { label: 'Coste', render: r => formatCurrency(r.cost), className: 'col-amount' },
+  { label: 'Coste', render: r => fmt(r.cost), className: 'col-amount' },
   { label: 'Color', render: r => r.color ? <span className="badge badge-blue">{r.color}</span> : '-' },
 ]
 

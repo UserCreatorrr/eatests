@@ -45,7 +45,7 @@ export default function AlertasPage() {
         })
       }
 
-      const pendEnvio = (pedRes.data || []).filter((p: any) => p.pending_send > 0)
+      const pendEnvio = (pedRes.data || []).filter((p: any) => p.pendingSend > 0)
       if (pendEnvio.length > 0) {
         alerts.push({
           tipo: 'pedido_pendiente',
@@ -71,7 +71,7 @@ export default function AlertasPage() {
         })
       }
 
-      const pendRec = (pedRes.data || []).filter((p: any) => p.pending_receive > 0)
+      const pendRec = (pedRes.data || []).filter((p: any) => p.pendingReceive > 0)
       if (pendRec.length > 0) {
         alerts.push({
           tipo: 'pedido_pendiente',

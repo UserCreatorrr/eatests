@@ -1,86 +1,63 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { supabaseAdmin } from '@/lib/supabase'
+import { requireServerUser } from '@/lib/auth'
+import db from '@/lib/db'
 
 function formatCurrency(amount: number | null) {
   if (amount === null || amount === undefined) return '-'
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
 }
 
-async function getVentasStats() {
-  const [
-    { count: deliveries },
-    { count: invoices },
-    { data: recentFacturas },
-  ] = await Promise.all([
-    supabaseAdmin.from('tspoonlab_albaranes_venta').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('tspoonlab_facturas_venta').select('*', { count: 'exact', head: true }),
-    supabaseAdmin
-      .from('tspoonlab_facturas_venta')
-      .select('id, invoice_num, customer, date_invoice, total')
-      .order('date_invoice', { ascending: false })
-      .limit(10),
-  ])
-
-  return { deliveries, invoices, recentFacturas: recentFacturas || [] }
-}
+type Factura = { id: number; invoice_num: string | null; customer: string | null; date_invoice: string | null; total: number | null }
 
 export default async function VentasPage() {
-  const { deliveries, invoices, recentFacturas } = await getVentasStats()
+  const user = await requireServerUser()
+  const deliveries = (db.prepare('SELECT COUNT(*) as n FROM albaranes_venta WHERE user_id = ?').get(user.id) as { n: number }).n
+  const invoices = (db.prepare('SELECT COUNT(*) as n FROM facturas_venta WHERE user_id = ?').get(user.id) as { n: number }).n
+  const recentFacturas = db.prepare('SELECT id, invoice_num, customer, date_invoice, total FROM facturas_venta WHERE user_id = ? ORDER BY date_invoice DESC LIMIT 10').all(user.id) as Factura[]
 
   const sections = [
-    { label: 'Albaranes', count: deliveries || 0, href: '/dashboard/ventas/albaranes', color: 'text-green-600' },
-    { label: 'Facturas', count: invoices || 0, href: '/dashboard/ventas/facturas', color: 'text-teal-600' },
+    { label: 'Albaranes', count: deliveries, href: '/dashboard/ventas/albaranes' },
+    { label: 'Facturas', count: invoices, href: '/dashboard/ventas/facturas' },
   ]
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Ventas</h1>
-        <p className="text-slate-500 mt-1">Gestión de albaranes y facturas de venta</p>
+      <div className="page-header">
+        <h1 className="page-title">Ventas</h1>
+        <p className="page-subtitle">Gestion de albaranes y facturas de venta</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        {sections.map((s) => (
-          <Link key={s.href} href={s.href} className="stat-card hover:shadow-md transition-shadow group">
-            <p className={`text-4xl font-bold ${s.color} mb-2`}>{s.count.toLocaleString('es-ES')}</p>
-            <p className="text-slate-600 font-medium">{s.label}</p>
-            <p className="text-blue-600 text-sm mt-3 group-hover:underline">Ver todos →</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16, marginBottom: 32 }}>
+        {sections.map(s => (
+          <Link key={s.href} href={s.href} className="stat-card" style={{ textDecoration: 'none', display: 'block' }}>
+            <p style={{ fontFamily: 'Chillax,sans-serif', fontSize: 36, fontWeight: 600, color: '#3d3834', marginBottom: 4 }}>{s.count.toLocaleString('es-ES')}</p>
+            <p style={{ fontFamily: 'DM Mono,monospace', fontSize: 13, color: '#3d3834', opacity: 0.6 }}>{s.label}</p>
           </Link>
         ))}
       </div>
 
-      {/* Recent facturas venta */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800">Últimas facturas de venta</h2>
+      <div className="table-wrap">
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <span className="page-title" style={{ fontSize: '1rem' }}>Ultimas facturas de venta</span>
         </div>
         {recentFacturas.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">Sin datos importados</div>
+          <div className="empty-state"><p className="page-subtitle">Sin datos importados</p></div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th className="px-6 py-4">Nº Factura</th>
-                  <th className="px-6 py-4">Cliente</th>
-                  <th className="px-6 py-4">Fecha</th>
-                  <th className="px-6 py-4">Total</th>
+          <table className="data-table">
+            <thead><tr><th>Nº Factura</th><th>Cliente</th><th>Fecha</th><th>Total</th></tr></thead>
+            <tbody>
+              {recentFacturas.map(f => (
+                <tr key={f.id}>
+                  <td className="col-mono">{f.invoice_num || '-'}</td>
+                  <td className="col-main">{f.customer || '-'}</td>
+                  <td>{f.date_invoice || '-'}</td>
+                  <td className="col-amount">{formatCurrency(f.total)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {recentFacturas.map((f) => (
-                  <tr key={f.id} className="hover:bg-slate-50">
-                    <td className="px-6 font-mono text-sm text-slate-600">{f.invoice_num || '-'}</td>
-                    <td className="px-6 font-medium text-slate-700">{f.customer || '-'}</td>
-                    <td className="px-6 text-slate-500">{f.date_invoice || '-'}</td>
-                    <td className="px-6 font-semibold text-teal-600">{formatCurrency(f.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>

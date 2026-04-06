@@ -1,161 +1,157 @@
 'use client'
 
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
 import Image from 'next/image'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useState, Suspense } from 'react'
+
+const ERROR_MESSAGES: Record<string, string> = {
+  google_denied: 'Acceso con Google cancelado.',
+  google_failed: 'Error al iniciar sesion con Google. Intentalo de nuevo.',
+  google_not_configured: 'Google OAuth no esta configurado.',
+}
 
 function LoginForm() {
   const searchParams = useSearchParams()
-  const urlError = searchParams.get('error')
+  const router = useRouter()
+  const errorKey = searchParams.get('error') || ''
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [loading, setLoading] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [isSuccess, setIsSuccess] = useState(false)
-  const supabase = createSupabaseBrowserClient()
+  const [msg, setMsg] = useState(ERROR_MESSAGES[errorKey] || '')
+  const [isError, setIsError] = useState(!!errorKey)
 
-  async function signInWithGoogle() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    })
-  }
-
-  async function handleEmail(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setMsg('')
-    setIsSuccess(false)
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setMsg(error.message)
-      else window.location.href = '/dashboard'
+    setIsError(false)
+
+    const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json()
+
+    if (!res.ok) {
+      setMsg(data.error || 'Error al procesar la solicitud')
+      setIsError(true)
     } else {
-      const { error } = await supabase.auth.signUp({
-        email, password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
-      })
-      if (error) setMsg(error.message)
-      else { setMsg('Revisa tu email para confirmar la cuenta.'); setIsSuccess(true) }
+      router.push('/dashboard')
     }
     setLoading(false)
   }
 
+  function signInWithGoogle() {
+    window.location.href = '/api/auth/google'
+  }
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#3d3834', display: 'flex', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f2ee', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ width: '100%', maxWidth: '400px' }}>
 
-      {/* Full background grid texture */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.18 }}>
-        <Image src="/logos/GRID_NEGATIVE.png" alt="" fill style={{ objectFit: 'cover' }} priority />
-      </div>
-
-      {/* Left panel */}
-      <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-        padding: '48px 56px', position: 'relative', zIndex: 1,
-      }} className="hidden lg:flex">
-        <Image src="/logos/COMPLETE_BICOLOR_NEGATIVE.svg" alt="MarginBites" width={200} height={52} />
-        <div>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: '36px', color: '#dfd5c9', lineHeight: 1.3, marginBottom: '16px' }}>
-            Controla tu cocina<br />con inteligencia.
-          </p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#dfd5c9', opacity: 0.45, lineHeight: 1.8 }}>
-            Ingredientes &middot; Pedidos &middot; Albaranes<br />Proveedores &middot; IA de cocina
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <Image
+            src="/logos/COMPLETE_BICOLOR_NEGATIVE.svg"
+            alt="MarginBites"
+            width={160}
+            height={42}
+            style={{ margin: '0 auto 16px', display: 'block' }}
+          />
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#3d3834', opacity: 0.4 }}>
+            Suite de gestion para cocinas profesionales
           </p>
         </div>
-        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#dfd5c9', opacity: 0.25 }}>
-          &copy; 2026 MarginBites
-        </p>
-      </div>
 
-      {/* Right panel - form */}
-      <div style={{
-        width: '100%', maxWidth: '480px', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', padding: '32px 24px', position: 'relative', zIndex: 1,
-        backgroundColor: '#f5f2ee',
-      }}>
-        {/* Right grid overlay */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.06 }}>
-          <Image src="/logos/grid-positive.png" alt="" fill style={{ objectFit: 'cover' }} />
-        </div>
-
-        <div style={{ width: '100%', maxWidth: '360px', position: 'relative', zIndex: 1 }}>
-
-          {/* Logo mobile */}
-          <div style={{ marginBottom: '36px' }}>
-            <Image src="/logos/COMPLETE_BICOLOR_NEGATIVE.svg" alt="MarginBites" width={180} height={46} />
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#3d3834', opacity: 0.4, marginTop: '8px' }}>
-              Suite para cocinas profesionales
-            </p>
-          </div>
+        {/* Card */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '32px', border: '1px solid #e8e2db', boxShadow: '0 4px 24px rgba(61,56,52,0.06)' }}>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: '4px', backgroundColor: '#e8e2db', borderRadius: '12px', padding: '4px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', gap: '4px', backgroundColor: '#f5f2ee', borderRadius: '12px', padding: '4px', marginBottom: '28px' }}>
             {(['login', 'signup'] as const).map(m => (
-              <button key={m} onClick={() => { setMode(m); setMsg('') }} style={{
-                flex: 1, padding: '9px', borderRadius: '9px', border: 'none', cursor: 'pointer',
-                fontFamily: 'DM Mono, monospace', fontSize: '12px',
-                backgroundColor: mode === m ? '#ffffff' : 'transparent',
-                color: '#3d3834', fontWeight: mode === m ? 600 : 400,
-                boxShadow: mode === m ? '0 1px 4px rgba(61,56,52,0.12)' : 'none',
-                transition: 'all 0.15s',
-              }}>
-                {m === 'login' ? 'Iniciar sesion' : 'Crear cuenta'}
+              <button
+                key={m}
+                onClick={() => { setMode(m); setMsg(''); setIsError(false) }}
+                style={{
+                  flex: 1, padding: '8px', borderRadius: '9px', border: 'none', cursor: 'pointer',
+                  fontFamily: 'DM Mono, monospace', fontSize: '12px',
+                  backgroundColor: mode === m ? '#ffffff' : 'transparent',
+                  color: '#3d3834',
+                  boxShadow: mode === m ? '0 1px 4px rgba(61,56,52,0.1)' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {m === 'login' ? 'Iniciar sesion' : 'Registrarse'}
               </button>
             ))}
           </div>
 
-          {(urlError || msg) && (
+          {msg && (
             <div style={{
-              backgroundColor: isSuccess ? '#f0fdf4' : '#fef2f2',
-              border: `1px solid ${isSuccess ? '#bbf7d0' : '#fecaca'}`,
+              backgroundColor: isError ? '#fef2f2' : '#f0fdf4',
+              border: `1px solid ${isError ? '#fecaca' : '#bbf7d0'}`,
               borderRadius: '10px', padding: '12px 16px', marginBottom: '20px',
             }}>
-              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '12px', color: isSuccess ? '#166534' : '#dc2626', margin: 0 }}>
-                {msg || 'Error de autenticacion. Intentalo de nuevo.'}
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '12px', color: isError ? '#dc2626' : '#166534', margin: 0 }}>
+                {msg}
               </p>
             </div>
           )}
 
-          {/* Email form */}
-          <form onSubmit={handleEmail} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+          {/* Form */}
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
             <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="tu@email.com" required
-              style={{ width: '100%', padding: '13px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#ffffff', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="tu@email.com"
+              required
+              style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#fafaf9', boxSizing: 'border-box' }}
               onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
               onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
             />
             <input
-              type="password" value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="Contrasena" required
-              style={{ width: '100%', padding: '13px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#ffffff', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Contrasena"
+              required
+              style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#fafaf9', boxSizing: 'border-box' }}
               onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
               onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
             />
-            <button type="submit" disabled={loading} style={{
-              width: '100%', padding: '13px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-              backgroundColor: '#19f973', color: '#2a2522', fontFamily: 'DM Mono, monospace',
-              fontSize: '13px', fontWeight: 600, opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s',
-            }}>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%', padding: '13px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                backgroundColor: '#19f973', color: '#2a2522', fontFamily: 'DM Mono, monospace',
+                fontSize: '13px', fontWeight: 600, opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s',
+              }}
+            >
               {loading ? 'Cargando...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
             </button>
           </form>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
             <div style={{ flex: 1, height: '1px', backgroundColor: '#e8e2db' }} />
             <span style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#3d3834', opacity: 0.4 }}>o</span>
             <div style={{ flex: 1, height: '1px', backgroundColor: '#e8e2db' }} />
           </div>
 
-          <button onClick={signInWithGoogle} style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-            backgroundColor: '#3d3834', color: '#dfd5c9', border: 'none', borderRadius: '12px',
-            padding: '13px 20px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: '13px',
-            transition: 'opacity 0.15s',
-          }}
+          {/* Google */}
+          <button
+            onClick={signInWithGoogle}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+              backgroundColor: '#3d3834', color: '#dfd5c9', border: 'none', borderRadius: '12px',
+              padding: '13px 20px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: '13px',
+              transition: 'opacity 0.15s',
+            }}
             onMouseOver={e => (e.currentTarget.style.opacity = '0.85')}
             onMouseOut={e => (e.currentTarget.style.opacity = '1')}
           >
@@ -167,11 +163,11 @@ function LoginForm() {
             </svg>
             Continuar con Google
           </button>
-
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '10px', color: '#3d3834', opacity: 0.28, textAlign: 'center', marginTop: '20px' }}>
-            Tus datos estan aislados y son solo tuyos
-          </p>
         </div>
+
+        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '10px', color: '#3d3834', opacity: 0.3, textAlign: 'center', marginTop: '20px' }}>
+          Tus datos estan aislados y son solo tuyos
+        </p>
       </div>
     </div>
   )

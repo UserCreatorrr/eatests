@@ -1,72 +1,56 @@
 export const dynamic = 'force-dynamic'
 
-import { supabaseAdmin } from '@/lib/supabase'
+import { requireServerUser } from '@/lib/auth'
+import db from '@/lib/db'
 
 function formatCurrency(amount: number | null) {
   if (amount === null || amount === undefined) return '-'
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
 }
 
-async function getData() {
-  const { data, count } = await supabaseAdmin
-    .from('tspoonlab_herramientas')
-    .select('id, migration_id, codi, descr, type, has_data, id_unit, unit, cost', { count: 'exact' })
-    .order('descr')
-    .limit(1000)
-
-  return { rows: data || [], count: count || 0 }
+type Row = {
+  id: number; codi: string | null; descr: string | null; type: string | null
+  has_data: number | null; unit: string | null; id_unit: number | null; cost: number | null
 }
 
 export default async function HerramientasPage() {
-  const { rows, count } = await getData()
+  const user = await requireServerUser()
+  const rows = db.prepare('SELECT * FROM herramientas WHERE user_id = ? ORDER BY descr').all(user.id) as Row[]
 
   return (
     <div className="p-8">
       <div className="page-header">
         <h1 className="page-title">Herramientas</h1>
-        <p className="page-subtitle">{count.toLocaleString('es-ES')} herramientas importadas</p>
+        <p className="page-subtitle">{rows.length.toLocaleString('es-ES')} herramientas importadas</p>
       </div>
 
       <div className="table-wrap">
         {rows.length === 0 ? (
-          <div className="p-12 text-center text-brand-dark/40">
-            <svg className="w-12 h-12 mx-auto mb-3 text-brand-dark/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <p>Sin herramientas importadas</p>
+          <div className="empty-state">
+            <p className="page-subtitle">Sin herramientas importadas. Ejecuta la migracion desde Ajustes.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="px-6 py-4">Código</th>
-                  <th className="px-6 py-4">Nombre</th>
-                  <th className="px-6 py-4">Tipo</th>
-                  <th className="px-6 py-4">Con datos</th>
-                  <th className="px-6 py-4">Unidad</th>
-                  <th className="px-6 py-4">ID Unidad</th>
-                  <th className="px-6 py-4">Coste</th>
+                  <th>Codigo</th><th>Nombre</th><th>Tipo</th>
+                  <th>Con datos</th><th>Unidad</th><th>Coste</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-brand-bg">
-                    <td className="px-6 col-mono">{row.codi || '-'}</td>
-                    <td className="px-6 col-main">{row.descr || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.type || '-'}</td>
-                    <td className="px-6">
-                      {row.has_data ? (
-                        <span className="badge badge-green">Sí</span>
-                      ) : (
-                        <span className="badge badge-blue">No</span>
-                      )}
+                {rows.map(row => (
+                  <tr key={row.id}>
+                    <td className="col-mono">{row.codi || '-'}</td>
+                    <td className="col-main">{row.descr || '-'}</td>
+                    <td>{row.type || '-'}</td>
+                    <td>
+                      {row.has_data
+                        ? <span className="badge badge-green">Si</span>
+                        : <span className="badge badge-gray">No</span>}
                     </td>
-                    <td className="px-6 text-brand-dark/70">{row.unit || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.id_unit ?? '-'}</td>
-                    <td className="px-6 col-amount">{formatCurrency(row.cost)}</td>
+                    <td>{row.unit || '-'}</td>
+                    <td className="col-amount">{formatCurrency(row.cost)}</td>
                   </tr>
                 ))}
               </tbody>

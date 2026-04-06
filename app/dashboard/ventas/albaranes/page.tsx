@@ -1,77 +1,54 @@
 export const dynamic = 'force-dynamic'
 
-import { supabaseAdmin } from '@/lib/supabase'
+import { requireServerUser } from '@/lib/auth'
+import db from '@/lib/db'
 
 function formatCurrency(amount: number | null) {
   if (amount === null || amount === undefined) return '-'
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
 }
 
-const formatDate = (v: string | null) => v ? new Date(v).toLocaleDateString('es-ES') : '-'
-
-async function getData() {
-  const { data, count } = await supabaseAdmin
-    .from('tspoonlab_albaranes_venta')
-    .select('id, migration_id, id_customer, customer, customer_code, customer_type, customer_type_code, nif, contact, phone, mail, address, cp, city, invoice_num, date_delivery, base', { count: 'exact' })
-    .order('date_delivery', { ascending: false })
-    .limit(1000)
-
-  return { rows: data || [], count: count || 0 }
+type Row = {
+  id: number; invoice_num: string | null; customer: string | null; customer_code: string | null
+  customer_type: string | null; nif: string | null; contact: string | null
+  phone: string | null; mail: string | null; address: string | null
+  cp: string | null; city: string | null; date_delivery: string | null; base: number | null
 }
 
 export default async function AlbaranesVentaPage() {
-  const { rows, count } = await getData()
+  const user = await requireServerUser()
+  const rows = db.prepare('SELECT * FROM albaranes_venta WHERE user_id = ? ORDER BY date_delivery DESC').all(user.id) as Row[]
 
   return (
     <div className="p-8">
       <div className="page-header">
         <h1 className="page-title">Albaranes de Venta</h1>
-        <p className="page-subtitle">{count.toLocaleString('es-ES')} albaranes</p>
+        <p className="page-subtitle">{rows.length.toLocaleString('es-ES')} albaranes</p>
       </div>
 
       <div className="table-wrap">
         {rows.length === 0 ? (
-          <div className="p-12 text-center text-brand-dark/40">
-            <svg className="w-12 h-12 mx-auto mb-3 text-brand-dark/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-            <p>Sin albaranes de venta importados</p>
-          </div>
+          <div className="empty-state"><p className="page-subtitle">Sin albaranes importados.</p></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="px-6 py-4">Nº Albarán</th>
-                  <th className="px-6 py-4">Cliente</th>
-                  <th className="px-6 py-4">Código</th>
-                  <th className="px-6 py-4">Tipo</th>
-                  <th className="px-6 py-4">NIF</th>
-                  <th className="px-6 py-4">Contacto</th>
-                  <th className="px-6 py-4">Teléfono</th>
-                  <th className="px-6 py-4">Email</th>
-                  <th className="px-6 py-4">Dirección</th>
-                  <th className="px-6 py-4">Fecha</th>
-                  <th className="px-6 py-4">Base</th>
+                  <th>Nº Albaran</th><th>Cliente</th><th>Tipo</th>
+                  <th>NIF</th><th>Contacto</th><th>Ciudad</th><th>Fecha</th><th>Base</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-brand-bg">
-                    <td className="px-6 col-mono">{row.invoice_num || '-'}</td>
-                    <td className="px-6 col-main">{row.customer || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.customer_code || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.customer_type || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.nif || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.contact || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.phone || '-'}</td>
-                    <td className="px-6 text-brand-dark/70">{row.mail || '-'}</td>
-                    <td className="px-6 text-brand-dark/70 text-sm">
-                      {[row.address, row.cp, row.city].filter(Boolean).join(', ') || '-'}
-                    </td>
-                    <td className="px-6 text-brand-dark/70">{formatDate(row.date_delivery)}</td>
-                    <td className="px-6 col-amount">{formatCurrency(row.base)}</td>
+                {rows.map(row => (
+                  <tr key={row.id}>
+                    <td className="col-mono">{row.invoice_num || '-'}</td>
+                    <td className="col-main">{row.customer || '-'}</td>
+                    <td>{row.customer_type || '-'}</td>
+                    <td className="col-mono">{row.nif || '-'}</td>
+                    <td>{row.contact || '-'}</td>
+                    <td>{[row.city, row.cp].filter(Boolean).join(' ') || '-'}</td>
+                    <td>{row.date_delivery || '-'}</td>
+                    <td className="col-amount">{formatCurrency(row.base)}</td>
                   </tr>
                 ))}
               </tbody>

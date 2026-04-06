@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
   image?: string
+}
+
+interface StoredConvo {
+  messages: Message[]
+  lastUsed: number  // timestamp ms
 }
 
 const SUGGESTIONS = [
@@ -16,20 +21,42 @@ const SUGGESTIONS = [
 ]
 
 const STORAGE_KEY = 'mb_chat_history'
+const CURRENT_KEY = 'mb_chat_current'
+const MAX_HISTORY = 15
+const EXPIRY_MS = 15 * 24 * 60 * 60 * 1000 // 15 days
 
-function loadHistory(): Message[][] {
+function loadHistory(): StoredConvo[] {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    const now = Date.now()
+    // Filter out expired and ensure format
+    return (raw as any[])
+      .filter(c => c && c.messages && c.lastUsed && (now - c.lastUsed) < EXPIRY_MS)
+      .slice(0, MAX_HISTORY)
   } catch { return [] }
 }
 
-function saveHistory(convos: Message[][]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(convos.slice(0, 5))) } catch {}
+function saveHistory(convos: StoredConvo[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(convos.slice(0, MAX_HISTORY)))
+  } catch {}
+}
+
+function loadCurrent(): Message[] {
+  try {
+    return JSON.parse(localStorage.getItem(CURRENT_KEY) || '[]')
+  } catch { return [] }
+}
+
+function saveCurrent(messages: Message[]) {
+  try {
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages))
+  } catch {}
 }
 
 export default function KitchenChat() {
   const [messages, setMessages] = useState<Message[]>([])
-  const [history, setHistory] = useState<Message[][]>([])
+  const [history, setHistory] = useState<StoredConvo[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -40,9 +67,19 @@ export default function KitchenChat() {
   const chunksRef = useRef<Blob[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { setHistory(loadHistory()) }, [])
+  // Restore current conversation and history on mount
+  useEffect(() => {
+    const current = loadCurrent()
+    if (current.length > 0) setMessages(current)
+    setHistory(loadHistory())
+  }, [])
+
+  // Persist current conversation on every change
+  useEffect(() => {
+    saveCurrent(messages)
+  }, [messages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -50,17 +87,34 @@ export default function KitchenChat() {
 
   function newConversation() {
     if (messages.length > 0) {
-      const updated = [messages, ...history].slice(0, 5)
+      const convo: StoredConvo = { messages, lastUsed: Date.now() }
+      const updated = [convo, ...history].slice(0, MAX_HISTORY)
       setHistory(updated)
       saveHistory(updated)
     }
     setMessages([])
+    saveCurrent([])
     setActionMsg('')
   }
 
-  function loadConversation(convo: Message[]) {
-    setMessages(convo)
+  function loadConversation(convo: StoredConvo) {
+    // Save current first
+    if (messages.length > 0) {
+      const c: StoredConvo = { messages, lastUsed: Date.now() }
+      const updated = [c, ...history.filter(h => h !== convo)].slice(0, MAX_HISTORY)
+      setHistory(updated)
+      saveHistory(updated)
+    }
+    setMessages(convo.messages)
+    saveCurrent(convo.messages)
     setShowHistory(false)
+  }
+
+  function deleteConversation(idx: number, e: React.MouseEvent) {
+    e.stopPropagation()
+    const updated = history.filter((_, i) => i !== idx)
+    setHistory(updated)
+    saveHistory(updated)
   }
 
   async function send(text: string, img?: string) {
@@ -87,16 +141,10 @@ export default function KitchenChat() {
       const contentType = res.headers.get('content-type') || ''
 
       if (contentType.includes('application/json')) {
-        // Function call response
         const json = await res.json()
-        if (json.action) {
-          setActionMsg(json.action)
-        }
-        if (json.reply) {
-          setMessages(prev => [...prev, { role: 'assistant', content: json.reply }])
-        }
+        if (json.action) setActionMsg(json.action)
+        if (json.reply) setMessages(prev => [...prev, { role: 'assistant', content: json.reply }])
       } else {
-        // Streaming text response
         const reader = res.body!.getReader()
         const decoder = new TextDecoder()
         let reply = ''
@@ -163,12 +211,12 @@ export default function KitchenChat() {
   )
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f5f2ee' }}>
+    <div style={{ display: 'flex', height: '100%', backgroundColor: '#f5f2ee' }}>
 
       {/* History panel */}
       {showHistory && (
-        <div style={{ width: 280, flexShrink: 0, backgroundColor: '#fff', borderRight: '1px solid #e8e2db', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid #e8e2db', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ width: 280, flexShrink: 0, backgroundColor: '#fff', borderRight: '1px solid #e8e2db', display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid #e8e2db', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 14, color: '#3d3834' }}>Conversaciones</span>
             <button onClick={() => setShowHistory(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.4, fontSize: 18, lineHeight: 1 }}>x</button>
           </div>
@@ -177,16 +225,20 @@ export default function KitchenChat() {
           ) : (
             <div style={{ overflowY: 'auto', flex: 1 }}>
               {history.map((convo, i) => {
-                const preview = convo.find(m => m.role === 'user')?.content || '...'
+                const preview = convo.messages.find(m => m.role === 'user')?.content || '...'
+                const date = new Date(convo.lastUsed)
                 return (
-                  <button key={i} onClick={() => loadConversation(convo)} style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', borderBottom: '1px solid #f5f2ee', cursor: 'pointer' }}>
-                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {preview.slice(0, 50)}
-                    </p>
-                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: '3px 0 0' }}>
-                      {convo.length} mensajes
-                    </p>
-                  </button>
+                  <div key={i} onClick={() => loadConversation(convo)} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f5f2ee', cursor: 'pointer' }}>
+                    <div style={{ flex: 1, padding: '12px 16px' }}>
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {preview.slice(0, 50)}
+                      </p>
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: '3px 0 0' }}>
+                        {convo.messages.length} mensajes · {date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                      </p>
+                    </div>
+                    <button onClick={(e) => deleteConversation(i, e)} style={{ padding: '0 12px', background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.25, fontSize: 16 }}>x</button>
+                  </div>
                 )
               })}
             </div>
@@ -195,7 +247,7 @@ export default function KitchenChat() {
       )}
 
       {/* Main chat */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%' }}>
         <div style={{ flexShrink: 0, padding: '16px 40px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button onClick={() => setShowHistory(s => !s)} style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4, background: 'none', border: 'none', cursor: 'pointer' }}>
             {showHistory ? 'Ocultar historial' : `Historial (${history.length})`}
@@ -275,12 +327,22 @@ export default function KitchenChat() {
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: '#ffffff', border: '1.5px solid #e8e2db', borderRadius: 18, padding: '8px 10px' }}>
-              <button onClick={() => fileRef.current?.click()} title="Foto de albaran" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3d3834', opacity: 0.55 }}>
+              {/* Galería */}
+              <button onClick={() => fileRef.current?.click()} title="Subir foto" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3d3834', opacity: 0.55 }}>
                 <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </button>
+              {/* Cámara */}
+              <button onClick={() => cameraRef.current?.click()} title="Abrir camara" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3d3834', opacity: 0.55 }}>
+                <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImage} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleImage} />
+              {/* Micro */}
               <button onClick={isRecording ? stopRecording : startRecording} title={isRecording ? 'Detener' : 'Nota de voz'} style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: isRecording ? '#19f973' : '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isRecording ? '#2a2522' : '#3d3834', opacity: isRecording ? 1 : 0.55 }}>
                 {isRecording
                   ? <span style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: '#2a2522', display: 'block' }} />
@@ -288,7 +350,6 @@ export default function KitchenChat() {
                 }
               </button>
               <input
-                ref={inputRef}
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}

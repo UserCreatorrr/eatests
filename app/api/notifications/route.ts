@@ -1,6 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import db from '@/lib/db'
+import webpush from 'web-push'
+
+const vapidConfigured = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
+if (vapidConfigured) {
+  webpush.setVapidDetails(
+    'mailto:admin@marginbites.com',
+    process.env.VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  )
+}
+
+async function sendPushToUser(userId: string, title: string, body: string, url: string) {
+  if (!vapidConfigured) return
+  const subs = db.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(userId) as any[]
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        JSON.stringify({ title, body, url, tag: title })
+      )
+    } catch (e: any) {
+      if (e.statusCode === 410 || e.statusCode === 404) {
+        db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(sub.endpoint)
+      }
+    }
+  }
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -25,13 +52,19 @@ export async function POST(req: NextRequest) {
   let generated = 0
 
   function upsertNotification(type: string, title: string, body: string, urgency: string, link: string) {
-    db.prepare(
-      "DELETE FROM notifications WHERE user_id = ? AND type = ? AND date(created_at) = date('now')"
-    ).run(uid, type)
-    db.prepare(
-      'INSERT INTO notifications (user_id, type, title, body, urgency, link) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(uid, type, title, body, urgency, link)
-    generated++
+    // Only insert if there's no notification of this type for today (read or unread)
+    const existing = db.prepare(
+      "SELECT id FROM notifications WHERE user_id = ? AND type = ? AND date(created_at) = date('now') LIMIT 1"
+    ).get(uid, type)
+    if (!existing) {
+      db.prepare(
+        'INSERT INTO notifications (user_id, type, title, body, urgency, link) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run(uid, type, title, body, urgency, link)
+      generated++
+      if (urgency === 'alta') {
+        sendPushToUser(uid, title, body, link).catch(() => {})
+      }
+    }
   }
 
   // 1. Ingredientes sin coste

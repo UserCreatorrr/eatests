@@ -29,6 +29,51 @@ function timeAgo(dateStr: string): string {
   return `hace ${Math.floor(hrs / 24)}d`
 }
 
+async function registerPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  try {
+    const res = await fetch('/api/push/vapid-key').then(r => r.json())
+    if (!res.publicKey) return
+
+    const reg = await navigator.serviceWorker.register('/sw.js')
+    await navigator.serviceWorker.ready
+
+    const permission = await Notification.requestPermission()
+    if (permission !== 'granted') return
+
+    const existing = await reg.pushManager.getSubscription()
+    if (existing) {
+      // Already subscribed, just ensure it's saved server-side
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(existing.toJSON()),
+      })
+      return
+    }
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(res.publicKey),
+    })
+
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub.toJSON()),
+    })
+  } catch (e) {
+    // Push not available in this context, ignore
+  }
+}
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = atob(base64)
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)))
+}
+
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unread, setUnread] = useState(0)
@@ -47,6 +92,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     fetch('/api/notifications', { method: 'POST' }).catch(() => {}).finally(() => load())
+    registerPush()
     const interval = setInterval(load, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
@@ -75,8 +121,12 @@ export default function NotificationBell() {
 
   async function handleNotificationClick(n: Notification) {
     if (!n.read) await markRead(n.id)
-    if (n.link) window.location.href = n.link
-    else setOpen(false)
+    if (n.link) {
+      setOpen(false)
+      window.location.href = n.link
+    } else {
+      setOpen(false)
+    }
   }
 
   return (
@@ -163,7 +213,7 @@ export default function NotificationBell() {
                     backgroundColor: n.read ? '#fff' : '#fffef9',
                     borderLeft: `3px solid ${urgencyColor[n.urgency] || '#d97706'}`,
                     borderBottom: '1px solid #f0ebe4',
-                    cursor: n.link ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     display: 'flex', flexDirection: 'column', gap: 3,
                   }}
                 >

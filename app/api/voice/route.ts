@@ -11,5 +11,10 @@ export async function POST(req: NextRequest) {
     model: 'whisper-1',
     language: 'es',
   })
-  return Response.json({ text: transcription.text })
+  const text = transcription.text
+    .replace(/subtítulos realizados por la comunidad de amara\.org/gi, '')
+    .replace(/subtitulos realizados por la comunidad de amara\.org/gi, '')
+    .replace(/amara\.org/gi, '')
+    .trim()
+  return Response.json({ text })
 }

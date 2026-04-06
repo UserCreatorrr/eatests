@@ -1,10 +1,14 @@
 import Database from 'better-sqlite3'
 import bcrypt from 'bcryptjs'
 import path from 'path'
+import fs from 'fs'
 
 const DB_PATH =
   process.env.DB_PATH ||
   (process.env.NODE_ENV === 'production' ? '/data/marginbites.db' : './marginbites.db')
+
+// Ensure the directory exists before opening the database (needed at build time and runtime)
+fs.mkdirSync(path.dirname(path.resolve(DB_PATH)), { recursive: true })
 
 declare global {
   // eslint-disable-next-line no-var

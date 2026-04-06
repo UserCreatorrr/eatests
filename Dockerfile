@@ -21,7 +21,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-RUN npm run build
+RUN mkdir -p /data && npm run build
 
 # SQLite data volume
 VOLUME ["/data"]

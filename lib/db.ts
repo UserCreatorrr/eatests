@@ -257,6 +257,9 @@ function initSchema(db: Database.Database) {
     );
   `)
 
+  // Add avatar column to users if it doesn't exist (safe migration)
+  try { db.exec(`ALTER TABLE users ADD COLUMN avatar TEXT`) } catch {}
+
   // Seed admin user
   const hash = bcrypt.hashSync('Marginbites2026+', 10)
   db.prepare(`

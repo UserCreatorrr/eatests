@@ -1,30 +1,28 @@
 /**
  * POST /api/migrate
- * Triggered by the user from the app. Sends TSpoonLab credentials + user_id to n8n.
- * n8n fetches all data and POSTs back to /api/ingest.
+ * Sends TSpoonLab credentials + user_id to n8n which fetches all data and POSTs to /api/ingest.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 const N8N_WEBHOOK_URL =
   process.env.N8N_WEBHOOK_URL ||
-  'https://marginbites-n8n.ps8uzx.easypanel.host/webhook/34f8720f-8faa-416c-bb5e-f4ea1d54686f'
+  'https://esencia-paradise-n8n.rh6pum.easypanel.host/webhook-test/34f8720f-8faa-416c-bb5e-f4ea1d54686f'
 
 export async function POST(req: NextRequest) {
   const user = await getUserFromRequest(req)
-  if (!user) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  const { email, password } = await req.json()
+  if (!email || !password) {
+    return NextResponse.json({ error: 'Email y contrasena de TSpoonLab requeridos' }, { status: 400 })
   }
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
   try {
-    const { email, password } = await req.json()
-
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email y contraseña de TSpoonLab requeridos' }, { status: 400 })
-    }
-
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
     const response = await fetch(N8N_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -39,12 +37,11 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const text = await response.text()
-      throw new Error(`n8n error (${response.status}): ${text}`)
+      throw new Error(`n8n error (${response.status}): ${text.slice(0, 200)}`)
     }
 
-    return NextResponse.json({ ok: true, message: 'Migración iniciada. Los datos aparecerán en unos minutos.' })
+    return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Migration error:', error)
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
   }
 }

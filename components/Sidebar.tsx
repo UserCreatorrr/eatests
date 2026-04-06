@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 const navItems = [
   {
@@ -169,22 +170,49 @@ export default function Sidebar() {
 }
 
 function SidebarUser() {
+  const pathname = usePathname()
+  const [user, setUser] = useState<{ name: string | null; email: string; avatar: string | null } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(d => { if (d.user) setUser(d.user) }).catch(() => {})
+  }, [])
+
   async function signOut() {
     await fetch('/api/auth/logout', { method: 'POST' })
     window.location.href = '/login'
   }
 
+  const initials = user ? (user.name || user.email)[0].toUpperCase() : '?'
+  const isActive = pathname === '/dashboard/perfil'
+
   return (
-    <button
-      onClick={signOut}
-      className="flex items-center gap-2 text-xs font-mono transition-opacity hover:opacity-80 w-full"
-      style={{ color: '#dfd5c9', opacity: 0.35, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-    >
-      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-      </svg>
-      Cerrar sesion
-    </button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <Link href="/dashboard/perfil" style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, textDecoration: 'none', padding: '6px 8px', borderRadius: 10, backgroundColor: isActive ? 'rgba(25,249,115,0.08)' : 'transparent' }}>
+        <div style={{ width: 30, height: 30, borderRadius: '50%', backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+          {user?.avatar ? (
+            <img src={user.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#2a2522' }}>{initials}</span>
+          )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: isActive ? '#19f973' : '#dfd5c9', margin: 0, opacity: isActive ? 1 : 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {user?.name || user?.email || 'Perfil'}
+          </p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', margin: '1px 0 0', opacity: 0.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {user?.name ? user.email : 'Ajustes'}
+          </p>
+        </div>
+      </Link>
+      <button
+        onClick={signOut}
+        title="Cerrar sesion"
+        style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, backgroundColor: 'rgba(255,255,255,0.04)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dfd5c9', opacity: 0.4 }}
+      >
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+      </button>
+    </div>
   )
 }

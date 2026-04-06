@@ -240,6 +240,18 @@ function initSchema(db: Database.Database) {
       notas        TEXT,
       activo       INTEGER DEFAULT 1
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT NOT NULL REFERENCES users(id),
+      type       TEXT NOT NULL,
+      title      TEXT NOT NULL,
+      body       TEXT,
+      urgency    TEXT DEFAULT 'media',
+      link       TEXT,
+      read       INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `)
 
   const hash = bcrypt.hashSync('Marginbites2026+', 10)

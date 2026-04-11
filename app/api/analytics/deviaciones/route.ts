@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
 
   const inconsistencias: any[] = []
   for (const [nombre, items] of Object.entries(byProduct)) {
-    const vendors = [...new Set(items.map(i => i.vendor).filter(Boolean))]
+    const vendors = Array.from(new Set(items.map((i: any) => i.vendor).filter(Boolean)))
     if (vendors.length < 2) continue
     const byVendor = vendors.map(v => {
       const last = items.find(i => i.vendor === v)

@@ -258,6 +258,97 @@ const tools: any[] = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  // ── MERMA ─────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'registrar_merma',
+      description: 'Registra una pérdida o merma de un producto (caducidad, rotura, sobreproducción, pérdida)',
+      parameters: {
+        type: 'object',
+        properties: {
+          nombre: { type: 'string', description: 'Nombre del producto' },
+          cantidad: { type: 'number' },
+          unidad: { type: 'string' },
+          motivo: { type: 'string', enum: ['caducidad', 'sobreproducción', 'rotura', 'pérdida', 'otro'] },
+          coste_estimado: { type: 'number', description: 'Coste en euros de la pérdida' },
+          fecha: { type: 'string', description: 'YYYY-MM-DD' },
+          notas: { type: 'string' },
+        },
+        required: ['nombre'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'ver_merma',
+      description: 'Muestra el resumen de merma/pérdidas por periodo',
+      parameters: {
+        type: 'object',
+        properties: {
+          periodo: { type: 'string', enum: ['hoy', 'esta_semana', 'este_mes', 'mes_anterior'] },
+          motivo: { type: 'string', description: 'Filtrar por tipo de motivo' },
+        },
+      },
+    },
+  },
+  // ── PRECIOS Y ALBARANES ───────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'registrar_precio',
+      description: 'Registra el precio de un ingrediente/producto (actualiza historial y coste del ingrediente)',
+      parameters: {
+        type: 'object',
+        properties: {
+          nombre: { type: 'string' },
+          precio: { type: 'number' },
+          unidad: { type: 'string' },
+          vendor: { type: 'string' },
+          fuente: { type: 'string', enum: ['manual', 'albaran', 'factura'] },
+        },
+        required: ['nombre', 'precio'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'guardar_linea_albaran',
+      description: 'Guarda una línea individual de un albarán escaneado (producto, cantidad, precio unitario)',
+      parameters: {
+        type: 'object',
+        properties: {
+          vendor: { type: 'string' },
+          nombre: { type: 'string', description: 'Nombre del producto' },
+          cantidad: { type: 'number' },
+          unidad: { type: 'string' },
+          precio_unitario: { type: 'number' },
+          total_linea: { type: 'number' },
+          fecha: { type: 'string', description: 'YYYY-MM-DD' },
+        },
+        required: ['nombre'],
+      },
+    },
+  },
+  // ── PRODUCCIÓN ────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'registrar_produccion',
+      description: 'Registra las raciones producidas de una receta para calcular consumo teórico',
+      parameters: {
+        type: 'object',
+        properties: {
+          nombre: { type: 'string', description: 'Nombre de la receta' },
+          raciones: { type: 'number' },
+          fecha: { type: 'string', description: 'YYYY-MM-DD' },
+        },
+        required: ['nombre', 'raciones'],
+      },
+    },
+  },
 ]
 
 async function executeTool(name: string, args: any, userId: string): Promise<string> {
@@ -419,6 +510,79 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       `Pedidos pendientes envío: ${pedPendEnvio}\n` +
       `Pedidos pendientes recepción: ${pedPendRec}\n` +
       `Facturas vencen en 7 días: ${facVencen.c} (${facVencen.t || 0}€)`
+  }
+
+  // ── REGISTRAR MERMA ───────────────────────────────────────
+  if (name === 'registrar_merma') {
+    try {
+      const { nombre, cantidad, unidad, motivo, coste_estimado, fecha, notas } = args
+      const ing = nombre ? db.prepare('SELECT id, cost, unit FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any : null
+      const coste = coste_estimado ?? (ing && cantidad ? Math.round(ing.cost * cantidad * 100) / 100 : null)
+      const r = db.prepare(`INSERT INTO merma_registro (user_id, nombre, ingrediente_id, cantidad, unidad, motivo, coste_estimado, fecha, notas) VALUES (?,?,?,?,?,?,?,?,?)`)
+        .run(userId, nombre, ing?.id ?? null, cantidad ?? null, unidad ?? ing?.unit ?? null, motivo ?? 'otro', coste ?? null, fecha ?? new Date().toISOString().split('T')[0], notas ?? null)
+      return `Merma registrada (id ${r.lastInsertRowid}): ${nombre}${cantidad ? ' · ' + cantidad + ' ' + (unidad || '') : ''}${coste ? ' · ' + coste + '€' : ''}`
+    } catch (e: any) { return `Error: ${e.message}` }
+  }
+
+  // ── VER MERMA ─────────────────────────────────────────────
+  if (name === 'ver_merma') {
+    const filtros: Record<string, string> = {
+      hoy: "date(fecha)=date('now')",
+      esta_semana: "date(fecha)>=date('now','-7 days')",
+      este_mes: "strftime('%Y-%m',fecha)=strftime('%Y-%m','now')",
+      mes_anterior: "strftime('%Y-%m',fecha)=strftime('%Y-%m',date('now','-1 month'))",
+    }
+    const f = filtros[args.periodo || 'este_mes']
+    let q = `SELECT nombre, cantidad, unidad, motivo, coste_estimado, fecha FROM merma_registro WHERE user_id=? AND ${f}`
+    if (args.motivo) q += ` AND motivo=?`
+    const params: any[] = [userId]
+    if (args.motivo) params.push(args.motivo)
+    const rows = db.prepare(q + ' ORDER BY fecha DESC LIMIT 20').all(...params) as any[]
+    const total = (db.prepare(`SELECT ROUND(SUM(coste_estimado),2) as t FROM merma_registro WHERE user_id=? AND ${f}`).get(userId) as any).t
+    if (!rows.length) return `No hay merma registrada para ${args.periodo || 'este mes'}.`
+    return `Merma ${args.periodo || 'este mes'} — Total: ${total || 0}€\n` +
+      rows.map(r => `• ${r.nombre} | ${r.cantidad || '?'} ${r.unidad || ''} | ${r.motivo} | ${r.coste_estimado ? r.coste_estimado + '€' : '-'} | ${r.fecha}`).join('\n')
+  }
+
+  // ── REGISTRAR PRECIO HISTORIAL ────────────────────────────
+  if (name === 'registrar_precio') {
+    try {
+      const { nombre, vendor, precio, unidad, fuente } = args
+      db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente) VALUES (?,?,?,?,?,?)`)
+        .run(userId, nombre, vendor ?? null, precio, unidad ?? null, fuente ?? 'manual')
+      // Also update ingredientes cost if match found
+      const ing = db.prepare('SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
+      if (ing) db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(precio, ing.id, userId)
+      return `Precio registrado: ${nombre} → ${precio}€${unidad ? '/' + unidad : ''}${vendor ? ' (' + vendor + ')' : ''}`
+    } catch (e: any) { return `Error: ${e.message}` }
+  }
+
+  // ── GUARDAR LÍNEA ALBARÁN ─────────────────────────────────
+  if (name === 'guardar_linea_albaran') {
+    try {
+      const { vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha } = args
+      db.prepare(`INSERT INTO lineas_albaran_compra (user_id, vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha) VALUES (?,?,?,?,?,?,?,?)`)
+        .run(userId, vendor ?? null, nombre, cantidad ?? null, unidad ?? null, precio_unitario ?? null, total_linea ?? null, fecha ?? new Date().toISOString().split('T')[0])
+      // Register price in history
+      if (precio_unitario) {
+        db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente) VALUES (?,?,?,?,?,?)`)
+          .run(userId, nombre, vendor ?? null, precio_unitario, unidad ?? null, 'albaran')
+        const ing = db.prepare('SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
+        if (ing) db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(precio_unitario, ing.id, userId)
+      }
+      return `Línea guardada: ${nombre} × ${cantidad || '?'} ${unidad || ''} a ${precio_unitario || '?'}€`
+    } catch (e: any) { return `Error: ${e.message}` }
+  }
+
+  // ── REGISTRAR PRODUCCIÓN ──────────────────────────────────
+  if (name === 'registrar_produccion') {
+    try {
+      const { nombre, raciones, fecha } = args
+      const receta = db.prepare('SELECT id FROM escandallo_receta WHERE user_id=? AND nombre LIKE ? AND activo=1 LIMIT 1').get(userId, '%' + nombre + '%') as any
+      db.prepare(`INSERT INTO ventas_produccion (user_id, receta_id, nombre, raciones, fecha) VALUES (?,?,?,?,?)`)
+        .run(userId, receta?.id ?? null, nombre, raciones ?? 1, fecha ?? new Date().toISOString().split('T')[0])
+      return `Producción registrada: ${nombre} × ${raciones || 1} raciones`
+    } catch (e: any) { return `Error: ${e.message}` }
   }
 
   return 'Herramienta no reconocida'

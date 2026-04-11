@@ -273,6 +273,53 @@ function initSchema(db: Database.Database) {
       read       INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS precio_historial (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT NOT NULL REFERENCES users(id),
+      nombre     TEXT NOT NULL,
+      vendor     TEXT,
+      precio     REAL NOT NULL,
+      unidad     TEXT,
+      fecha      TEXT DEFAULT (date('now')),
+      fuente     TEXT DEFAULT 'manual'
+    );
+
+    CREATE TABLE IF NOT EXISTS merma_registro (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id        TEXT NOT NULL REFERENCES users(id),
+      nombre         TEXT NOT NULL,
+      ingrediente_id INTEGER,
+      cantidad       REAL,
+      unidad         TEXT,
+      motivo         TEXT,
+      coste_estimado REAL,
+      fecha          TEXT DEFAULT (date('now')),
+      notas          TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS lineas_albaran_compra (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         TEXT NOT NULL REFERENCES users(id),
+      albaran_id      INTEGER,
+      vendor          TEXT,
+      nombre          TEXT,
+      cantidad        REAL,
+      unidad          TEXT,
+      precio_unitario REAL,
+      total_linea     REAL,
+      fecha           TEXT DEFAULT (date('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS ventas_produccion (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id   TEXT NOT NULL REFERENCES users(id),
+      receta_id INTEGER,
+      nombre    TEXT,
+      raciones  INTEGER,
+      fecha     TEXT DEFAULT (date('now')),
+      notas     TEXT
+    );
   `)
 
   const hash = bcrypt.hashSync('Marginbites2026+', 10)

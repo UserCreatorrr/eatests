@@ -129,7 +129,7 @@ export default function Sidebar() {
     <aside className="w-60 flex flex-col flex-shrink-0" style={{ backgroundColor: '#3d3834', height: '100vh', overflow: 'hidden' }}>
       <div className="px-5 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <Image
-          src="/logos/logo-bicolor-negative.svg"
+          src="/logos/COMPLETE_BICOLOR_NEGATIVE.svg"
           alt="MarginBite"
           width={140}
           height={36}

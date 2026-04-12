@@ -516,16 +516,18 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const mermaMes = db.prepare("SELECT ROUND(SUM(coste_estimado),2) as t, COUNT(*) as n FROM merma_registro WHERE user_id=? AND strftime('%Y-%m',fecha)=strftime('%Y-%m','now')").get(userId) as any
     const topMerma = db.prepare("SELECT nombre, ROUND(SUM(coste_estimado),2) as t FROM merma_registro WHERE user_id=? AND strftime('%Y-%m',fecha)=strftime('%Y-%m','now') GROUP BY nombre ORDER BY t DESC LIMIT 3").all(userId) as any[]
 
-    const alertasPrecios = db.prepare(`
-      SELECT p1.nombre, p1.precio as precio_actual, p2.precio as precio_anterior,
-        ROUND(((p1.precio - p2.precio) / p2.precio) * 100) as variacion_pct
-      FROM precio_historial p1
-      JOIN precio_historial p2 ON p1.nombre=p2.nombre AND p1.user_id=p2.user_id
-        AND p2.fecha=(SELECT MAX(fecha) FROM precio_historial WHERE nombre=p1.nombre AND user_id=p1.user_id AND fecha<p1.fecha)
-      WHERE p1.user_id=? AND p1.fecha=(SELECT MAX(fecha) FROM precio_historial WHERE nombre=p1.nombre AND user_id=p1.user_id)
-        AND ((p1.precio-p2.precio)/p2.precio)>0.07
-      ORDER BY variacion_pct DESC LIMIT 4
-    `).all(userId) as any[]
+    // Detect price increases: compare latest vs earliest price per ingredient
+    const allPrecios = db.prepare(`SELECT nombre, precio, fecha FROM precio_historial WHERE user_id=? ORDER BY nombre, fecha ASC`).all(userId) as any[]
+    const precioMap: Record<string, {first: number, last: number}> = {}
+    for (const p of allPrecios) {
+      if (!precioMap[p.nombre]) precioMap[p.nombre] = { first: p.precio, last: p.precio }
+      precioMap[p.nombre].last = p.precio
+    }
+    const alertasPrecios = Object.entries(precioMap)
+      .map(([nombre, v]) => ({ nombre, precio_actual: v.last, precio_anterior: v.first, variacion_pct: v.first > 0 ? Math.round(((v.last - v.first) / v.first) * 100) : 0 }))
+      .filter(a => a.variacion_pct > 7)
+      .sort((a, b) => b.variacion_pct - a.variacion_pct)
+      .slice(0, 4)
 
     return `${saludo} — BRIEF ${hoy}\n\n` +
       `GASTO COMPRAS\n` +

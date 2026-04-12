@@ -55,6 +55,7 @@ function saveCurrent(messages: Message[]) {
 }
 
 export default function KitchenChat() {
+  const [greeting, setGreeting] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [history, setHistory] = useState<StoredConvo[]>([])
   const [showHistory, setShowHistory] = useState(false)
@@ -71,6 +72,8 @@ export default function KitchenChat() {
 
   // Restore current conversation and history on mount
   useEffect(() => {
+    const h = new Date().getHours()
+    setGreeting(h < 13 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches')
     const current = loadCurrent()
     if (current.length > 0) setMessages(current)
     setHistory(loadHistory())
@@ -293,7 +296,7 @@ export default function KitchenChat() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#2a2522' }}>
-                    {new Date().getHours() < 13 ? 'Buenos días' : new Date().getHours() < 20 ? 'Buenas tardes' : 'Buenas noches'} — Brief del día
+                    {greeting || 'Buenos días'} — Brief del día
                   </span>
                 </button>
 

@@ -22,7 +22,7 @@ export function storeTokens(tokens: any) {
   db.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('gmail_tokens', ?)").run(JSON.stringify(tokens))
 }
 
-export async function sendEmail(to: string, subject: string, body: string): Promise<void> {
+export async function sendEmail(to: string, subject: string, htmlBody: string, plainBody?: string): Promise<void> {
   const oauth2Client = getOAuth2Client()
   const tokens = getStoredTokens()
   if (!tokens?.refresh_token) {
@@ -41,14 +41,29 @@ export async function sendEmail(to: string, subject: string, body: string): Prom
 
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
+  // Build multipart/alternative email (plain + html)
+  const boundary = `mb_${Date.now()}`
+  const plain = plainBody || htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
   const raw = [
     `To: ${to}`,
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
     'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: base64',
     '',
-    Buffer.from(body).toString('base64'),
+    Buffer.from(plain).toString('base64'),
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(htmlBody).toString('base64'),
+    '',
+    `--${boundary}--`,
   ].join('\r\n')
 
   const encoded = Buffer.from(raw).toString('base64url')

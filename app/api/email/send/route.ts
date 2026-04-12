@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/gmail'
+import { buildOrderEmailHtml } from '@/lib/emailTemplate'
 import { getUserFromRequest } from '@/lib/auth'
 import db from '@/lib/db'
 
@@ -15,8 +16,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1. Send the email
-    await sendEmail(to, subject, body)
+    // 1. Build HTML template and send
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://marginbites-marginbites.ps8uzx.easypanel.host'
+    const htmlBody = buildOrderEmailHtml({
+      proveedor: proveedor || to,
+      message: body,
+      items: Array.isArray(items) ? items : [],
+      appUrl,
+    })
+    await sendEmail(to, subject, htmlBody, body)
 
     // 2. Create pedido_compra record
     const today = new Date().toISOString().split('T')[0]

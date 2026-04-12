@@ -320,6 +320,11 @@ function initSchema(db: Database.Database) {
       fecha     TEXT DEFAULT (date('now')),
       notas     TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
 
   const hash = bcrypt.hashSync('Marginbites2026+', 10)

@@ -2,10 +2,103 @@
 
 import { useState, useRef, useEffect } from 'react'
 
+interface EmailProposal {
+  proveedor: string
+  to: string
+  subject: string
+  body: string
+}
+
 interface Message {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'email_proposal'
   content: string
   image?: string
+  emailProposal?: EmailProposal
+}
+
+function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard: () => void }) {
+  const [subject, setSubject] = useState(proposal.subject)
+  const [body, setBody] = useState(proposal.body)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSend() {
+    setSending(true)
+    setError('')
+    try {
+      const res = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: proposal.to, subject, body }),
+      })
+      const json = await res.json()
+      if (json.ok) setSent(true)
+      else setError(json.error || 'Error al enviar')
+    } catch { setError('Error de conexión') }
+    finally { setSending(false) }
+  }
+
+  if (sent) {
+    return (
+      <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #19f973', borderRadius: 16, padding: '14px 18px', maxWidth: '90%', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#166534' }}>Email enviado a {proposal.to}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ backgroundColor: '#fafffe', border: '1.5px solid #19f973', borderRadius: 16, padding: 18, maxWidth: '90%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+        </div>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#3d3834', margin: 0 }}>Borrador de pedido — {proposal.proveedor}</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, margin: 0 }}>Para: {proposal.to}</p>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, display: 'block', marginBottom: 4 }}>Asunto</label>
+        <input
+          value={subject}
+          onChange={e => setSubject(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', backgroundColor: '#f5f2ee', border: '1px solid #e8e2db', borderRadius: 8, padding: '8px 10px', outline: 'none' }}
+        />
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, display: 'block', marginBottom: 4 }}>Cuerpo del email</label>
+        <textarea
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          rows={9}
+          style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', backgroundColor: '#f5f2ee', border: '1px solid #e8e2db', borderRadius: 8, padding: '8px 10px', outline: 'none', resize: 'vertical', lineHeight: 1.6 }}
+        />
+      </div>
+
+      {error && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#dc2626', margin: '0 0 10px' }}>{error}</p>}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={handleSend}
+          disabled={sending}
+          style={{ flex: 1, padding: '10px 16px', backgroundColor: '#19f973', border: 'none', borderRadius: 10, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#2a2522', opacity: sending ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+        >
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+          {sending ? 'Enviando...' : 'Enviar email'}
+        </button>
+        <button
+          onClick={onDiscard}
+          style={{ padding: '10px 16px', backgroundColor: '#f5f2ee', border: '1px solid #e8e2db', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.6 }}
+        >
+          Descartar
+        </button>
+      </div>
+    </div>
+  )
 }
 
 interface StoredConvo {
@@ -50,7 +143,7 @@ function loadCurrent(): Message[] {
 
 function saveCurrent(messages: Message[]) {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages))
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal')))
   } catch {}
 }
 
@@ -124,6 +217,8 @@ export default function KitchenChat() {
     const t = text.trim()
     if (!t && !img) return
     const userMsg: Message = { role: 'user', content: t, image: img }
+    // Filter out email_proposal messages before sending to API
+    const apiMessages = messages.filter(m => m.role !== 'email_proposal')
     const history2 = [...messages, userMsg]
     setMessages(history2)
     setInput('')
@@ -135,7 +230,7 @@ export default function KitchenChat() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: history2.map(m => ({ role: m.role, content: m.content })),
+          messages: [...apiMessages, userMsg].map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })),
           image: img,
         }),
       })
@@ -146,7 +241,13 @@ export default function KitchenChat() {
       if (contentType.includes('application/json')) {
         const json = await res.json()
         if (json.action) setActionMsg(json.action)
-        if (json.reply) setMessages(prev => [...prev, { role: 'assistant', content: json.reply }])
+        if (json.reply) {
+          const newMsgs: Message[] = [{ role: 'assistant', content: json.reply }]
+          if (json.emailProposal) {
+            newMsgs.push({ role: 'email_proposal', content: '', emailProposal: json.emailProposal })
+          }
+          setMessages(prev => [...prev, ...newMsgs])
+        }
       } else {
         const reader = res.body!.getReader()
         const decoder = new TextDecoder()
@@ -317,22 +418,35 @@ export default function KitchenChat() {
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {messages.map((msg, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', gap: 10 }}>
-                  {msg.role === 'assistant' && (
-                    <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
-                      {iconAI}
+              {messages.map((msg, i) => {
+                // Email proposal card
+                if (msg.role === 'email_proposal' && msg.emailProposal) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', paddingLeft: 38 }}>
+                      <EmailCard
+                        proposal={msg.emailProposal}
+                        onDiscard={() => setMessages(prev => prev.filter((_, idx) => idx !== i))}
+                      />
                     </div>
-                  )}
-                  <div style={{ maxWidth: '78%', borderRadius: 18, padding: '12px 18px', backgroundColor: msg.role === 'user' ? '#3d3834' : '#ffffff', color: msg.role === 'user' ? '#dfd5c9' : '#3d3834', fontFamily: 'DM Mono, monospace', fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap', border: msg.role === 'assistant' ? '1px solid #e8e2db' : 'none' }}>
-                    {msg.image && <img src={msg.image} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 200, objectFit: 'cover' }} />}
-                    {msg.content}
-                    {msg.role === 'assistant' && isLoading && i === messages.length - 1 && !msg.content && (
-                      <span style={{ color: '#19f973' }}>|</span>
+                  )
+                }
+                return (
+                  <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                    {msg.role === 'assistant' && (
+                      <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
+                        {iconAI}
+                      </div>
                     )}
+                    <div style={{ maxWidth: '78%', borderRadius: 18, padding: '12px 18px', backgroundColor: msg.role === 'user' ? '#3d3834' : '#ffffff', color: msg.role === 'user' ? '#dfd5c9' : '#3d3834', fontFamily: 'DM Mono, monospace', fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap', border: msg.role === 'assistant' ? '1px solid #e8e2db' : 'none' }}>
+                      {msg.image && <img src={msg.image} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 200, objectFit: 'cover' }} />}
+                      {msg.content}
+                      {msg.role === 'assistant' && isLoading && i === messages.length - 1 && !msg.content && (
+                        <span style={{ color: '#19f973' }}>|</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
             <div ref={bottomRef} />
           </div>

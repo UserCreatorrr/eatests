@@ -349,6 +349,35 @@ const tools: any[] = [
       },
     },
   },
+  // ── EMAIL PEDIDOS ──────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'proponer_pedido_email',
+      description: 'Genera un borrador de email de pedido a un proveedor para que el usuario lo revise y envíe con un clic',
+      parameters: {
+        type: 'object',
+        properties: {
+          proveedor_nombre: { type: 'string', description: 'Nombre del proveedor' },
+          proveedor_email: { type: 'string', description: 'Email del proveedor (si se conoce)' },
+          items: {
+            type: 'array',
+            description: 'Productos a pedir',
+            items: {
+              type: 'object',
+              properties: {
+                nombre: { type: 'string' },
+                cantidad: { type: 'number' },
+                unidad: { type: 'string' },
+              },
+            },
+          },
+          notas: { type: 'string', description: 'Instrucciones adicionales para el pedido' },
+        },
+        required: ['proveedor_nombre', 'items'],
+      },
+    },
+  },
 ]
 
 async function executeTool(name: string, args: any, userId: string): Promise<string> {
@@ -619,6 +648,32 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     } catch (e: any) { return `Error: ${e.message}` }
   }
 
+  // ── PROPONER PEDIDO EMAIL ─────────────────────────────────
+  if (name === 'proponer_pedido_email') {
+    const { proveedor_nombre, proveedor_email, items, notas } = args
+    const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const itemLines = (items as any[]).map(i => `  - ${i.nombre}: ${i.cantidad || ''}${i.unidad ? ' ' + i.unidad : ''}`).join('\n')
+    const subject = `Pedido ${today} - MarginBites`
+    const body = `Estimado equipo de ${proveedor_nombre},
+
+Necesitamos realizar el siguiente pedido para la próxima entrega:
+
+${itemLines}
+${notas ? '\nNotas adicionales: ' + notas : ''}
+
+Por favor, confirmen disponibilidad y fecha estimada de entrega.
+
+Muchas gracias,
+Equipo MarginBites`
+
+    return `__EMAIL_PROPOSAL__${JSON.stringify({
+      proveedor: proveedor_nombre,
+      to: proveedor_email || 'pabloperez@visualandgrowth.es',
+      subject,
+      body,
+    })}`
+  }
+
   return 'Herramienta no reconocida'
 }
 
@@ -662,7 +717,9 @@ REGLAS:
 - Para "resumen", "informe", "cómo estamos" → usa informe_diario
 - Para análisis de gasto → usa resumen_gastos o gasto_por_proveedor
 - Para actualizar precio → usa actualizar_ingrediente
-- Cuando crees o modifiques algo, confirma con el id generado`
+- Cuando crees o modifiques algo, confirma con el id generado
+- Para "hacer pedido a X", "pedir X a proveedor", "manda el pedido", "envía email" → usa proponer_pedido_email (el usuario revisará y enviará con un clic)
+- En el brief, si hay pedidos pendientes o ingredientes críticos, sugiere hacer el pedido y ofrece usar proponer_pedido_email`
 
   const chatMessages: any[] = messages.map((m: any) => ({ role: m.role, content: m.content }))
 
@@ -694,9 +751,18 @@ REGLAS:
 
   if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
     const results: string[] = []
+    let emailProposal: any = null
+
     for (const tc of choice.message.tool_calls) {
       const args = JSON.parse(tc.function.arguments)
-      results.push(await executeTool(tc.function.name, args, user?.id ?? ''))
+      const result = await executeTool(tc.function.name, args, user?.id ?? '')
+      const EMAIL_MARKER = '__EMAIL_PROPOSAL__'
+      if (result.startsWith(EMAIL_MARKER)) {
+        emailProposal = JSON.parse(result.slice(EMAIL_MARKER.length))
+        results.push('Propuesta de email generada correctamente.')
+      } else {
+        results.push(result)
+      }
     }
 
     const followUp = await openai.chat.completions.create({
@@ -717,7 +783,7 @@ REGLAS:
 
     const reply = followUp.choices[0]?.message?.content || 'Hecho.'
     const toolNames = choice.message.tool_calls.map((tc: any) => tc.function.name).join(', ')
-    return NextResponse.json({ reply, action: toolNames })
+    return NextResponse.json({ reply, action: toolNames, emailProposal })
   }
 
   // Streaming response for non-tool calls

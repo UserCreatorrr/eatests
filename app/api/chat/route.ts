@@ -497,19 +497,51 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
   // ── INFORME DIARIO ─────────────────────────────────────
   if (name === 'informe_diario') {
     const hoy = new Date().toISOString().split('T')[0]
-    const ingSinCoste = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=? AND (cost IS NULL OR cost=0)').get(userId) as any).c
+    const h = new Date().getHours()
+    const saludo = h < 13 ? 'Buenos dias' : h < 20 ? 'Buenas tardes' : 'Buenas noches'
+
+    const gastoMes = (db.prepare("SELECT ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND strftime('%Y-%m',date_order)=strftime('%Y-%m','now')").get(userId) as any).t
+    const gastoMesAnt = (db.prepare("SELECT ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND strftime('%Y-%m',date_order)=strftime('%Y-%m',date('now','-1 month'))").get(userId) as any).t
+    const variacion = gastoMesAnt > 0 ? Math.round(((gastoMes - gastoMesAnt) / gastoMesAnt) * 100) : null
+    const topProv = db.prepare("SELECT vendor, ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND strftime('%Y-%m',date_order)=strftime('%Y-%m','now') GROUP BY vendor ORDER BY t DESC LIMIT 3").all(userId) as any[]
+
     const pedPendEnvio = (db.prepare('SELECT COUNT(*) as c FROM lista_pedidos WHERE user_id=? AND pending_send>0').get(userId) as any).c
     const pedPendRec = (db.prepare('SELECT COUNT(*) as c FROM lista_pedidos WHERE user_id=? AND pending_receive>0').get(userId) as any).c
-    const facVencen = db.prepare("SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL) AND date_due<=date('now','+7 days')").get(userId) as any
-    const gastoMes = (db.prepare("SELECT ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND strftime('%Y-%m',date_order)=strftime('%Y-%m','now')").get(userId) as any).t
-    const topProv = db.prepare("SELECT vendor, ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND strftime('%Y-%m',date_order)=strftime('%Y-%m','now') GROUP BY vendor ORDER BY t DESC LIMIT 3").all(userId) as any[]
-    return `INFORME — ${hoy}\n\n` +
-      `Gasto este mes: ${gastoMes || 0}€\n` +
-      `Top proveedores mes: ${topProv.map(p => `${p.vendor} (${p.t}€)`).join(', ') || 'sin datos'}\n` +
-      `Ingredientes sin coste: ${ingSinCoste}\n` +
-      `Pedidos pendientes envío: ${pedPendEnvio}\n` +
-      `Pedidos pendientes recepción: ${pedPendRec}\n` +
-      `Facturas vencen en 7 días: ${facVencen.c} (${facVencen.t || 0}€)`
+
+    const facVencidas = db.prepare("SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL) AND date_due<date('now')").get(userId) as any
+    const facVencen7 = db.prepare("SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL) AND date_due BETWEEN date('now') AND date('now','+7 days')").get(userId) as any
+    const facPendTotal = db.prepare("SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL)").get(userId) as any
+
+    const ingSinCoste = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=? AND (cost IS NULL OR cost=0)').get(userId) as any).c
+    const mermaMes = db.prepare("SELECT ROUND(SUM(coste_estimado),2) as t, COUNT(*) as n FROM merma_registro WHERE user_id=? AND strftime('%Y-%m',fecha)=strftime('%Y-%m','now')").get(userId) as any
+    const topMerma = db.prepare("SELECT nombre, ROUND(SUM(coste_estimado),2) as t FROM merma_registro WHERE user_id=? AND strftime('%Y-%m',fecha)=strftime('%Y-%m','now') GROUP BY nombre ORDER BY t DESC LIMIT 3").all(userId) as any[]
+
+    const alertasPrecios = db.prepare(`
+      SELECT p1.nombre, p1.precio as precio_actual, p2.precio as precio_anterior,
+        ROUND(((p1.precio - p2.precio) / p2.precio) * 100) as variacion_pct
+      FROM precio_historial p1
+      JOIN precio_historial p2 ON p1.nombre=p2.nombre AND p1.user_id=p2.user_id
+        AND p2.fecha=(SELECT MAX(fecha) FROM precio_historial WHERE nombre=p1.nombre AND user_id=p1.user_id AND fecha<p1.fecha)
+      WHERE p1.user_id=? AND p1.fecha=(SELECT MAX(fecha) FROM precio_historial WHERE nombre=p1.nombre AND user_id=p1.user_id)
+        AND ((p1.precio-p2.precio)/p2.precio)>0.07
+      ORDER BY variacion_pct DESC LIMIT 4
+    `).all(userId) as any[]
+
+    return `${saludo} — BRIEF ${hoy}\n\n` +
+      `GASTO COMPRAS\n` +
+      `Este mes: ${gastoMes || 0}EUR${variacion !== null ? ` (${variacion > 0 ? '+' : ''}${variacion}% vs mes anterior)` : ''}\n` +
+      `Top: ${topProv.map(p => `${p.vendor} ${p.t}EUR`).join(' / ') || 'sin datos'}\n\n` +
+      `PEDIDOS\n` +
+      `Pendientes de enviar: ${pedPendEnvio} | Pendientes de recibir: ${pedPendRec}\n\n` +
+      `FACTURAS\n` +
+      (facVencidas.c > 0 ? `VENCIDAS (urgente): ${facVencidas.c} facturas por ${facVencidas.t || 0}EUR\n` : '') +
+      `Vencen en 7 dias: ${facVencen7.c} (${facVencen7.t || 0}EUR)\n` +
+      `Total pendiente pago: ${facPendTotal.c} facturas (${facPendTotal.t || 0}EUR)\n\n` +
+      `MERMA ESTE MES\n` +
+      `Total: ${mermaMes.t || 0}EUR en ${mermaMes.n || 0} eventos\n` +
+      (topMerma.length > 0 ? `Mayor impacto: ${topMerma.map(m => `${m.nombre} ${m.t}EUR`).join(', ')}\n` : '') + '\n' +
+      (alertasPrecios.length > 0 ? `ALERTAS DE PRECIO\n${alertasPrecios.map(a => `${a.nombre}: +${a.variacion_pct}% ahora a ${a.precio_actual}EUR`).join('\n')}\n\n` : '') +
+      (ingSinCoste > 0 ? `PENDIENTE: ${ingSinCoste} ingredientes sin coste (afecta al escandallo)\n` : '')
   }
 
   // ── REGISTRAR MERMA ───────────────────────────────────────

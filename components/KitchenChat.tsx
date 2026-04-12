@@ -210,6 +210,12 @@ export default function KitchenChat() {
     </svg>
   )
 
+  function startBrief() {
+    const h = new Date().getHours()
+    const saludo = h < 13 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches'
+    send(`${saludo}, dame el brief completo del día: pedidos pendientes, facturas que vencen, merma reciente, alertas de precio, cómo vamos en general y qué debería priorizar ahora mismo.`)
+  }
+
   return (
     <div style={{ display: 'flex', height: '100%', backgroundColor: '#f5f2ee' }}>
 
@@ -276,6 +282,21 @@ export default function KitchenChat() {
                 <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.4, textAlign: 'center', margin: '0 0 28px' }}>
                   Pregunta sobre tu cocina, sube una foto de albaran o graba una nota de voz
                 </p>
+
+                {/* Brief button */}
+                <button
+                  onClick={startBrief}
+                  disabled={isLoading}
+                  style={{ width: '100%', marginBottom: 16, padding: '16px 20px', backgroundColor: '#19f973', border: 'none', borderRadius: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+                >
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#2a2522' }}>
+                    {new Date().getHours() < 13 ? 'Buenos días' : new Date().getHours() < 20 ? 'Buenas tardes' : 'Buenas noches'} — Brief del día
+                  </span>
+                </button>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   {SUGGESTIONS.map(s => (
                     <button key={s} onClick={() => send(s)} style={{ textAlign: 'left', backgroundColor: '#ffffff', border: '1px solid #e8e2db', borderRadius: 14, padding: '14px 16px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', cursor: 'pointer' }}>

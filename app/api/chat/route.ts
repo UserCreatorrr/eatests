@@ -671,6 +671,7 @@ Equipo MarginBites`
       to: proveedor_email || 'pabloperez@visualandgrowth.es',
       subject,
       body,
+      items: items || [],
     })}`
   }
 

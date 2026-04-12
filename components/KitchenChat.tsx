@@ -7,6 +7,7 @@ interface EmailProposal {
   to: string
   subject: string
   body: string
+  items?: { nombre: string; cantidad?: number; unidad?: string }[]
 }
 
 interface Message {
@@ -20,7 +21,7 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
   const [subject, setSubject] = useState(proposal.subject)
   const [body, setBody] = useState(proposal.body)
   const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
+  const [sentInfo, setSentInfo] = useState<{ to: string; num_order?: string } | null>(null)
   const [error, setError] = useState('')
 
   async function handleSend() {
@@ -30,20 +31,27 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
       const res = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: proposal.to, subject, body }),
+        body: JSON.stringify({ to: proposal.to, subject, body, proveedor: proposal.proveedor, items: proposal.items }),
       })
       const json = await res.json()
-      if (json.ok) setSent(true)
+      if (json.ok) setSentInfo({ to: proposal.to, num_order: json.num_order })
       else setError(json.error || 'Error al enviar')
     } catch { setError('Error de conexión') }
     finally { setSending(false) }
   }
 
-  if (sent) {
+  if (sentInfo) {
     return (
-      <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #19f973', borderRadius: 16, padding: '14px 18px', maxWidth: '90%', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#166534' }}>Email enviado a {proposal.to}</span>
+      <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #19f973', borderRadius: 16, padding: '14px 18px', maxWidth: '90%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: sentInfo.num_order ? 6 : 0 }}>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#166534' }}>Email enviado a {sentInfo.to}</span>
+        </div>
+        {sentInfo.num_order && (
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.7, margin: '0 0 0 28px' }}>
+            Pedido creado: {sentInfo.num_order} · pendiente de recepción
+          </p>
+        )}
       </div>
     )
   }

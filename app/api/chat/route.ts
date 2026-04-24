@@ -558,21 +558,109 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       .sort((a, b) => b.variacion_pct - a.variacion_pct)
       .slice(0, 4)
 
-    return `${saludo} — BRIEF ${hoy}\n\n` +
-      `GASTO COMPRAS\n` +
-      `Este mes: ${gastoMes || 0}EUR${variacion !== null ? ` (${variacion > 0 ? '+' : ''}${variacion}% vs mes anterior)` : ''}\n` +
-      `Top: ${topProv.map(p => `${p.vendor} ${p.t}EUR`).join(' / ') || 'sin datos'}\n\n` +
-      `PEDIDOS\n` +
-      `Pendientes de enviar: ${pedPendEnvio} | Pendientes de recibir: ${pedPendRec}\n\n` +
-      `FACTURAS\n` +
-      (facVencidas.c > 0 ? `VENCIDAS (urgente): ${facVencidas.c} facturas por ${facVencidas.t || 0}EUR\n` : '') +
-      `Vencen en 7 dias: ${facVencen7.c} (${facVencen7.t || 0}EUR)\n` +
-      `Total pendiente pago: ${facPendTotal.c} facturas (${facPendTotal.t || 0}EUR)\n\n` +
-      `MERMA ESTE MES\n` +
-      `Total: ${mermaMes.t || 0}EUR en ${mermaMes.n || 0} eventos\n` +
-      (topMerma.length > 0 ? `Mayor impacto: ${topMerma.map(m => `${m.nombre} ${m.t}EUR`).join(', ')}\n` : '') + '\n' +
-      (alertasPrecios.length > 0 ? `ALERTAS DE PRECIO\n${alertasPrecios.map(a => `${a.nombre}: +${a.variacion_pct}% ahora a ${a.precio_actual}EUR`).join('\n')}\n\n` : '') +
-      (ingSinCoste > 0 ? `PENDIENTE: ${ingSinCoste} ingredientes sin coste (afecta al escandallo)\n` : '')
+    const cards: any[] = []
+
+    // GASTO COMPRAS
+    cards.push({
+      id: 'gastos',
+      titulo: 'Gasto compras',
+      icon: 'chart',
+      urgencia: variacion !== null && variacion > 15 ? 'warning' : 'normal',
+      items: [
+        `Este mes: **${gastoMes || 0} EUR**${variacion !== null ? ` (${variacion > 0 ? '+' : ''}${variacion}% vs mes anterior)` : ''}`,
+        ...(topProv.length > 0 ? topProv.map(p => `${p.vendor}: ${p.t} EUR`) : ['Sin datos este mes']),
+      ],
+      acciones: [
+        { label: 'Ver analytics', href: '/dashboard/analytics' },
+        { label: 'Gasto por proveedor', chat: 'Dame un análisis detallado del gasto por proveedor este mes' },
+      ],
+    })
+
+    // PEDIDOS
+    if (pedPendEnvio > 0 || pedPendRec > 0) {
+      cards.push({
+        id: 'pedidos',
+        titulo: 'Pedidos',
+        icon: 'truck',
+        urgencia: pedPendEnvio > 0 ? 'warning' : 'normal',
+        items: [
+          pedPendEnvio > 0 ? `**${pedPendEnvio}** pendientes de enviar` : null,
+          pedPendRec > 0 ? `**${pedPendRec}** pendientes de recibir` : null,
+        ].filter(Boolean),
+        acciones: [
+          { label: 'Ver pedidos', href: '/dashboard/compras/pedidos' },
+          { label: 'Hacer pedido', chat: 'Quiero hacer un pedido a un proveedor' },
+        ],
+      })
+    }
+
+    // FACTURAS
+    cards.push({
+      id: 'facturas',
+      titulo: 'Facturas pendientes',
+      icon: 'invoice',
+      urgencia: facVencidas.c > 0 ? 'danger' : facVencen7.c > 0 ? 'warning' : 'normal',
+      items: [
+        facVencidas.c > 0 ? `**${facVencidas.c} vencidas** · ${facVencidas.t || 0} EUR` : null,
+        facVencen7.c > 0 ? `${facVencen7.c} vencen en 7 días · ${facVencen7.t || 0} EUR` : null,
+        `Total pendiente: **${facPendTotal.c} facturas** (${facPendTotal.t || 0} EUR)`,
+      ].filter(Boolean),
+      acciones: [
+        { label: 'Ver facturas', href: '/dashboard/compras/facturas' },
+        { label: 'Cuáles son urgentes', chat: 'Dime qué facturas están vencidas y cuáles vencen pronto' },
+      ],
+    })
+
+    // MERMA
+    if (mermaMes.n > 0) {
+      cards.push({
+        id: 'merma',
+        titulo: 'Merma este mes',
+        icon: 'merma',
+        urgencia: mermaMes.t > 100 ? 'warning' : 'normal',
+        items: [
+          `**${mermaMes.t || 0} EUR** en ${mermaMes.n} eventos`,
+          ...topMerma.map(m => `${m.nombre}: ${m.t} EUR`),
+        ],
+        acciones: [
+          { label: 'Ver sangrado', href: '/dashboard/sangrado' },
+          { label: 'Registrar merma', chat: 'Quiero registrar una merma' },
+          { label: 'Análisis de merma', chat: 'Analiza la merma de este mes y dime cómo reducirla' },
+        ],
+      })
+    }
+
+    // ALERTAS DE PRECIO
+    if (alertasPrecios.length > 0) {
+      cards.push({
+        id: 'precios',
+        titulo: 'Alertas de precio',
+        icon: 'alert',
+        urgencia: 'warning',
+        items: alertasPrecios.map(a => `**${a.nombre}**: +${a.variacion_pct}% → ${a.precio_actual} EUR`),
+        acciones: [
+          { label: 'Ver analytics', href: '/dashboard/analytics' },
+          { label: 'Actualizar precios', chat: 'Ayúdame a actualizar los precios de ingredientes que han subido' },
+        ],
+      })
+    }
+
+    // INGREDIENTES SIN COSTE
+    if (ingSinCoste > 0) {
+      cards.push({
+        id: 'sin_coste',
+        titulo: 'Ingredientes sin coste',
+        icon: 'warning',
+        urgencia: 'warning',
+        items: [`**${ingSinCoste} ingredientes** sin precio registrado (afecta al escandallo)`],
+        acciones: [
+          { label: 'Ver ingredientes', href: '/dashboard/ingredientes' },
+          { label: 'Cuáles son', chat: 'Dime qué ingredientes no tienen coste registrado' },
+        ],
+      })
+    }
+
+    return `__BRIEF_CARDS__${JSON.stringify({ saludo, fecha: hoy, cards })}`
   }
 
   // ── REGISTRAR MERMA ───────────────────────────────────────
@@ -753,14 +841,17 @@ REGLAS:
   if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
     const results: string[] = []
     let emailProposal: any = null
+    let briefCards: any = null
 
     for (const tc of choice.message.tool_calls) {
       const args = JSON.parse(tc.function.arguments)
       const result = await executeTool(tc.function.name, args, user?.id ?? '')
-      const EMAIL_MARKER = '__EMAIL_PROPOSAL__'
-      if (result.startsWith(EMAIL_MARKER)) {
-        emailProposal = JSON.parse(result.slice(EMAIL_MARKER.length))
-        results.push('Propuesta de email generada correctamente.')
+      if (result.startsWith('__EMAIL_PROPOSAL__')) {
+        emailProposal = JSON.parse(result.slice('__EMAIL_PROPOSAL__'.length))
+        results.push('Propuesta de email generada.')
+      } else if (result.startsWith('__BRIEF_CARDS__')) {
+        briefCards = JSON.parse(result.slice('__BRIEF_CARDS__'.length))
+        results.push('Brief generado.')
       } else {
         results.push(result)
       }
@@ -782,8 +873,14 @@ REGLAS:
       temperature: 0.3,
     })
 
-    const reply = followUp.choices[0]?.message?.content || 'Hecho.'
     const toolNames = choice.message.tool_calls.map((tc: any) => tc.function.name).join(', ')
+
+    // Brief cards: skip follow-up LLM call, send cards directly
+    if (briefCards) {
+      return NextResponse.json({ reply: '', action: toolNames, briefCards })
+    }
+
+    const reply = followUp.choices[0]?.message?.content || 'Hecho.'
     return NextResponse.json({ reply, action: toolNames, emailProposal })
   }
 

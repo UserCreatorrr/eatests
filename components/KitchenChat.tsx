@@ -10,11 +10,119 @@ interface EmailProposal {
   items?: { nombre: string; cantidad?: number; unidad?: string }[]
 }
 
+interface BriefCard {
+  id: string
+  titulo: string
+  icon: 'chart' | 'truck' | 'invoice' | 'merma' | 'alert' | 'warning'
+  urgencia: 'normal' | 'warning' | 'danger'
+  items: string[]
+  acciones: { label: string; href?: string; chat?: string }[]
+}
+
+interface BriefData {
+  saludo: string
+  fecha: string
+  cards: BriefCard[]
+}
+
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal'
+  role: 'user' | 'assistant' | 'email_proposal' | 'brief_cards'
   content: string
   image?: string
   emailProposal?: EmailProposal
+  briefCards?: BriefData
+}
+
+const CARD_ICONS: Record<string, JSX.Element> = {
+  chart: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 16v-4M11 16V8M15 16v-6M19 16V6" /></svg>,
+  truck: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM21 17a2 2 0 11-4 0 2 2 0 014 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M1 1h11l1 6H1V1zM13 7h5l3 5v4h-8V7z"/></svg>,
+  invoice: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+  merma: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+  alert: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+  warning: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+}
+
+const URGENCIA_COLORS = {
+  normal:  { bg: '#f8f7f5', border: '#e8e2db', icon: '#3d3834', badge: null },
+  warning: { bg: '#fffbeb', border: '#fcd34d', icon: '#92400e', badge: '#f59e0b' },
+  danger:  { bg: '#fff1f2', border: '#fca5a5', icon: '#991b1b', badge: '#ef4444' },
+}
+
+function renderBriefText(text: string) {
+  // Bold **text**
+  const parts = text.split(/\*\*(.*?)\*\*/g)
+  return parts.map((p, i) => i % 2 === 1
+    ? <strong key={i} style={{ fontWeight: 700, color: 'inherit' }}>{p}</strong>
+    : <span key={i}>{p}</span>
+  )
+}
+
+function BriefCards({ data, onAction }: { data: BriefData; onAction: (chat: string) => void }) {
+  return (
+    <div style={{ width: '100%', maxWidth: 620 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+        </div>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#3d3834', margin: 0 }}>{data.saludo}</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4, margin: 0 }}>Brief del {data.fecha}</p>
+        </div>
+      </div>
+
+      {/* Cards grid */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {data.cards.map(card => {
+          const colors = URGENCIA_COLORS[card.urgencia]
+          return (
+            <div key={card.id} style={{ backgroundColor: colors.bg, border: `1.5px solid ${colors.border}`, borderRadius: 14, padding: '14px 16px' }}>
+              {/* Card header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ color: colors.icon, display: 'flex', alignItems: 'center' }}>{CARD_ICONS[card.icon]}</span>
+                <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#3d3834', flex: 1 }}>{card.titulo}</span>
+                {colors.badge && (
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: colors.badge, flexShrink: 0 }} />
+                )}
+              </div>
+
+              {/* Items */}
+              <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {card.items.map((item, i) => (
+                  <p key={i} style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.8, margin: 0, lineHeight: 1.5 }}>
+                    {renderBriefText(item)}
+                  </p>
+                ))}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {card.acciones.map((accion, i) => (
+                  accion.href ? (
+                    <a
+                      key={i}
+                      href={accion.href}
+                      style={{ padding: '6px 12px', backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      {accion.label} →
+                    </a>
+                  ) : (
+                    <button
+                      key={i}
+                      onClick={() => onAction(accion.chat!)}
+                      style={{ padding: '6px 12px', backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834' }}
+                    >
+                      {accion.label}
+                    </button>
+                  )
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard: () => void }) {
@@ -151,7 +259,7 @@ function loadCurrent(): Message[] {
 
 function saveCurrent(messages: Message[]) {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal')))
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards')))
   } catch {}
 }
 
@@ -226,7 +334,7 @@ export default function KitchenChat() {
     if (!t && !img) return
     const userMsg: Message = { role: 'user', content: t, image: img }
     // Filter out email_proposal messages before sending to API
-    const apiMessages = messages.filter(m => m.role !== 'email_proposal')
+    const apiMessages = messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards')
     const history2 = [...messages, userMsg]
     setMessages(history2)
     setInput('')
@@ -249,7 +357,9 @@ export default function KitchenChat() {
       if (contentType.includes('application/json')) {
         const json = await res.json()
         if (json.action) setActionMsg(json.action)
-        if (json.reply) {
+        if (json.briefCards) {
+          setMessages(prev => [...prev, { role: 'brief_cards', content: '', briefCards: json.briefCards }])
+        } else if (json.reply) {
           const newMsgs: Message[] = [{ role: 'assistant', content: json.reply }]
           if (json.emailProposal) {
             newMsgs.push({ role: 'email_proposal', content: '', emailProposal: json.emailProposal })
@@ -427,6 +537,19 @@ export default function KitchenChat() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {messages.map((msg, i) => {
+                // Brief cards
+                if (msg.role === 'brief_cards' && msg.briefCards) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <BriefCards
+                        data={msg.briefCards}
+                        onAction={(chat) => send(chat)}
+                      />
+                    </div>
+                  )
+                }
+
                 // Email proposal card
                 if (msg.role === 'email_proposal' && msg.emailProposal) {
                   return (

@@ -259,7 +259,7 @@ function loadCurrent(): Message[] {
 
 function saveCurrent(messages: Message[]) {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards')))
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal')))
   } catch {}
 }
 
@@ -333,8 +333,12 @@ export default function KitchenChat() {
     const t = text.trim()
     if (!t && !img) return
     const userMsg: Message = { role: 'user', content: t, image: img }
-    // Filter out email_proposal messages before sending to API
-    const apiMessages = messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards')
+    // Convert special message types for API: brief_cards → assistant placeholder, drop email_proposal/channel_choice/whatsapp_proposal
+    const apiMessages = messages.flatMap(m => {
+      if (m.role === 'brief_cards') return [{ role: 'assistant' as const, content: '[Brief diario generado y mostrado al usuario]' }]
+      if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice' || (m.role as string) === 'whatsapp_proposal') return []
+      return [m]
+    })
     const history2 = [...messages, userMsg]
     setMessages(history2)
     setInput('')

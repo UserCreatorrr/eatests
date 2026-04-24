@@ -14,8 +14,8 @@ declare global {
   var _db: Database.Database | undefined
 }
 
-// Bump when schema changes — triggers drop+recreate of entity tables
-const SCHEMA_VERSION = 3
+// NEVER lower this value — it would wipe all data on next deploy
+const SCHEMA_VERSION = 4
 
 function initSchema(db: Database.Database) {
   db.pragma('journal_mode = WAL')
@@ -35,22 +35,12 @@ function initSchema(db: Database.Database) {
   `)
 
   const row = db.prepare('SELECT version FROM _schema_version LIMIT 1').get() as { version: number } | undefined
-  if (!row || row.version < SCHEMA_VERSION) {
-    db.exec(`
-      DROP TABLE IF EXISTS ingredientes;
-      DROP TABLE IF EXISTS herramientas;
-      DROP TABLE IF EXISTS proveedores;
-      DROP TABLE IF EXISTS proveedores_detalle;
-      DROP TABLE IF EXISTS lista_pedidos;
-      DROP TABLE IF EXISTS pedidos_compra;
-      DROP TABLE IF EXISTS albaranes_compra;
-      DROP TABLE IF EXISTS albaranes_venta;
-      DROP TABLE IF EXISTS facturas_compra;
-      DROP TABLE IF EXISTS facturas_venta;
-      DROP TABLE IF EXISTS escandallo_receta;
-      DELETE FROM _schema_version;
-      INSERT INTO _schema_version (version) VALUES (${SCHEMA_VERSION});
-    `)
+  if (!row) {
+    // First time ever — just mark version, tables created below with IF NOT EXISTS
+    db.exec(`INSERT INTO _schema_version (version) VALUES (${SCHEMA_VERSION});`)
+  } else if (row.version < SCHEMA_VERSION) {
+    // Safe migration: only update version, never drop tables
+    db.exec(`UPDATE _schema_version SET version = ${SCHEMA_VERSION};`)
   }
 
   // Column names match EXACTLY what node "12. Preparar Payload" sends to /api/ingest

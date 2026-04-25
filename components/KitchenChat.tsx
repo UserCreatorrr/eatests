@@ -820,39 +820,19 @@ export default function KitchenChat() {
       })
       if (!res.ok) throw new Error('Error')
 
-      const contentType = res.headers.get('content-type') || ''
-
-      if (contentType.includes('application/json')) {
-        const json = await res.json()
-        if (json.action) setActionMsg(json.action)
-        if (json.briefCards) {
-          setMessages(prev => [...prev, { role: 'brief_cards', content: '', briefCards: json.briefCards }])
-        } else if (json.pedidoSelector) {
-          setMessages(prev => [...prev, { role: 'pedido_selector', content: '', pedidoSelector: json.pedidoSelector }])
-        } else if (json.whatsappProposal) {
-          setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
-        } else if (json.reply) {
-          const newMsgs: Message[] = [{ role: 'assistant', content: json.reply }]
-          if (json.emailProposal) {
-            newMsgs.push({ role: 'email_proposal', content: '', emailProposal: json.emailProposal })
-          }
-          setMessages(prev => [...prev, ...newMsgs])
-        }
+      const json = await res.json()
+      if (json.action) setActionMsg(json.action)
+      if (json.briefCards) {
+        setMessages(prev => [...prev, { role: 'brief_cards', content: '', briefCards: json.briefCards }])
+      } else if (json.pedidoSelector) {
+        setMessages(prev => [...prev, { role: 'pedido_selector', content: '', pedidoSelector: json.pedidoSelector }])
+      } else if (json.whatsappProposal) {
+        setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
-        const reader = res.body!.getReader()
-        const decoder = new TextDecoder()
-        let reply = ''
-        setMessages(prev => [...prev, { role: 'assistant', content: '' }])
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          reply += decoder.decode(value)
-          setMessages(prev => {
-            const u = [...prev]
-            u[u.length - 1] = { role: 'assistant', content: reply }
-            return u
-          })
-        }
+        const newMsgs: Message[] = []
+        if (json.reply) newMsgs.push({ role: 'assistant', content: json.reply })
+        if (json.emailProposal) newMsgs.push({ role: 'email_proposal', content: '', emailProposal: json.emailProposal })
+        if (newMsgs.length) setMessages(prev => [...prev, ...newMsgs])
       }
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error al conectar.' }])

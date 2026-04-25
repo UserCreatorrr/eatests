@@ -7,18 +7,27 @@ export const dynamic = 'force-dynamic'
 
 function getKitchenContext(userId: string) {
   const counts = {
-    ingredientes: (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id = ?').get(userId) as any)?.c ?? 0,
-    proveedores: (db.prepare('SELECT COUNT(*) as c FROM proveedores WHERE user_id = ?').get(userId) as any)?.c ?? 0,
-    pedidos: (db.prepare('SELECT COUNT(*) as c FROM pedidos_compra WHERE user_id = ?').get(userId) as any)?.c ?? 0,
-    albaranes: (db.prepare('SELECT COUNT(*) as c FROM albaranes_compra WHERE user_id = ?').get(userId) as any)?.c ?? 0,
-    herramientas: (db.prepare('SELECT COUNT(*) as c FROM herramientas WHERE user_id = ?').get(userId) as any)?.c ?? 0,
-    facturas_pendientes: (db.prepare("SELECT COUNT(*) as c FROM facturas_compra WHERE user_id = ? AND (paid=0 OR paid IS NULL)").get(userId) as any)?.c ?? 0,
+    ingredientes:       (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=?').get(userId) as any)?.c ?? 0,
+    ing_sin_proveedor:  (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=? AND proveedor_id IS NULL').get(userId) as any)?.c ?? 0,
+    proveedores:        (db.prepare('SELECT COUNT(*) as c FROM proveedores WHERE user_id=?').get(userId) as any)?.c ?? 0,
+    pedidos:            (db.prepare('SELECT COUNT(*) as c FROM pedidos_compra WHERE user_id=?').get(userId) as any)?.c ?? 0,
+    albaranes:          (db.prepare('SELECT COUNT(*) as c FROM albaranes_compra WHERE user_id=?').get(userId) as any)?.c ?? 0,
+    facturas_pendientes:(db.prepare("SELECT COUNT(*) as c FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL)").get(userId) as any)?.c ?? 0,
   }
-  const ingredientes = db.prepare('SELECT id, descr, type, unit, cost FROM ingredientes WHERE user_id = ? ORDER BY descr LIMIT 100').all(userId)
-  const proveedores = db.prepare('SELECT id, codi, descr, descr_type, mail, phone FROM proveedores WHERE user_id = ? ORDER BY descr LIMIT 60').all(userId)
-  const recentOrders = db.prepare('SELECT num_order, vendor, date_order, total FROM pedidos_compra WHERE user_id = ? ORDER BY date_order DESC LIMIT 10').all(userId)
-  return { counts, ingredientes, proveedores, recentOrders }
+  const recentOrders = db.prepare('SELECT vendor, date_order, total FROM pedidos_compra WHERE user_id=? ORDER BY date_order DESC LIMIT 5').all(userId)
+  const overdue = (db.prepare("SELECT ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL) AND date_due<date('now')").get(userId) as any)?.t ?? 0
+  return { counts, recentOrders, overdue }
 }
+
+// Tools that don't need a follow-up LLM call — the result IS the answer
+const SIMPLE_TOOLS = new Set([
+  'crear_ingrediente', 'crear_proveedor', 'crear_pedido',
+  'actualizar_ingrediente', 'guardar_albaran_compra', 'guardar_factura_compra',
+  'registrar_merma', 'registrar_precio', 'guardar_linea_albaran', 'registrar_produccion',
+])
+
+// Lean prompt for follow-up calls (no data lists, saves tokens)
+const FOLLOWUP_SYSTEM = 'Asistente de MarginBite. Presenta el resultado de la herramienta al usuario de forma concisa en español. Usa listas markdown si hay varios items. No repitas datos ya formateados — solo añade contexto útil si lo hay.'
 
 const tools: any[] = [
   // ── INGREDIENTES ──────────────────────────────────────
@@ -876,46 +885,27 @@ export async function POST(req: NextRequest) {
   const { messages, image } = await req.json()
   const ctx = getKitchenContext(user?.id ?? '')
 
-  const ingList = (ctx.ingredientes as any[]).map(i =>
-    `• [${i.id}] ${i.descr} [${i.type || '-'}] ${i.unit || ''}${i.cost ? ' ' + i.cost + '€' : ' SIN COSTE'}`
-  ).join('\n')
+  // ── Lean system prompt — no data dumps, AI uses tools to query ──────────
+  const recentStr = (ctx.recentOrders as any[]).map(o =>
+    `${o.vendor}/${(o.date_order || '').slice(0, 7)}/${o.total ?? 0}€`
+  ).join(' · ') || 'ninguno'
 
-  const provList = (ctx.proveedores as any[]).map(p =>
-    `• [${p.id}] ${p.descr} [${p.descr_type || '-'}]`
-  ).join('\n')
+  const systemPrompt = `Eres el asistente IA de MarginBite (restaurante). Tienes herramientas para consultar y modificar todos los datos.
 
-  const orderList = (ctx.recentOrders as any[]).map(o =>
-    `• ${o.vendor} | ${o.date_order || '-'} | ${o.total ? o.total + '€' : '-'}`
-  ).join('\n')
-
-  const systemPrompt = `Eres el asistente IA de gestión gastronómica de MarginBite. Tienes acceso completo a todos los datos del restaurante y puedes realizar cualquier acción.
-
-DATOS ACTUALES:
-Ingredientes: ${ctx.counts.ingredientes} | Proveedores: ${ctx.counts.proveedores} | Pedidos: ${ctx.counts.pedidos} | Albaranes: ${ctx.counts.albaranes} | Herramientas: ${ctx.counts.herramientas} | Facturas pendientes: ${ctx.counts.facturas_pendientes}
-
-INGREDIENTES (${ctx.counts.ingredientes} total):
-${ingList}
-
-PROVEEDORES:
-${provList}
-
-ÚLTIMOS PEDIDOS:
-${orderList}
+ESTADO HOY:
+Ingredientes: ${ctx.counts.ingredientes} (${ctx.counts.ing_sin_proveedor} sin proveedor asignado) | Proveedores: ${ctx.counts.proveedores} | Pedidos: ${ctx.counts.pedidos} | Albaranes: ${ctx.counts.albaranes} | Facturas pendientes: ${ctx.counts.facturas_pendientes}${ctx.overdue > 0 ? ` — ⚠ ${ctx.overdue}€ VENCIDAS` : ''}
+Últimos pedidos: ${recentStr}
 
 REGLAS:
-- Responde SIEMPRE en español, directo y concreto
-- Usa listas markdown, nunca párrafos largos
-- Precios siempre en euros
-- FOTO de albarán/factura: extrae TODOS los datos visibles (proveedor, número, fecha, base, IVA, total, productos) en tabla markdown y pregunta si quieres guardarla
-- Si el usuario confirma guardar, usa guardar_albaran_compra o guardar_factura_compra
-- Para "resumen", "informe", "cómo estamos" → usa informe_diario
-- Para análisis de gasto → usa resumen_gastos o gasto_por_proveedor
-- Para actualizar precio → usa actualizar_ingrediente
-- Cuando crees o modifiques algo, confirma con el id generado
-- PEDIDOS — REGLA OBLIGATORIA: cuando el usuario quiera hacer UN PEDIDO de cualquier tipo (a proveedores, de productos, de compras, de carnes, de cualquier cosa) → llama SIEMPRE a selector_pedido. Nunca respondas con texto listando proveedores, siempre usa selector_pedido.
-- PEDIDO EMAIL: cuando el usuario seleccione email para un proveedor concreto → usa proponer_pedido_email con los productos que tiene asignados ese proveedor en la lista de ingredientes
-- PEDIDO WHATSAPP: cuando el usuario seleccione WhatsApp para un proveedor concreto → usa proponer_pedido_whatsapp con los productos asignados a ese proveedor. SÍ PUEDES enviar WhatsApp, está integrado. NUNCA digas que no puedes.
-- En el brief, si hay pedidos pendientes, sugiere usar selector_pedido`
+- Responde en español, directo y conciso. Listas markdown, nunca párrafos.
+- Precios en euros. USA LAS HERRAMIENTAS para consultar datos — no inventes ni adivines.
+- FOTO albarán/factura → extrae todo en tabla markdown, pregunta si guardar. Si confirma → guardar_albaran_compra / guardar_factura_compra.
+- "resumen/informe/cómo estamos/brief" → informe_diario
+- "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor
+- "busca/qué ingredientes/cuáles" → buscar_ingrediente
+- PEDIDOS — OBLIGATORIO: cualquier intención de pedir (carnes, verduras, compras, hacer un pedido...) → selector_pedido SIEMPRE. Jamás respondas con texto listando proveedores.
+- Email a proveedor concreto → proponer_pedido_email con sus productos asignados
+- WhatsApp → proponer_pedido_whatsapp. INTEGRADO — SÍ PUEDES. Jamás digas que no puedes.`
 
   const chatMessages: any[] = messages.map((m: any) => ({ role: m.role, content: m.content }))
 
@@ -931,9 +921,9 @@ REGLAS:
     }
   }
 
-  // Use gpt-4o when there's an image, gpt-4o-mini otherwise
   const model = image ? 'gpt-4o' : 'gpt-4o-mini'
 
+  // ── Single API call — handles both tool detection and content ────────────
   const response = await openai.chat.completions.create({
     model,
     messages: [{ role: 'system', content: systemPrompt }, ...chatMessages],
@@ -945,87 +935,70 @@ REGLAS:
 
   const choice = response.choices[0]
 
-  if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
-    const results: string[] = []
-    let emailProposal: any = null
-    let whatsappProposal: any = null
-    let briefCards: any = null
-    let pedidoSelector: any = null
+  // ── Non-tool response: return directly — no second API call ─────────────
+  if (choice.finish_reason !== 'tool_calls' || !choice.message.tool_calls) {
+    const reply = choice.message.content || ''
+    return NextResponse.json({ reply })
+  }
 
-    for (const tc of choice.message.tool_calls) {
-      const args = JSON.parse(tc.function.arguments)
-      const result = await executeTool(tc.function.name, args, user?.id ?? '')
-      if (result.startsWith('__EMAIL_PROPOSAL__')) {
-        emailProposal = JSON.parse(result.slice('__EMAIL_PROPOSAL__'.length))
-        results.push('Propuesta de email generada.')
-      } else if (result.startsWith('__WHATSAPP_PROPOSAL__')) {
-        whatsappProposal = JSON.parse(result.slice('__WHATSAPP_PROPOSAL__'.length))
-        results.push('Propuesta de WhatsApp generada.')
-      } else if (result.startsWith('__BRIEF_CARDS__')) {
-        briefCards = JSON.parse(result.slice('__BRIEF_CARDS__'.length))
-        results.push('Brief generado.')
-      } else if (result.startsWith('__PEDIDO_SELECTOR__')) {
-        pedidoSelector = JSON.parse(result.slice('__PEDIDO_SELECTOR__'.length))
-        results.push('Selector de pedido generado.')
-      } else {
-        results.push(result)
-      }
+  // ── Tool execution ───────────────────────────────────────────────────────
+  const toolCalls = choice.message.tool_calls
+  const toolNames = toolCalls.map((tc: any) => tc.function.name).join(', ')
+  const results: string[] = []
+  let emailProposal: any = null
+  let whatsappProposal: any = null
+  let briefCards: any = null
+  let pedidoSelector: any = null
+
+  for (const tc of toolCalls) {
+    const args = JSON.parse(tc.function.arguments)
+    const result = await executeTool(tc.function.name, args, user?.id ?? '')
+    if (result.startsWith('__EMAIL_PROPOSAL__')) {
+      emailProposal = JSON.parse(result.slice('__EMAIL_PROPOSAL__'.length))
+      results.push('Propuesta de email generada.')
+    } else if (result.startsWith('__WHATSAPP_PROPOSAL__')) {
+      whatsappProposal = JSON.parse(result.slice('__WHATSAPP_PROPOSAL__'.length))
+      results.push('Propuesta de WhatsApp generada.')
+    } else if (result.startsWith('__BRIEF_CARDS__')) {
+      briefCards = JSON.parse(result.slice('__BRIEF_CARDS__'.length))
+      results.push('Brief generado.')
+    } else if (result.startsWith('__PEDIDO_SELECTOR__')) {
+      pedidoSelector = JSON.parse(result.slice('__PEDIDO_SELECTOR__'.length))
+      results.push('Selector de pedido generado.')
+    } else {
+      results.push(result)
     }
+  }
 
-    const followUp = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...chatMessages,
-        choice.message,
-        ...choice.message.tool_calls.map((tc: any, i: number) => ({
-          role: 'tool' as const,
-          tool_call_id: tc.id,
-          content: results[i] || 'ok',
-        })),
-      ],
-      max_tokens: 600,
-      temperature: 0.3,
-    })
+  // Visual cards → return immediately, no follow-up needed
+  if (briefCards)     return NextResponse.json({ reply: '', action: toolNames, briefCards })
+  if (pedidoSelector) return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
+  if (whatsappProposal) return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
 
-    const toolNames = choice.message.tool_calls.map((tc: any) => tc.function.name).join(', ')
-
-    // Skip follow-up LLM call for visual card responses
-    if (briefCards) {
-      return NextResponse.json({ reply: '', action: toolNames, briefCards })
-    }
-    if (pedidoSelector) {
-      return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
-    }
-    if (whatsappProposal) {
-      return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
-    }
-
-    const reply = followUp.choices[0]?.message?.content || 'Hecho.'
+  // Simple CRUD tools → return result directly, no follow-up LLM call
+  const allSimple = toolCalls.every((tc: any) => SIMPLE_TOOLS.has(tc.function.name))
+  if (allSimple) {
+    const reply = results.join('\n')
     return NextResponse.json({ reply, action: toolNames, emailProposal })
   }
 
-  // Streaming response for non-tool calls
-  const stream = await openai.chat.completions.create({
-    model,
-    messages: [{ role: 'system', content: systemPrompt }, ...chatMessages],
-    stream: true,
-    max_tokens: 1500,
-    temperature: 0.4,
+  // Analytical tools → follow-up with lean system prompt (not the full context)
+  const followUp = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: FOLLOWUP_SYSTEM },
+      ...chatMessages,
+      choice.message,
+      ...toolCalls.map((tc: any, i: number) => ({
+        role: 'tool' as const,
+        tool_call_id: tc.id,
+        content: results[i] || 'ok',
+      })),
+    ],
+    max_tokens: 500,
+    temperature: 0.2,
   })
 
-  const encoder = new TextEncoder()
-  const readable = new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content || ''
-        if (text) controller.enqueue(encoder.encode(text))
-      }
-      controller.close()
-    },
-  })
-
-  return new Response(readable, {
-    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Transfer-Encoding': 'chunked' },
-  })
+  const reply = followUp.choices[0]?.message?.content || results.join('\n')
+  return NextResponse.json({ reply, action: toolNames, emailProposal })
 }

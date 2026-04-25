@@ -91,33 +91,33 @@ export default function CRUDPage({ title, entity, fields, columns }: Props) {
 
   return (
     <div className="p-8">
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 className="page-title">{title}</h1>
-          <p className="page-subtitle">{count.toLocaleString('es-ES')} registros</p>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#3d3834" strokeWidth={2} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: 0.4, pointerEvents: 'none' }}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Buscar..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, borderRadius: 10, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', outline: 'none', backgroundColor: '#fff', width: 200 }}
-              onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
-            />
+      <div className="table-wrap" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, padding: '24px 28px', borderBottom: '1.5px solid #e8e2db' }}>
+          <div>
+            <h1 className="page-title">{title}</h1>
+            <p className="page-subtitle">{count.toLocaleString('es-ES')} registros</p>
           </div>
-          <button onClick={openAdd} style={{ ...BTN.base, backgroundColor: '#19f973', color: '#2a2522', fontWeight: 600, fontSize: 13, padding: '10px 20px' }}>
-            + Nuevo
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#3d3834" strokeWidth={2} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: 0.4, pointerEvents: 'none' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Buscar..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, borderRadius: 10, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', outline: 'none', backgroundColor: '#fff', width: 200 }}
+                onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
+                onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
+              />
+            </div>
+            <button onClick={openAdd} style={{ ...BTN.base, backgroundColor: '#19f973', color: '#2a2522', fontWeight: 600, fontSize: 13, padding: '10px 20px' }}>
+              + Nuevo
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div className="table-wrap">
         {loading ? (
           <div className="empty-state"><p className="page-subtitle">Cargando...</p></div>
         ) : rows.length === 0 ? (

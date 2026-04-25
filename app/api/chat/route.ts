@@ -382,6 +382,15 @@ const tools: any[] = [
       },
     },
   },
+  // ── ANALIZAR NECESIDADES PEDIDO ────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'analizar_necesidades_pedido',
+      description: 'Analiza qué ingredientes hace falta reponer (basándose en cuánto tiempo hace que no se piden y el patrón histórico) y los agrupa por proveedor. USAR SIEMPRE cuando el usuario diga "quiero hacer un pedido", "qué tengo que pedir", "haz un pedido", etc. — sin preguntar a qué proveedor. Devuelve la lista de proveedores y los items específicos que necesitan reposición.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
   // ── WHATSAPP PEDIDOS ───────────────────────────────────────
   {
     type: 'function',
@@ -883,6 +892,76 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       `\n\nUSA ESTOS NOMBRES EXACTOS al proponer el pedido. Ajusta cantidades si el usuario lo indica.`
   }
 
+  // ── ANALIZAR NECESIDADES PEDIDO ────────────────────────────
+  if (name === 'analizar_necesidades_pedido') {
+    // For each ingredient with vendor, find last delivery date and average qty
+    const items = db.prepare(`
+      SELECT
+        i.descr        AS nombre,
+        i.unit         AS unidad,
+        i.type         AS tipo,
+        p.descr        AS proveedor,
+        p.mail         AS proveedor_email,
+        p.phone        AS proveedor_phone,
+        (SELECT MAX(l.fecha) FROM lineas_albaran_compra l
+           WHERE l.user_id=i.user_id AND l.nombre = i.descr)        AS ultima_fecha,
+        (SELECT ROUND(AVG(l.cantidad), 2) FROM lineas_albaran_compra l
+           WHERE l.user_id=i.user_id AND l.nombre = i.descr)        AS cant_media
+      FROM ingredientes i
+      JOIN proveedores p ON p.id = i.proveedor_id
+      WHERE i.user_id=?
+      ORDER BY p.descr, i.descr
+    `).all(userId) as any[]
+
+    const today = new Date()
+    // Reorder thresholds (days since last delivery)
+    const freshTypes = new Set(['Pescado','Marisco','Carne','Verdura','Hongo','Lácteo','Fruta','Hierba','Charcutería','Panadería'])
+    const dryThreshold = 30
+    const freshThreshold = 7
+
+    const needsReorder: Record<string, { proveedor: any; items: any[] }> = {}
+
+    for (const it of items) {
+      const isFresh = freshTypes.has(it.tipo)
+      const threshold = isFresh ? freshThreshold : dryThreshold
+      let daysSince = 999
+      if (it.ultima_fecha) {
+        const last = new Date(it.ultima_fecha)
+        daysSince = Math.floor((today.getTime() - last.getTime()) / 86400000)
+      }
+      if (daysSince < threshold) continue // No hace falta reponer aún
+
+      // Suggested qty = historical avg or 1 unit fallback
+      const cant = it.cant_media || 1
+
+      if (!needsReorder[it.proveedor]) {
+        needsReorder[it.proveedor] = {
+          proveedor: { nombre: it.proveedor, email: it.proveedor_email, phone: it.proveedor_phone },
+          items: [],
+        }
+      }
+      needsReorder[it.proveedor].items.push({
+        nombre: it.nombre,
+        cantidad: cant,
+        unidad: it.unidad,
+        dias_sin_pedir: daysSince === 999 ? 'nunca' : daysSince,
+      })
+    }
+
+    const grupos = Object.values(needsReorder)
+    if (!grupos.length) {
+      return 'Todos los ingredientes están dentro de su ciclo de pedido habitual. No hace falta reponer nada urgente. ¿Quieres ver el selector_pedido para hacer un pedido manual?'
+    }
+
+    const summary = grupos.map(g => {
+      const head = `**${g.proveedor.nombre}** (${g.items.length} items):`
+      const lines = g.items.slice(0, 12).map((it: any) => `  • ${it.nombre} — ${it.cantidad} ${it.unidad || 'ud'} (${it.dias_sin_pedir} días sin pedir)`).join('\n')
+      return head + '\n' + lines
+    }).join('\n\n')
+
+    return `Detectado ${grupos.length} proveedor(es) con items que reponer:\n\n${summary}\n\nINSTRUCCIONES PARA EL ASISTENTE:\n1. Presenta este resumen al usuario en formato lista clara.\n2. Pregunta explícitamente: "¿Lo envío por email o por WhatsApp?"\n3. Cuando el usuario elija canal, llama a proponer_pedido_email o proponer_pedido_whatsapp UNA VEZ por cada proveedor con su lista de items exactos (nombre, cantidad, unidad).`
+  }
+
   // ── PROPONER PEDIDO WHATSAPP ──────────────────────────────
   if (name === 'proponer_pedido_whatsapp') {
     const { proveedor_nombre, proveedor_phone, items, notas } = args
@@ -962,12 +1041,15 @@ REGLAS:
 - "resumen/informe/cómo estamos/brief" → informe_diario
 - "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor
 - "busca/qué ingredientes/cuáles" → buscar_ingrediente
-- PEDIDOS — OBLIGATORIO: cualquier intención de pedir sin proveedor concreto → selector_pedido SIEMPRE. Jamás respondas con texto listando proveedores.
-- PEDIDO A PROVEEDOR CONCRETO — flujo obligatorio:
-  1. Llama a sugerir_items_pedido({proveedor_nombre}) para obtener los ingredientes REALES que ese proveedor suele entregar (con cantidades históricas).
-  2. Pasa esa lista TAL CUAL a proponer_pedido_email o proponer_pedido_whatsapp.
-- PROHIBIDO usar nombres genéricos ("carne", "pescado", "verduras", "fruta") en items de pedido. SIEMPRE nombres específicos del catálogo: "Salmón fresco (lomo)", "Solomillo de ternera", "Tomate rama madurado", etc. Si dudas, llama a buscar_ingrediente o sugerir_items_pedido.
-- Pregunta al usuario por canal preferido (email o WhatsApp) si no lo indica. WhatsApp INTEGRADO — SÍ PUEDES. Jamás digas que no puedes.`
+- PEDIDOS — flujo obligatorio cuando el usuario diga "quiero pedir/hacer un pedido/qué tengo que pedir/repón":
+  1. JAMÁS preguntes "qué proveedor". Llama YA a analizar_necesidades_pedido — esa tool detecta qué falta y por qué proveedor.
+  2. Presenta el resultado como lista agrupada por proveedor con items específicos y cantidades.
+  3. Termina SIEMPRE con la pregunta: "¿Lo envío por email o por WhatsApp?"
+  4. Cuando el usuario elija canal, llama a proponer_pedido_email o proponer_pedido_whatsapp UNA VEZ por proveedor (puede ser varias llamadas en paralelo) con la lista exacta de items.
+- Si el usuario YA especifica un proveedor concreto: salta a sugerir_items_pedido({proveedor_nombre}) y luego al proponer_pedido_*.
+- selector_pedido SOLO si el usuario pide explícitamente "muéstrame los proveedores" o "quiero elegir manualmente".
+- PROHIBIDO usar nombres genéricos ("carne", "pescado", "verduras", "fruta") en items de pedido. SIEMPRE nombres específicos del catálogo: "Salmón fresco (lomo)", "Solomillo de ternera", "Tomate rama madurado", etc.
+- WhatsApp INTEGRADO — SÍ PUEDES. Jamás digas que no puedes.`
 
   const chatMessages: any[] = messages.map((m: any) => ({ role: m.role, content: m.content }))
 

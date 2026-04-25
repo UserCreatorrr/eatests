@@ -326,6 +326,8 @@ function initSchema(db: Database.Database) {
 
   // Safe column additions (ALTER TABLE IF NOT EXIST equivalent via try/catch)
   try { db.exec(`ALTER TABLE proveedores ADD COLUMN canal_preferido TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE ingredientes ADD COLUMN proveedor_id INTEGER`) } catch {}
+  try { db.exec(`ALTER TABLE ingredientes ADD COLUMN proveedor_nombre TEXT`) } catch {}
 
   // Auto-seed demo data if DB is empty (new installation or after data loss)
   const ingCount = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=?').get('pablo-admin') as any).c

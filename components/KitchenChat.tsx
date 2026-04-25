@@ -25,6 +25,13 @@ interface BriefData {
   cards: BriefCard[]
 }
 
+interface WhatsAppProposal {
+  proveedor: string
+  phone: string
+  message: string
+  items?: { nombre: string; cantidad?: number; unidad?: string }[]
+}
+
 interface PedidoPendiente {
   id: number
   descr: string
@@ -47,10 +54,11 @@ interface PedidoSelectorData {
 }
 
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'brief_cards' | 'pedido_selector'
+  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector'
   content: string
   image?: string
   emailProposal?: EmailProposal
+  whatsappProposal?: WhatsAppProposal
   briefCards?: BriefData
   pedidoSelector?: PedidoSelectorData
 }
@@ -260,6 +268,115 @@ function BriefCards({ data, onAction }: { data: BriefData; onAction: (chat: stri
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onDiscard: () => void }) {
+  const [phone, setPhone] = useState(proposal.phone)
+  const [message, setMessage] = useState(proposal.message)
+  const [sending, setSending] = useState(false)
+  const [sentInfo, setSentInfo] = useState<{ num_order?: string } | null>(null)
+  const [error, setError] = useState('')
+
+  async function handleSend() {
+    if (!phone.trim()) { setError('Introduce el número de teléfono'); return }
+    setSending(true)
+    setError('')
+    try {
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, message, proveedor: proposal.proveedor, items: proposal.items }),
+      })
+      const json = await res.json()
+      if (json.ok) setSentInfo({ num_order: json.num_order })
+      else setError(json.error || 'Error al enviar')
+    } catch { setError('Error de conexión') }
+    finally { setSending(false) }
+  }
+
+  if (sentInfo) {
+    return (
+      <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 16, padding: '14px 18px', maxWidth: '90%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#166534' }}>
+            WhatsApp enviado a {phone}
+          </span>
+        </div>
+        {sentInfo.num_order && (
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.7, margin: '6px 0 0 28px' }}>
+            Pedido registrado: {sentInfo.num_order}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 16, padding: 18, maxWidth: '90%' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.854L0 24l6.303-1.654A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.214-3.733.979 1.001-3.64-.234-.374A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+          </svg>
+        </div>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#166534', margin: 0 }}>
+            WhatsApp — {proposal.proveedor}
+          </p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.6, margin: 0 }}>
+            Revisa y envía con un clic
+          </p>
+        </div>
+      </div>
+
+      {/* Phone */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.6, display: 'block', marginBottom: 4 }}>Teléfono</label>
+        <input
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          placeholder="+34 645 966 701"
+          style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, padding: '8px 10px', outline: 'none' }}
+        />
+      </div>
+
+      {/* Message */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.6, display: 'block', marginBottom: 4 }}>Mensaje</label>
+        <textarea
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          rows={8}
+          style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, padding: '8px 10px', outline: 'none', resize: 'vertical', lineHeight: 1.6 }}
+        />
+      </div>
+
+      {error && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#dc2626', margin: '0 0 10px' }}>{error}</p>}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={handleSend}
+          disabled={sending}
+          style={{ flex: 1, padding: '10px 16px', backgroundColor: '#22c55e', border: 'none', borderRadius: 10, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#fff', opacity: sending ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.854L0 24l6.303-1.654A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.214-3.733.979 1.001-3.64-.234-.374A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+          </svg>
+          {sending ? 'Enviando...' : 'Enviar por WhatsApp'}
+        </button>
+        <button
+          onClick={onDiscard}
+          style={{ padding: '10px 16px', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#166534', opacity: 0.7 }}
+        >
+          Descartar
+        </button>
       </div>
     </div>
   )
@@ -618,7 +735,8 @@ export default function KitchenChat() {
     const apiMessages = messages.flatMap(m => {
       if (m.role === 'brief_cards') return [{ role: 'assistant' as const, content: '[Brief diario generado y mostrado al usuario]' }]
       if (m.role === 'pedido_selector') return [{ role: 'assistant' as const, content: '[Selector de proveedores mostrado al usuario]' }]
-      if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice' || (m.role as string) === 'whatsapp_proposal') return []
+      if (m.role === 'whatsapp_proposal') return [{ role: 'assistant' as const, content: '[Borrador de WhatsApp generado y mostrado al usuario]' }]
+      if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice') return []
       return [m]
     })
     const history2 = [...messages, userMsg]
@@ -647,6 +765,8 @@ export default function KitchenChat() {
           setMessages(prev => [...prev, { role: 'brief_cards', content: '', briefCards: json.briefCards }])
         } else if (json.pedidoSelector) {
           setMessages(prev => [...prev, { role: 'pedido_selector', content: '', pedidoSelector: json.pedidoSelector }])
+        } else if (json.whatsappProposal) {
+          setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
         } else if (json.reply) {
           const newMsgs: Message[] = [{ role: 'assistant', content: json.reply }]
           if (json.emailProposal) {
@@ -844,6 +964,18 @@ export default function KitchenChat() {
                     <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', paddingLeft: 38 }}>
                       <EmailCard
                         proposal={msg.emailProposal}
+                        onDiscard={() => setMessages(prev => prev.filter((_, idx) => idx !== i))}
+                      />
+                    </div>
+                  )
+                }
+
+                // WhatsApp proposal card
+                if (msg.role === 'whatsapp_proposal' && msg.whatsappProposal) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', paddingLeft: 38 }}>
+                      <WhatsAppCard
+                        proposal={msg.whatsappProposal}
                         onDiscard={() => setMessages(prev => prev.filter((_, idx) => idx !== i))}
                       />
                     </div>

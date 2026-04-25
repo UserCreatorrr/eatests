@@ -358,6 +358,35 @@ const tools: any[] = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  // ── WHATSAPP PEDIDOS ───────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'proponer_pedido_whatsapp',
+      description: 'Genera un mensaje de WhatsApp de pedido a un proveedor para que el usuario lo revise y envíe con un clic. Usar cuando el usuario quiere enviar el pedido por WhatsApp.',
+      parameters: {
+        type: 'object',
+        properties: {
+          proveedor_nombre: { type: 'string', description: 'Nombre del proveedor' },
+          proveedor_phone:  { type: 'string', description: 'Teléfono del proveedor con prefijo de país, ej: +34645966701' },
+          items: {
+            type: 'array',
+            description: 'Productos a pedir',
+            items: {
+              type: 'object',
+              properties: {
+                nombre:   { type: 'string' },
+                cantidad: { type: 'number' },
+                unidad:   { type: 'string' },
+              },
+            },
+          },
+          notas: { type: 'string', description: 'Instrucciones adicionales' },
+        },
+        required: ['proveedor_nombre', 'items'],
+      },
+    },
+  },
   // ── EMAIL PEDIDOS ──────────────────────────────────────────
   {
     type: 'function',
@@ -756,6 +785,32 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     return `__PEDIDO_SELECTOR__${JSON.stringify({ pendientes, proveedores })}`
   }
 
+  // ── PROPONER PEDIDO WHATSAPP ──────────────────────────────
+  if (name === 'proponer_pedido_whatsapp') {
+    const { proveedor_nombre, proveedor_phone, items, notas } = args
+    const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const itemLines = (items as any[]).map((i: any) =>
+      `• ${i.nombre}${i.cantidad ? ': ' + i.cantidad + (i.unidad ? ' ' + i.unidad : '') : ''}`
+    ).join('\n')
+
+    const message = `Hola, soy MarginBites 👋
+
+Pedido para el ${today}:
+
+${itemLines}${notas ? '\n\n' + notas : ''}
+
+Muchas gracias 🙏`
+
+    // Try to find phone in DB if not provided
+    let phone = proveedor_phone || ''
+    if (!phone && proveedor_nombre) {
+      const prov = db.prepare(`SELECT phone FROM proveedores WHERE user_id=? AND descr LIKE ? LIMIT 1`).get(userId, `%${proveedor_nombre}%`) as any
+      if (prov?.phone) phone = prov.phone
+    }
+
+    return `__WHATSAPP_PROPOSAL__${JSON.stringify({ proveedor: proveedor_nombre, phone, message, items: items || [] })}`
+  }
+
   // ── PROPONER PEDIDO EMAIL ─────────────────────────────────
   if (name === 'proponer_pedido_email') {
     const { proveedor_nombre, proveedor_email, items, notas } = args
@@ -828,8 +883,9 @@ REGLAS:
 - Para actualizar precio → usa actualizar_ingrediente
 - Cuando crees o modifiques algo, confirma con el id generado
 - Cuando el usuario quiera hacer un pedido SIN especificar proveedor → usa selector_pedido para mostrar la lista visual de proveedores
-- Cuando el usuario ya especificó proveedor e items (ej: "email a Mercabarna con X kg de tomates") → usa proponer_pedido_email directamente
-- Cuando el usuario pida "pedido por WhatsApp a X" → usa proponer_pedido_email con notas indicando que es por WhatsApp
+- Cuando el usuario quiera enviar por EMAIL a un proveedor específico → usa proponer_pedido_email
+- Cuando el usuario quiera enviar por WHATSAPP → usa proponer_pedido_whatsapp (SÍ puedes enviar WhatsApp, está integrado con Evolution API)
+- SÍ PUEDES enviar mensajes de WhatsApp. Nunca digas que no puedes — usa proponer_pedido_whatsapp
 - En el brief, si hay pedidos pendientes, sugiere usar selector_pedido`
 
   const chatMessages: any[] = messages.map((m: any) => ({ role: m.role, content: m.content }))
@@ -863,6 +919,7 @@ REGLAS:
   if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
     const results: string[] = []
     let emailProposal: any = null
+    let whatsappProposal: any = null
     let briefCards: any = null
     let pedidoSelector: any = null
 
@@ -872,6 +929,9 @@ REGLAS:
       if (result.startsWith('__EMAIL_PROPOSAL__')) {
         emailProposal = JSON.parse(result.slice('__EMAIL_PROPOSAL__'.length))
         results.push('Propuesta de email generada.')
+      } else if (result.startsWith('__WHATSAPP_PROPOSAL__')) {
+        whatsappProposal = JSON.parse(result.slice('__WHATSAPP_PROPOSAL__'.length))
+        results.push('Propuesta de WhatsApp generada.')
       } else if (result.startsWith('__BRIEF_CARDS__')) {
         briefCards = JSON.parse(result.slice('__BRIEF_CARDS__'.length))
         results.push('Brief generado.')
@@ -907,6 +967,9 @@ REGLAS:
     }
     if (pedidoSelector) {
       return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
+    }
+    if (whatsappProposal) {
+      return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
     }
 
     const reply = followUp.choices[0]?.message?.content || 'Hecho.'

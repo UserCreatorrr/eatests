@@ -37,6 +37,7 @@ interface PedidoPendiente {
   descr: string
   data: string
   pending_receive: number
+  proveedor_sugerido: ProveedorSelectorItem | null
 }
 
 interface ProveedorSelectorItem {
@@ -416,19 +417,41 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Pendientes de enviar
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {data.pendientes.map(lp => (
-              <div key={lp.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1 }}>
-                  📋 {lp.descr}
-                  {lp.data && <span style={{ opacity: 0.45, marginLeft: 6 }}>{lp.data}</span>}
-                </span>
-                <button
-                  onClick={() => onAction(`Gestiona el pedido pendiente "${lp.descr}": ayúdame a decidir qué necesito pedir y a qué proveedor enviarlo`)}
-                  style={{ padding: '4px 10px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
-                >
-                  Gestionar →
-                </button>
+              <div key={lp.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: lp.proveedor_sugerido ? 5 : 0 }}>
+                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1, fontWeight: 600 }}>
+                    📋 {lp.descr}
+                  </span>
+                  {!lp.proveedor_sugerido && (
+                    <button
+                      onClick={() => onAction(`Gestiona el pedido pendiente "${lp.descr}": ¿qué productos necesito pedir y a qué proveedor?`)}
+                      style={{ padding: '4px 10px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
+                    >
+                      ¿A quién? →
+                    </button>
+                  )}
+                </div>
+                {lp.proveedor_sugerido && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 22 }}>
+                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', opacity: 0.7, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      → {lp.proveedor_sugerido.descr}
+                    </span>
+                    <button
+                      onClick={() => onAction(`Preparar pedido por email a ${lp.proveedor_sugerido!.descr} para el pedido "${lp.descr}"`)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
+                    >
+                      {iconEmail} Email
+                    </button>
+                    <button
+                      onClick={() => onAction(`Preparar pedido por WhatsApp a ${lp.proveedor_sugerido!.descr} para el pedido "${lp.descr}"`)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
+                    >
+                      {iconWA} WA
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

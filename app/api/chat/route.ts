@@ -782,7 +782,88 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const proveedores = (db.prepare(
       `SELECT id, descr, descr_type, mail, phone, canal_preferido FROM proveedores WHERE user_id=? ORDER BY descr LIMIT 40`
     ).all(userId) as any[])
-    return `__PEDIDO_SELECTOR__${JSON.stringify({ pendientes, proveedores })}`
+
+    // Keyword → descr_type mapping for auto-matching pending orders to suppliers
+    const keywordMap: Record<string, string[]> = {
+      'carne': ['Carnicería', 'Carne'],
+      'carnes': ['Carnicería', 'Carne'],
+      'lacteo': ['Lácteos', 'Lácteo'],
+      'lacteos': ['Lácteos', 'Lácteo'],
+      'lácteo': ['Lácteos', 'Lácteo'],
+      'lácteos': ['Lácteos', 'Lácteo'],
+      'pescado': ['Pescadería', 'Pescado'],
+      'pescados': ['Pescadería', 'Pescado'],
+      'marisco': ['Marisco', 'Mariscos'],
+      'mariscos': ['Marisco', 'Mariscos'],
+      'verdura': ['Frutas y Verduras', 'Verduras'],
+      'verduras': ['Frutas y Verduras', 'Verduras'],
+      'fruta': ['Frutas y Verduras'],
+      'frutas': ['Frutas y Verduras'],
+      'vino': ['Bebidas y Vinos'],
+      'vinos': ['Bebidas y Vinos'],
+      'bebida': ['Bebidas y Vinos'],
+      'bebidas': ['Bebidas y Vinos'],
+      'harina': ['Harinas y Cereales'],
+      'harinas': ['Harinas y Cereales'],
+      'cereal': ['Harinas y Cereales'],
+      'cereales': ['Harinas y Cereales'],
+      'aceite': ['Aceites y Conservas'],
+      'aceites': ['Aceites y Conservas'],
+      'especia': ['Especias y Café', 'Especias'],
+      'especias': ['Especias y Café', 'Especias'],
+      'charcuteria': ['Charcutería'],
+      'charcutería': ['Charcutería'],
+      'reposteria': ['Repostería y Bollería'],
+      'repostería': ['Repostería y Bollería'],
+      'pasteleria': ['Repostería y Bollería'],
+      'congelado': ['Congelados'],
+      'congelados': ['Congelados'],
+      'ecologico': ['Productos Ecológicos'],
+      'ecológico': ['Productos Ecológicos'],
+    }
+
+    // Also check recent pedidos_compra to see which vendors are used per category
+    const recentByVendor = (db.prepare(
+      `SELECT vendor, COUNT(*) as cnt FROM pedidos_compra WHERE user_id=? GROUP BY vendor ORDER BY cnt DESC LIMIT 20`
+    ).all(userId) as any[])
+
+    // For each pending order, find the best matching supplier
+    const pendientesConSugerencia = pendientes.map((lp: any) => {
+      const descrLower = (lp.descr || '').toLowerCase()
+      const words = descrLower.split(/[\s\-_]+/)
+
+      // Try keyword matching against proveedores
+      let suggested: any = null
+      for (const word of words) {
+        const types = keywordMap[word]
+        if (types) {
+          const match = (proveedores as any[]).find(p =>
+            types.some(t => (p.descr_type || '').toLowerCase().includes(t.toLowerCase()))
+          )
+          if (match) { suggested = match; break }
+        }
+      }
+
+      // Fallback: check recent orders that contain similar keywords
+      if (!suggested) {
+        for (const word of words) {
+          if (word.length < 4) continue
+          const recent = recentByVendor.find((r: any) =>
+            (r.vendor || '').toLowerCase().includes(word)
+          )
+          if (recent) {
+            suggested = (proveedores as any[]).find(p =>
+              p.descr.toLowerCase().includes(recent.vendor.toLowerCase().split(' ')[0])
+            )
+            if (suggested) break
+          }
+        }
+      }
+
+      return { ...lp, proveedor_sugerido: suggested || null }
+    })
+
+    return `__PEDIDO_SELECTOR__${JSON.stringify({ pendientes: pendientesConSugerencia, proveedores })}`
   }
 
   // ── PROPONER PEDIDO WHATSAPP ──────────────────────────────

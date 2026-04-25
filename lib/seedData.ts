@@ -151,6 +151,39 @@ export function seedDemoData(db: Database.Database, uid: string) {
       .run(uid,i.codi,i.descr,i.type,i.unit,i.cost)
   }
 
+  // Assign proveedor_id to ingredients based on type
+  const typeToProvCodi: Record<string, string> = {
+    'Pescado':     'PROV002',   // Pescados del Atlántico SA
+    'Marisco':     'PROV010',   // Mariscos Costa Brava SL
+    'Carne':       'PROV003',   // Carnes Selectas Martínez
+    'Charcutería': 'PROV011',   // Charcutería Ibérica Extremeña
+    'Verdura':     'PROV001',   // Mercabarna Express SL
+    'Fruta':       'PROV001',   // Mercabarna Express SL
+    'Hongo':       'PROV009',   // Verduras del Mediterráneo SL
+    'Hierba':      'PROV009',   // Verduras del Mediterráneo SL
+    'Lácteo':      'PROV004',   // Lácteos Frescos del Pirineo
+    'Aceite':      'PROV005',   // Aceites García e Hijos
+    'Conserva':    'PROV005',   // Aceites García e Hijos
+    'Harina':      'PROV006',   // Harinera del Norte SL
+    'Cereal':      'PROV006',   // Harinera del Norte SL
+    'Pasta':       'PROV006',   // Harinera del Norte SL
+    'Vino':        'PROV007',   // Bodegas Rioja Premium
+    'Licor':       'PROV007',   // Bodegas Rioja Premium
+    'Especia':     'PROV013',   // Cafés y Especias del Mundo
+    'Condimento':  'PROV013',   // Cafés y Especias del Mundo
+    'Repostería':  'PROV012',   // Pastelería Industrial Balear
+    'Azúcar':      'PROV012',   // Pastelería Industrial Balear
+    'Panadería':   'PROV012',   // Pastelería Industrial Balear
+  }
+  for (const [type, codi] of Object.entries(typeToProvCodi)) {
+    const provId = provIds[codi]
+    const provDescr = proveedores.find(p => p.codi === codi)?.descr || ''
+    if (provId) {
+      db.prepare(`UPDATE ingredientes SET proveedor_id=?, proveedor_nombre=? WHERE user_id=? AND type=?`)
+        .run(provId, provDescr, uid, type)
+    }
+  }
+
   // ── HERRAMIENTAS ──────────────────────────────────────────────────────────
   const herramientas = [
     { codi:'HER001', descr:'Thermomix TM6',                      type:'Maquinaria',  unit:'ud',  cost:1499.00 },

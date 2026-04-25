@@ -394,10 +394,35 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
   )
 }
 
+function findSupplierForPedido(descr: string, proveedores: ProveedorSelectorItem[]): ProveedorSelectorItem | null {
+  const lower = descr.toLowerCase()
+  // Try matching supplier name words directly in the description
+  for (const prov of proveedores) {
+    const words = prov.descr.toLowerCase().split(/\s+/).filter(w => w.length > 4)
+    if (words.some(w => lower.includes(w))) return prov
+  }
+  // Keyword → type fallback
+  const kwMap: [string, string][] = [
+    ['carne', 'Carnicería'], ['lácteo', 'Lácteo'], ['lacteo', 'Lácteo'],
+    ['pescado', 'Pescad'], ['verdura', 'Verdura'], ['fruta', 'Verdura'],
+    ['marisco', 'Marisco'], ['vino', 'Vinos'], ['bebida', 'Bebidas'],
+    ['harina', 'Harinas'], ['especia', 'Especias'], ['congela', 'Congelad'],
+    ['charcutería', 'Charcutería'], ['charcuteria', 'Charcutería'],
+  ]
+  for (const [kw, type] of kwMap) {
+    if (lower.includes(kw)) {
+      const match = proveedores.find(p => (p.descr_type || '').toLowerCase().includes(type.toLowerCase()))
+      if (match) return match
+    }
+  }
+  return null
+}
+
 function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAction: (chat: string) => void }) {
   const [showOtro, setShowOtro] = useState(false)
   const [otroText, setOtroText] = useState('')
   const [expanded, setExpanded] = useState<Record<number, boolean>>({})
+  const [expandedPendiente, setExpandedPendiente] = useState<Record<number, boolean>>({})
   const [showAllProvs, setShowAllProvs] = useState(false)
 
   const iconEmail = (
@@ -507,18 +532,53 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Listas pendientes de enviar
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {data.pendientes.map(lp => (
-              <div key={lp.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1 }}>📋 {lp.descr}</span>
-                <button
-                  onClick={() => onAction(`Gestiona el pedido pendiente "${lp.descr}": qué productos necesito y a qué proveedor`)}
-                  style={{ padding: '4px 10px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
-                >
-                  Gestionar →
-                </button>
-              </div>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {data.pendientes.map(lp => {
+              const isExpLP = expandedPendiente[lp.id] ?? false
+              const suggested = findSupplierForPedido(lp.descr, data.proveedores)
+              return (
+                <div key={lp.id}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1 }}>📋 {lp.descr}</span>
+                    <button
+                      onClick={() => setExpandedPendiente(prev => ({ ...prev, [lp.id]: !isExpLP }))}
+                      style={{ padding: '4px 10px', backgroundColor: isExpLP ? '#fef3c7' : '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
+                    >
+                      {isExpLP ? '▲ Cerrar' : 'Enviar →'}
+                    </button>
+                  </div>
+                  {isExpLP && (
+                    <div style={{ marginTop: 8, padding: '10px 12px', backgroundColor: '#fff', border: '1px solid #fcd34d', borderRadius: 8 }}>
+                      {suggested ? (
+                        <>
+                          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', margin: '0 0 8px', opacity: 0.7 }}>
+                            Proveedor sugerido: <strong style={{ color: '#92400e', opacity: 1 }}>{suggested.descr}</strong>
+                          </p>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              onClick={() => onAction(`Preparar pedido por email a ${suggested.descr} para el pedido "${lp.descr}"`)}
+                              style={{ ...btnBase, flex: 1, justifyContent: 'center', backgroundColor: '#fef3c7', borderColor: '#fcd34d', color: '#92400e' }}
+                            >
+                              {iconEmail} Email a {suggested.descr.split(' ').slice(0,2).join(' ')}
+                            </button>
+                            <button
+                              onClick={() => onAction(`Preparar pedido por WhatsApp a ${suggested.descr} para el pedido "${lp.descr}"`)}
+                              style={{ ...btnBase, flex: 1, justifyContent: 'center', backgroundColor: '#fef3c7', borderColor: '#fcd34d', color: '#92400e' }}
+                            >
+                              {iconWA} WA a {suggested.descr.split(' ').slice(0,2).join(' ')}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', margin: 0 }}>
+                          Selecciona un proveedor de la lista de abajo
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

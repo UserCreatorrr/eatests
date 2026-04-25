@@ -508,28 +508,79 @@ export function seedDemoData(db: Database.Database, uid: string) {
       .run(uid,m.nombre,m.cantidad,m.unidad,m.motivo,m.coste_estimado,m.fecha,m.notas)
   }
 
-  // ── LINEAS ALBARÁN (comparativa precios proveedores) ──────────────────────
-  const lineas = [
-    { vendor:'Mercabarna Express SL',       nombre:'Tomate rama madurado',         cantidad:20, unidad:'kg', precio_unitario:1.80, total_linea:36.00,  fecha:dAgo(7)  },
-    { vendor:'Distribuciones Roca',         nombre:'Tomate rama madurado',         cantidad:15, unidad:'kg', precio_unitario:2.40, total_linea:36.00,  fecha:dAgo(3)  },
-    { vendor:'Ecológicos del Valle SL',     nombre:'Tomate rama madurado',         cantidad:10, unidad:'kg', precio_unitario:3.10, total_linea:31.00,  fecha:dAgo(5)  },
-    { vendor:'Aceites García e Hijos',      nombre:'Aceite de oliva virgen extra', cantidad:30, unidad:'l',  precio_unitario:6.20, total_linea:186.00, fecha:dAgo(10) },
-    { vendor:'Distribuciones Roca',         nombre:'Aceite de oliva virgen extra', cantidad:10, unidad:'l',  precio_unitario:4.90, total_linea:49.00,  fecha:dAgo(12) },
-    { vendor:'Pescados del Atlántico SA',   nombre:'Salmón fresco (lomo)',         cantidad:15, unidad:'kg', precio_unitario:15.20, total_linea:228.00, fecha:dAgo(5) },
-    { vendor:'Mercabarna Express SL',       nombre:'Salmón fresco (lomo)',         cantidad:5,  unidad:'kg', precio_unitario:12.50, total_linea:62.50,  fecha:dAgo(7) },
-    { vendor:'Carnes Selectas Martínez',    nombre:'Pechuga de pollo (filetes)',   cantidad:25, unidad:'kg', precio_unitario:6.20, total_linea:155.00, fecha:dAgo(4)  },
-    { vendor:'Distribuciones Roca',         nombre:'Pechuga de pollo (filetes)',   cantidad:10, unidad:'kg', precio_unitario:7.10, total_linea:71.00,  fecha:dAgo(3)  },
-    { vendor:'Lácteos Frescos del Pirineo', nombre:'Nata líquida 35% MG',         cantidad:20, unidad:'l',  precio_unitario:2.30, total_linea:46.00,  fecha:dAgo(6)  },
-    { vendor:'Harinera del Norte SL',       nombre:'Harina de trigo T55',          cantidad:50, unidad:'kg', precio_unitario:0.87, total_linea:43.50,  fecha:dAgo(9)  },
-    { vendor:'Pescados del Atlántico SA',   nombre:'Gambas rojas (16/20)',         cantidad:8,  unidad:'kg', precio_unitario:28.50, total_linea:228.00, fecha:dAgo(5) },
-    { vendor:'Mariscos Costa Brava SL',     nombre:'Gambas rojas (16/20)',         cantidad:5,  unidad:'kg', precio_unitario:31.00, total_linea:155.00, fecha:dAgo(3) },
-    { vendor:'Mercabarna Express SL',       nombre:'Espárrago verde (calibre 16)', cantidad:5,  unidad:'kg', precio_unitario:4.80, total_linea:24.00,  fecha:dAgo(7)  },
-    { vendor:'Verduras del Mediterráneo',   nombre:'Espárrago verde (calibre 16)', cantidad:8,  unidad:'kg', precio_unitario:4.20, total_linea:33.60,  fecha:dAgo(4)  },
-    { vendor:'Carnes Selectas Martínez',    nombre:'Solomillo de ternera',         cantidad:6,  unidad:'kg', precio_unitario:32.00, total_linea:192.00, fecha:dAgo(4) },
-    { vendor:'Mariscos Costa Brava SL',     nombre:'Atún rojo (sashimi)',          cantidad:4,  unidad:'kg', precio_unitario:42.00, total_linea:168.00, fecha:dAgo(14) },
-    { vendor:'Charcutería Ibérica',         nombre:'Foie gras mi-cuit',            cantidad:2,  unidad:'kg', precio_unitario:68.00, total_linea:136.00, fecha:dAgo(16) },
+  // ── LINEAS ALBARÁN (histórico real por ingrediente — alimenta detección de reposiciones) ──
+  // Typical kitchen quantities per ingredient type (min..max)
+  const qtyByType: Record<string, [number, number]> = {
+    Pescado:[4,15], Marisco:[3,12], Carne:[5,25], Charcutería:[1,5],
+    Verdura:[5,25], Hongo:[1,4], Lácteo:[3,15],
+    Aceite:[5,20], Conserva:[3,12],
+    Harina:[20,50], Cereal:[10,30], Pasta:[5,15],
+    Panadería:[15,40], Caldo:[5,18],
+    Vino:[6,18], Licor:[2,8],
+    Azúcar:[5,25], Repostería:[1,4],
+    Fruta:[5,18], Condimento:[1,3], Especia:[0.5,2], Hierba:[3,10],
+  }
+  const rand = (a: number, b: number) => Math.round((a + Math.random() * (b - a)) * 100) / 100
+  const randInt = (a: number, b: number) => Math.floor(a + Math.random() * (b - a + 1))
+
+  const lineasAuto: any[] = []
+  let idx = 0
+  for (const ing of ingredientes) {
+    const provCodi = ingProvMap[ing.codi]
+    if (!provCodi) continue
+    const provDescr = proveedores.find(p => p.codi === provCodi)!.descr
+    const range = qtyByType[ing.type] || [1, 5]
+
+    // Cycle: every 5th ingredient = "recently restocked" (no reorder needed)
+    // Rest = last delivery old enough to trigger reorder
+    const cycle = idx % 5
+    let lastDays: number
+    if (cycle === 0)        lastDays = randInt(2, 4)        // recién pedido, no reponer
+    else if (cycle === 1)   lastDays = randInt(8, 14)       // toca reponer (fresco)
+    else if (cycle === 2)   lastDays = randInt(15, 22)      // toca reponer claramente
+    else if (cycle === 3)   lastDays = randInt(10, 18)      // toca reponer
+    else                    lastDays = randInt(25, 40)      // hace mucho que no se pide
+
+    const cant1 = rand(range[0], range[1])
+    const price = ing.cost
+    lineasAuto.push({
+      vendor: provDescr, nombre: ing.descr, cantidad: cant1, unidad: ing.unit,
+      precio_unitario: price, total_linea: Math.round(cant1 * price * 100) / 100,
+      fecha: dAgo(lastDays),
+    })
+    // Una segunda entrada más antigua para tener media histórica
+    const cant2 = rand(range[0], range[1])
+    lineasAuto.push({
+      vendor: provDescr, nombre: ing.descr, cantidad: cant2, unidad: ing.unit,
+      precio_unitario: Math.round(price * (0.9 + Math.random() * 0.15) * 100) / 100,
+      total_linea: Math.round(cant2 * price * 100) / 100,
+      fecha: dAgo(lastDays + randInt(14, 28)),
+    })
+    // Tercera entrada (sólo algunos ingredientes) para simular pedidos recurrentes
+    if (idx % 2 === 0) {
+      const cant3 = rand(range[0], range[1])
+      lineasAuto.push({
+        vendor: provDescr, nombre: ing.descr, cantidad: cant3, unidad: ing.unit,
+        precio_unitario: Math.round(price * (0.85 + Math.random() * 0.2) * 100) / 100,
+        total_linea: Math.round(cant3 * price * 100) / 100,
+        fecha: dAgo(lastDays + randInt(35, 55)),
+      })
+    }
+    idx++
+  }
+
+  // Comparativa de precios — mismo producto a varios proveedores (mantiene el caso de uso original)
+  const lineasComparativa = [
+    { vendor:'Distribuciones Roca Alimentación', nombre:'Tomate rama madurado',         cantidad:15, unidad:'kg', precio_unitario:2.40, total_linea:36.00,  fecha:dAgo(11) },
+    { vendor:'Ecológicos del Valle SL',          nombre:'Tomate rama madurado',         cantidad:10, unidad:'kg', precio_unitario:3.10, total_linea:31.00,  fecha:dAgo(9)  },
+    { vendor:'Distribuciones Roca Alimentación', nombre:'Aceite de oliva virgen extra', cantidad:10, unidad:'l',  precio_unitario:4.90, total_linea:49.00,  fecha:dAgo(13) },
+    { vendor:'Mercabarna Express SL',            nombre:'Salmón fresco (lomo)',         cantidad:5,  unidad:'kg', precio_unitario:12.50, total_linea:62.50, fecha:dAgo(11) },
+    { vendor:'Distribuciones Roca Alimentación', nombre:'Pechuga de pollo (filetes)',   cantidad:10, unidad:'kg', precio_unitario:7.10, total_linea:71.00,  fecha:dAgo(13) },
+    { vendor:'Mariscos Costa Brava SL',          nombre:'Gambas rojas (16/20)',         cantidad:5,  unidad:'kg', precio_unitario:31.00, total_linea:155.00, fecha:dAgo(11) },
+    { vendor:'Verduras del Mediterráneo SL',     nombre:'Espárrago verde (calibre 16)', cantidad:8,  unidad:'kg', precio_unitario:4.20, total_linea:33.60,  fecha:dAgo(10) },
   ]
-  for (const l of lineas) {
+
+  for (const l of [...lineasAuto, ...lineasComparativa]) {
     db.prepare(`INSERT INTO lineas_albaran_compra (user_id,vendor,nombre,cantidad,unidad,precio_unitario,total_linea,fecha) VALUES (?,?,?,?,?,?,?,?)`)
       .run(uid,l.vendor,l.nombre,l.cantidad,l.unidad,l.precio_unitario,l.total_linea,l.fecha)
   }

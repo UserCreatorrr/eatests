@@ -156,7 +156,7 @@ export default function CRUDPage({ title, entity, fields, columns }: Props) {
       </div>
 
       {modalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }}>
+        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 240, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }}>
           <div style={{ backgroundColor: '#fff', borderRadius: 20, padding: 32, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 18, color: '#3d3834', margin: '0 0 24px' }}>
               {editing ? 'Editar registro' : `Nuevo ${title.toLowerCase().replace('s', '').trim()}`}

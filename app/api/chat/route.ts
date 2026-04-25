@@ -367,6 +367,21 @@ const tools: any[] = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  // ── SUGERIR ITEMS PEDIDO ──────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'sugerir_items_pedido',
+      description: 'Devuelve los ingredientes específicos (con nombre completo, cantidad sugerida y unidad) que se deberían pedir a un proveedor concreto, basándose en el histórico de albaranes y consumo. SIEMPRE usar antes de proponer_pedido_email o proponer_pedido_whatsapp para obtener items reales — nunca inventes nombres genéricos como "carne" o "pescado".',
+      parameters: {
+        type: 'object',
+        properties: {
+          proveedor_nombre: { type: 'string', description: 'Nombre del proveedor (ej. "Mercabarna Express SL")' },
+        },
+        required: ['proveedor_nombre'],
+      },
+    },
+  },
   // ── WHATSAPP PEDIDOS ───────────────────────────────────────
   {
     type: 'function',
@@ -824,6 +839,50 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     return `__PEDIDO_SELECTOR__${JSON.stringify({ pedidosPorProveedor, pendientes, proveedores })}`
   }
 
+  // ── SUGERIR ITEMS PEDIDO ──────────────────────────────────
+  if (name === 'sugerir_items_pedido') {
+    const provNombre = (args.proveedor_nombre || '').trim()
+    if (!provNombre) return 'Necesito el nombre del proveedor.'
+
+    // Average quantity from last 6 months of albaran lines for this vendor
+    const lineas = db.prepare(`
+      SELECT nombre, unidad,
+             ROUND(AVG(cantidad), 2) AS avg_cant,
+             COUNT(*) AS veces,
+             MAX(fecha) AS ultima
+      FROM lineas_albaran_compra
+      WHERE user_id=? AND vendor LIKE ?
+      GROUP BY nombre, unidad
+      ORDER BY veces DESC, ultima DESC
+      LIMIT 15
+    `).all(userId, '%' + provNombre + '%') as any[]
+
+    // Fallback: ingredients assigned to this provider (no history yet)
+    const asignados = db.prepare(`
+      SELECT i.descr AS nombre, i.unit AS unidad, i.cost
+      FROM ingredientes i
+      JOIN proveedores p ON p.id = i.proveedor_id
+      WHERE i.user_id=? AND p.descr LIKE ?
+      ORDER BY i.descr
+      LIMIT 20
+    `).all(userId, '%' + provNombre + '%') as any[]
+
+    if (!lineas.length && !asignados.length) {
+      return `No tengo datos de pedidos previos ni ingredientes asignados a "${provNombre}". Pregunta al usuario qué quiere pedir.`
+    }
+
+    // Merge: history first (with avg quantities), then assigned ingredients not yet in history
+    const seen = new Set(lineas.map(l => l.nombre.toLowerCase()))
+    const sugerencias = [
+      ...lineas.map(l => ({ nombre: l.nombre, cantidad: l.avg_cant, unidad: l.unidad, fuente: `histórico (${l.veces}x, última ${l.ultima})` })),
+      ...asignados.filter(a => !seen.has(a.nombre.toLowerCase())).map(a => ({ nombre: a.nombre, cantidad: null, unidad: a.unidad, fuente: 'asignado (sin histórico)' })),
+    ]
+
+    return `Items sugeridos para ${provNombre} (basado en histórico real):\n` +
+      sugerencias.map(s => `• ${s.nombre} — ${s.cantidad ?? '?'} ${s.unidad || 'ud'} [${s.fuente}]`).join('\n') +
+      `\n\nUSA ESTOS NOMBRES EXACTOS al proponer el pedido. Ajusta cantidades si el usuario lo indica.`
+  }
+
   // ── PROPONER PEDIDO WHATSAPP ──────────────────────────────
   if (name === 'proponer_pedido_whatsapp') {
     const { proveedor_nombre, proveedor_phone, items, notas } = args
@@ -903,9 +962,12 @@ REGLAS:
 - "resumen/informe/cómo estamos/brief" → informe_diario
 - "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor
 - "busca/qué ingredientes/cuáles" → buscar_ingrediente
-- PEDIDOS — OBLIGATORIO: cualquier intención de pedir (carnes, verduras, compras, hacer un pedido...) → selector_pedido SIEMPRE. Jamás respondas con texto listando proveedores.
-- Email a proveedor concreto → proponer_pedido_email con sus productos asignados
-- WhatsApp → proponer_pedido_whatsapp. INTEGRADO — SÍ PUEDES. Jamás digas que no puedes.`
+- PEDIDOS — OBLIGATORIO: cualquier intención de pedir sin proveedor concreto → selector_pedido SIEMPRE. Jamás respondas con texto listando proveedores.
+- PEDIDO A PROVEEDOR CONCRETO — flujo obligatorio:
+  1. Llama a sugerir_items_pedido({proveedor_nombre}) para obtener los ingredientes REALES que ese proveedor suele entregar (con cantidades históricas).
+  2. Pasa esa lista TAL CUAL a proponer_pedido_email o proponer_pedido_whatsapp.
+- PROHIBIDO usar nombres genéricos ("carne", "pescado", "verduras", "fruta") en items de pedido. SIEMPRE nombres específicos del catálogo: "Salmón fresco (lomo)", "Solomillo de ternera", "Tomate rama madurado", etc. Si dudas, llama a buscar_ingrediente o sugerir_items_pedido.
+- Pregunta al usuario por canal preferido (email o WhatsApp) si no lo indica. WhatsApp INTEGRADO — SÍ PUEDES. Jamás digas que no puedes.`
 
   const chatMessages: any[] = messages.map((m: any) => ({ role: m.role, content: m.content }))
 

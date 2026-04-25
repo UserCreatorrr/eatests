@@ -776,94 +776,43 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
 
   // ── SELECTOR PEDIDO ──────────────────────────────────────
   if (name === 'selector_pedido') {
-    const pendientes = (db.prepare(
-      `SELECT id, descr, data, pending_receive FROM lista_pedidos WHERE user_id=? AND pending_send=1 ORDER BY data DESC LIMIT 10`
-    ).all(userId) as any[])
+    // All proveedores for "pedido suelto" section
     const proveedores = (db.prepare(
       `SELECT id, descr, descr_type, mail, phone, canal_preferido FROM proveedores WHERE user_id=? ORDER BY descr LIMIT 40`
     ).all(userId) as any[])
 
-    // Keyword → descr_type mapping for auto-matching pending orders to suppliers
-    const keywordMap: Record<string, string[]> = {
-      'carne': ['Carnicería', 'Carne'],
-      'carnes': ['Carnicería', 'Carne'],
-      'lacteo': ['Lácteos', 'Lácteo'],
-      'lacteos': ['Lácteos', 'Lácteo'],
-      'lácteo': ['Lácteos', 'Lácteo'],
-      'lácteos': ['Lácteos', 'Lácteo'],
-      'pescado': ['Pescadería', 'Pescado'],
-      'pescados': ['Pescadería', 'Pescado'],
-      'marisco': ['Marisco', 'Mariscos'],
-      'mariscos': ['Marisco', 'Mariscos'],
-      'verdura': ['Frutas y Verduras', 'Verduras'],
-      'verduras': ['Frutas y Verduras', 'Verduras'],
-      'fruta': ['Frutas y Verduras'],
-      'frutas': ['Frutas y Verduras'],
-      'vino': ['Bebidas y Vinos'],
-      'vinos': ['Bebidas y Vinos'],
-      'bebida': ['Bebidas y Vinos'],
-      'bebidas': ['Bebidas y Vinos'],
-      'harina': ['Harinas y Cereales'],
-      'harinas': ['Harinas y Cereales'],
-      'cereal': ['Harinas y Cereales'],
-      'cereales': ['Harinas y Cereales'],
-      'aceite': ['Aceites y Conservas'],
-      'aceites': ['Aceites y Conservas'],
-      'especia': ['Especias y Café', 'Especias'],
-      'especias': ['Especias y Café', 'Especias'],
-      'charcuteria': ['Charcutería'],
-      'charcutería': ['Charcutería'],
-      'reposteria': ['Repostería y Bollería'],
-      'repostería': ['Repostería y Bollería'],
-      'pasteleria': ['Repostería y Bollería'],
-      'congelado': ['Congelados'],
-      'congelados': ['Congelados'],
-      'ecologico': ['Productos Ecológicos'],
-      'ecológico': ['Productos Ecológicos'],
-    }
-
-    // Also check recent pedidos_compra to see which vendors are used per category
-    const recentByVendor = (db.prepare(
-      `SELECT vendor, COUNT(*) as cnt FROM pedidos_compra WHERE user_id=? GROUP BY vendor ORDER BY cnt DESC LIMIT 20`
+    // Ingredients that have a supplier assigned → group by proveedor_id
+    const ingConProv = (db.prepare(
+      `SELECT proveedor_id, proveedor_nombre, descr AS ing_descr, unit, cost
+       FROM ingredientes
+       WHERE user_id=? AND proveedor_id IS NOT NULL
+       ORDER BY proveedor_nombre, descr`
     ).all(userId) as any[])
 
-    // For each pending order, find the best matching supplier
-    const pendientesConSugerencia = pendientes.map((lp: any) => {
-      const descrLower = (lp.descr || '').toLowerCase()
-      const words = descrLower.split(/[\s\-_]+/)
-
-      // Try keyword matching against proveedores
-      let suggested: any = null
-      for (const word of words) {
-        const types = keywordMap[word]
-        if (types) {
-          const match = (proveedores as any[]).find(p =>
-            types.some(t => (p.descr_type || '').toLowerCase().includes(t.toLowerCase()))
-          )
-          if (match) { suggested = match; break }
+    const byProvMap: Record<number, { proveedor: any; ingredientes: any[] }> = {}
+    for (const ing of ingConProv) {
+      if (!byProvMap[ing.proveedor_id]) {
+        const prov = (proveedores as any[]).find(p => p.id === ing.proveedor_id) || {
+          id: ing.proveedor_id,
+          descr: ing.proveedor_nombre,
+          descr_type: null, mail: null, phone: null, canal_preferido: null,
         }
+        byProvMap[ing.proveedor_id] = { proveedor: prov, ingredientes: [] }
       }
+      byProvMap[ing.proveedor_id].ingredientes.push({
+        descr: ing.ing_descr,
+        unit: ing.unit,
+        cost: ing.cost,
+      })
+    }
+    const pedidosPorProveedor = Object.values(byProvMap)
 
-      // Fallback: check recent orders that contain similar keywords
-      if (!suggested) {
-        for (const word of words) {
-          if (word.length < 4) continue
-          const recent = recentByVendor.find((r: any) =>
-            (r.vendor || '').toLowerCase().includes(word)
-          )
-          if (recent) {
-            suggested = (proveedores as any[]).find(p =>
-              p.descr.toLowerCase().includes(recent.vendor.toLowerCase().split(' ')[0])
-            )
-            if (suggested) break
-          }
-        }
-      }
+    // Pending lista_pedidos (not yet sent)
+    const pendientes = (db.prepare(
+      `SELECT id, descr, data, pending_receive FROM lista_pedidos WHERE user_id=? AND pending_send=1 ORDER BY data DESC LIMIT 10`
+    ).all(userId) as any[])
 
-      return { ...lp, proveedor_sugerido: suggested || null }
-    })
-
-    return `__PEDIDO_SELECTOR__${JSON.stringify({ pendientes: pendientesConSugerencia, proveedores })}`
+    return `__PEDIDO_SELECTOR__${JSON.stringify({ pedidosPorProveedor, pendientes, proveedores })}`
   }
 
   // ── PROPONER PEDIDO WHATSAPP ──────────────────────────────
@@ -963,10 +912,9 @@ REGLAS:
 - Para análisis de gasto → usa resumen_gastos o gasto_por_proveedor
 - Para actualizar precio → usa actualizar_ingrediente
 - Cuando crees o modifiques algo, confirma con el id generado
-- Cuando el usuario quiera hacer un pedido SIN especificar proveedor → usa selector_pedido para mostrar la lista visual de proveedores
-- Cuando el usuario quiera enviar por EMAIL a un proveedor específico → usa proponer_pedido_email
-- Cuando el usuario quiera enviar por WHATSAPP → usa proponer_pedido_whatsapp (SÍ puedes enviar WhatsApp, está integrado con Evolution API)
-- SÍ PUEDES enviar mensajes de WhatsApp. Nunca digas que no puedes — usa proponer_pedido_whatsapp
+- PEDIDOS — REGLA OBLIGATORIA: cuando el usuario quiera hacer UN PEDIDO de cualquier tipo (a proveedores, de productos, de compras, de carnes, de cualquier cosa) → llama SIEMPRE a selector_pedido. Nunca respondas con texto listando proveedores, siempre usa selector_pedido.
+- PEDIDO EMAIL: cuando el usuario seleccione email para un proveedor concreto → usa proponer_pedido_email con los productos que tiene asignados ese proveedor en la lista de ingredientes
+- PEDIDO WHATSAPP: cuando el usuario seleccione WhatsApp para un proveedor concreto → usa proponer_pedido_whatsapp con los productos asignados a ese proveedor. SÍ PUEDES enviar WhatsApp, está integrado. NUNCA digas que no puedes.
 - En el brief, si hay pedidos pendientes, sugiere usar selector_pedido`
 
   const chatMessages: any[] = messages.map((m: any) => ({ role: m.role, content: m.content }))

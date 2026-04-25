@@ -37,19 +37,30 @@ interface PedidoPendiente {
   descr: string
   data: string
   pending_receive: number
-  proveedor_sugerido: ProveedorSelectorItem | null
 }
 
 interface ProveedorSelectorItem {
   id: number
   descr: string
-  descr_type: string
-  mail: string
-  phone: string
+  descr_type: string | null
+  mail: string | null
+  phone: string | null
   canal_preferido: 'email' | 'whatsapp' | null
 }
 
+interface IngredienteBasico {
+  descr: string
+  unit: string | null
+  cost: number | null
+}
+
+interface PedidoProveedor {
+  proveedor: ProveedorSelectorItem
+  ingredientes: IngredienteBasico[]
+}
+
 interface PedidoSelectorData {
+  pedidosPorProveedor: PedidoProveedor[]
   pendientes: PedidoPendiente[]
   proveedores: ProveedorSelectorItem[]
 }
@@ -386,6 +397,8 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
 function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAction: (chat: string) => void }) {
   const [showOtro, setShowOtro] = useState(false)
   const [otroText, setOtroText] = useState('')
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({})
+  const [showAllProvs, setShowAllProvs] = useState(false)
 
   const iconEmail = (
     <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -399,122 +412,150 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
     </svg>
   )
 
+  const btnBase: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 4, padding: '5px 9px',
+    borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11,
+    border: '1px solid #e8e2db', backgroundColor: '#f5f2ee', color: '#3d3834',
+  }
+
+  function ingText(ingredientes: IngredienteBasico[]) {
+    return ingredientes.map(i => `${i.descr}${i.unit ? ' (' + i.unit + ')' : ''}`).join(', ')
+  }
+
   return (
-    <div style={{ width: '100%', maxWidth: 560 }}>
+    <div style={{ width: '100%', maxWidth: 580 }}>
+
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
         </div>
         <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#3d3834', margin: 0 }}>
-          ¿A qué proveedor quieres hacer el pedido?
+          Pedidos por proveedor
         </p>
       </div>
 
-      {/* Pedidos pendientes */}
-      {data.pendientes.length > 0 && (
-        <div style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 12, padding: '10px 14px', marginBottom: 10 }}>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Pendientes de enviar
+      {/* === MAIN: proveedores con ingredientes asignados === */}
+      {data.pedidosPorProveedor.length > 0 ? (
+        <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 14, overflow: 'hidden', marginBottom: 10 }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, fontWeight: 600, margin: 0, padding: '8px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #f0ece8' }}>
+            Tus proveedores · {data.pedidosPorProveedor.length} con productos asignados
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {data.pendientes.map(lp => (
-              <div key={lp.id}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: lp.proveedor_sugerido ? 5 : 0 }}>
-                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1, fontWeight: 600 }}>
-                    📋 {lp.descr}
-                  </span>
-                  {!lp.proveedor_sugerido && (
+          {data.pedidosPorProveedor.map((pp, i) => {
+            const isExp = expanded[pp.proveedor.id] ?? false
+            return (
+              <div key={pp.proveedor.id} style={{ borderBottom: i < data.pedidosPorProveedor.length - 1 ? '1px solid #f0ece8' : 'none' }}>
+                {/* Row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
+                  {/* Toggle */}
+                  <button
+                    onClick={() => setExpanded(prev => ({ ...prev, [pp.proveedor.id]: !isExp }))}
+                    style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
+                  >
+                    <span style={{ fontSize: 10, color: '#3d3834', opacity: 0.35, flexShrink: 0, transform: isExp ? 'rotate(90deg)' : 'none', display: 'inline-block', transition: 'transform 0.15s' }}>▶</span>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pp.proveedor.descr}</p>
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: 0 }}>
+                        {pp.ingredientes.length} productos{pp.proveedor.descr_type ? ' · ' + pp.proveedor.descr_type : ''}
+                      </p>
+                    </div>
+                  </button>
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                     <button
-                      onClick={() => onAction(`Gestiona el pedido pendiente "${lp.descr}": ¿qué productos necesito pedir y a qué proveedor?`)}
-                      style={{ padding: '4px 10px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
-                    >
-                      ¿A quién? →
-                    </button>
-                  )}
-                </div>
-                {lp.proveedor_sugerido && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 22 }}>
-                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', opacity: 0.7, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      → {lp.proveedor_sugerido.descr}
-                    </span>
-                    <button
-                      onClick={() => onAction(`Preparar pedido por email a ${lp.proveedor_sugerido!.descr} para el pedido "${lp.descr}"`)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
+                      onClick={() => onAction(`Preparar pedido por email a ${pp.proveedor.descr} con estos productos: ${ingText(pp.ingredientes)}`)}
+                      title={pp.proveedor.mail || 'Email'}
+                      style={{ ...btnBase, backgroundColor: pp.proveedor.canal_preferido === 'email' ? '#19f973' : '#f5f2ee', borderColor: pp.proveedor.canal_preferido === 'email' ? '#19f973' : '#e8e2db', color: pp.proveedor.canal_preferido === 'email' ? '#1a3a2a' : '#3d3834', fontWeight: pp.proveedor.canal_preferido === 'email' ? 600 : 400 }}
                     >
                       {iconEmail} Email
                     </button>
                     <button
-                      onClick={() => onAction(`Preparar pedido por WhatsApp a ${lp.proveedor_sugerido!.descr} para el pedido "${lp.descr}"`)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
+                      onClick={() => onAction(`Preparar pedido por WhatsApp a ${pp.proveedor.descr} con estos productos: ${ingText(pp.ingredientes)}`)}
+                      title={pp.proveedor.phone || 'WhatsApp'}
+                      style={{ ...btnBase, backgroundColor: pp.proveedor.canal_preferido === 'whatsapp' ? '#dcfce7' : '#f5f2ee', borderColor: pp.proveedor.canal_preferido === 'whatsapp' ? '#86efac' : '#e8e2db', color: pp.proveedor.canal_preferido === 'whatsapp' ? '#166534' : '#3d3834', fontWeight: pp.proveedor.canal_preferido === 'whatsapp' ? 600 : 400 }}
                     >
                       {iconWA} WA
                     </button>
                   </div>
+                </div>
+                {/* Expanded ingredients */}
+                {isExp && (
+                  <div style={{ padding: '0 14px 12px 32px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {pp.ingredientes.map((ing, j) => (
+                      <span key={j} style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', backgroundColor: '#f5f2ee', borderRadius: 6, padding: '3px 8px', opacity: 0.8 }}>
+                        {ing.descr}{ing.unit ? <span style={{ opacity: 0.5 }}> · {ing.unit}</span> : null}
+                      </span>
+                    ))}
+                  </div>
                 )}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 12, padding: '12px 16px', marginBottom: 10 }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#92400e', margin: 0, lineHeight: 1.6 }}>
+            Ningún ingrediente tiene proveedor asignado aún.<br />
+            Ve a <strong>Ingredientes</strong> y asigna proveedores a tus productos para que el sistema sepa a quién pedir cada cosa.
+          </p>
+        </div>
+      )}
+
+      {/* Listas de pedido pendientes */}
+      {data.pendientes.length > 0 && (
+        <div style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 12, padding: '10px 14px', marginBottom: 10 }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Listas pendientes de enviar
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {data.pendientes.map(lp => (
+              <div key={lp.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1 }}>📋 {lp.descr}</span>
+                <button
+                  onClick={() => onAction(`Gestiona el pedido pendiente "${lp.descr}": qué productos necesito y a qué proveedor`)}
+                  style={{ padding: '4px 10px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
+                >
+                  Gestionar →
+                </button>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Proveedores list */}
-      <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 12, overflow: 'hidden', marginBottom: 8 }}>
-        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, fontWeight: 600, margin: 0, padding: '8px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #f0ece8' }}>
-          Selecciona proveedor
-        </p>
-        <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-          {data.proveedores.map((p, i) => (
-            <div
-              key={p.id}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: i < data.proveedores.length - 1 ? '1px solid #f0ece8' : 'none' }}
-            >
-              {/* Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.descr}</p>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: 0 }}>{p.descr_type || ''}</p>
-              </div>
-              {/* Buttons */}
-              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                <button
-                  onClick={() => onAction(`Preparar pedido por email a ${p.descr}`)}
-                  title={p.mail || 'Email'}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4, padding: '5px 9px',
-                    backgroundColor: p.canal_preferido === 'email' ? '#19f973' : '#f5f2ee',
-                    border: `1px solid ${p.canal_preferido === 'email' ? '#19f973' : '#e8e2db'}`,
-                    borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11,
-                    color: p.canal_preferido === 'email' ? '#1a3a2a' : '#3d3834',
-                    fontWeight: p.canal_preferido === 'email' ? 600 : 400,
-                  }}
-                >
-                  {iconEmail} Email
-                </button>
-                <button
-                  onClick={() => onAction(`Preparar pedido por WhatsApp a ${p.descr}`)}
-                  title={p.phone || 'WhatsApp'}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4, padding: '5px 9px',
-                    backgroundColor: p.canal_preferido === 'whatsapp' ? '#dcfce7' : '#f5f2ee',
-                    border: `1px solid ${p.canal_preferido === 'whatsapp' ? '#86efac' : '#e8e2db'}`,
-                    borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11,
-                    color: p.canal_preferido === 'whatsapp' ? '#166534' : '#3d3834',
-                    fontWeight: p.canal_preferido === 'whatsapp' ? 600 : 400,
-                  }}
-                >
-                  {iconWA} WA
-                </button>
-              </div>
+      {/* Pedido suelto: todos los proveedores */}
+      <div style={{ marginBottom: 8 }}>
+        <button
+          onClick={() => setShowAllProvs(s => !s)}
+          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #d4cec8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.55, textAlign: 'center' }}
+        >
+          {showAllProvs ? '▲ Ocultar' : '+ Pedido suelto a cualquier proveedor'}
+        </button>
+        {showAllProvs && (
+          <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 12, overflow: 'hidden', marginTop: 6 }}>
+            <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+              {data.proveedores.map((p, i) => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: i < data.proveedores.length - 1 ? '1px solid #f0ece8' : 'none' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12, color: '#3d3834', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.descr}</p>
+                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: 0 }}>{p.descr_type || ''}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                    <button onClick={() => onAction(`Preparar pedido por email a ${p.descr}`)} style={btnBase}>{iconEmail} Email</button>
+                    <button onClick={() => onAction(`Preparar pedido por WhatsApp a ${p.descr}`)} style={btnBase}>{iconWA} WA</button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Otro */}
+      {/* Manual input */}
       {!showOtro ? (
         <button
           onClick={() => setShowOtro(true)}
-          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #d4cec8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.5, textAlign: 'center' }}
+          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #d4cec8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.4, textAlign: 'center' }}
         >
           + Especificar proveedor manualmente
         </button>

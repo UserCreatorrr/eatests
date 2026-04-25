@@ -151,36 +151,66 @@ export function seedDemoData(db: Database.Database, uid: string) {
       .run(uid,i.codi,i.descr,i.type,i.unit,i.cost)
   }
 
-  // Assign proveedor_id to ingredients based on type
-  const typeToProvCodi: Record<string, string> = {
-    'Pescado':     'PROV002',   // Pescados del Atlántico SA
-    'Marisco':     'PROV010',   // Mariscos Costa Brava SL
-    'Carne':       'PROV003',   // Carnes Selectas Martínez
-    'Charcutería': 'PROV011',   // Charcutería Ibérica Extremeña
-    'Verdura':     'PROV001',   // Mercabarna Express SL
-    'Fruta':       'PROV001',   // Mercabarna Express SL
-    'Hongo':       'PROV009',   // Verduras del Mediterráneo SL
-    'Hierba':      'PROV009',   // Verduras del Mediterráneo SL
-    'Lácteo':      'PROV004',   // Lácteos Frescos del Pirineo
-    'Aceite':      'PROV005',   // Aceites García e Hijos
-    'Conserva':    'PROV005',   // Aceites García e Hijos
-    'Harina':      'PROV006',   // Harinera del Norte SL
-    'Cereal':      'PROV006',   // Harinera del Norte SL
-    'Pasta':       'PROV006',   // Harinera del Norte SL
-    'Vino':        'PROV007',   // Bodegas Rioja Premium
-    'Licor':       'PROV007',   // Bodegas Rioja Premium
-    'Especia':     'PROV013',   // Cafés y Especias del Mundo
-    'Condimento':  'PROV013',   // Cafés y Especias del Mundo
-    'Repostería':  'PROV012',   // Pastelería Industrial Balear
-    'Azúcar':      'PROV012',   // Pastelería Industrial Balear
-    'Panadería':   'PROV012',   // Pastelería Industrial Balear
+  // Assign proveedor_id to specific ingredients (leaving some unassigned on purpose)
+  const ingProvMap: Record<string, string> = {
+    // Pescados → Pescados del Atlántico SA
+    'ING001': 'PROV002', 'ING002': 'PROV002', 'ING003': 'PROV002',
+    'ING004': 'PROV002', 'ING006': 'PROV002', 'ING007': 'PROV002',
+    // Mariscos → Mariscos Costa Brava SL
+    'ING008': 'PROV010', 'ING009': 'PROV010', 'ING010': 'PROV010',
+    'ING011': 'PROV010', 'ING012': 'PROV010', 'ING013': 'PROV010',
+    // ING005 (Atún rojo) y ING014 (Navaja) sin proveedor — los piden ocasionalmente
+    // Carnes → Carnes Selectas Martínez
+    'ING015': 'PROV003', 'ING016': 'PROV003', 'ING017': 'PROV003',
+    'ING018': 'PROV003', 'ING019': 'PROV003', 'ING020': 'PROV003',
+    'ING022': 'PROV003', 'ING023': 'PROV003',
+    // ING021 (Muslo de pato) sin proveedor — producto especial
+    // Charcutería → Charcutería Ibérica Extremeña
+    'ING024': 'PROV011', 'ING025': 'PROV011', 'ING026': 'PROV011', 'ING027': 'PROV011',
+    // Verduras → Mercabarna Express SL
+    'ING028': 'PROV001', 'ING029': 'PROV001', 'ING030': 'PROV001',
+    'ING031': 'PROV001', 'ING032': 'PROV001', 'ING033': 'PROV001',
+    'ING034': 'PROV001', 'ING035': 'PROV001', 'ING036': 'PROV001',
+    'ING037': 'PROV001', 'ING038': 'PROV001',
+    // ING039-ING045 (berenjena, calabacín, zanahoria, apio, puerro, alcachofa, remolacha) → Verduras del Mediterráneo
+    'ING039': 'PROV009', 'ING040': 'PROV009', 'ING041': 'PROV009',
+    'ING042': 'PROV009', 'ING043': 'PROV009', 'ING044': 'PROV009', 'ING045': 'PROV009',
+    // Hongos — sin proveedor (ING046-ING050 se dejan sin asignar)
+    // Lácteos → Lácteos Frescos del Pirineo
+    'ING051': 'PROV004', 'ING052': 'PROV004', 'ING053': 'PROV004',
+    'ING054': 'PROV004', 'ING057': 'PROV004', 'ING058': 'PROV004', 'ING059': 'PROV004',
+    // ING055 (Brie) e ING056 (Cabra) sin proveedor — se compran según temporada
+    // Aceites → Aceites García e Hijos
+    'ING060': 'PROV005', 'ING061': 'PROV005',
+    // Conservas → Aceites García e Hijos
+    'ING062': 'PROV005', 'ING063': 'PROV005',
+    // ING064 (Anchoas) sin proveedor
+    // Harinas → Harinera del Norte SL
+    'ING065': 'PROV006', 'ING066': 'PROV006',
+    // Cereales y pasta → Harinera del Norte SL
+    'ING067': 'PROV006', 'ING068': 'PROV006',
+    // Pan (ING069, ING070) sin proveedor — panadería local
+    // Caldos (ING071-ING073) sin proveedor — elaboración propia
+    // Vinos → Bodegas Rioja Premium
+    'ING074': 'PROV007', 'ING075': 'PROV007',
+    // ING076 (Brandy) sin proveedor
+    // Azúcares (ING077, ING078) sin proveedor
+    // Repostería → Pastelería Industrial Balear
+    'ING079': 'PROV012', 'ING080': 'PROV012',
+    // Frutas → Mercabarna Express SL
+    'ING081': 'PROV001', 'ING082': 'PROV001', 'ING083': 'PROV001',
+    'ING084': 'PROV001', 'ING085': 'PROV001',
+    // Especias → Cafés y Especias del Mundo
+    'ING087': 'PROV013', 'ING088': 'PROV013', 'ING089': 'PROV013',
+    // ING086 (Sal) sin proveedor — se compra a granel
+    // Hierbas (ING090-ING092) sin proveedor — proveedor local pendiente de confirmar
   }
-  for (const [type, codi] of Object.entries(typeToProvCodi)) {
-    const provId = provIds[codi]
-    const provDescr = proveedores.find(p => p.codi === codi)?.descr || ''
+  for (const [codi, provCodi] of Object.entries(ingProvMap)) {
+    const provId = provIds[provCodi]
+    const provDescr = proveedores.find(p => p.codi === provCodi)?.descr || ''
     if (provId) {
-      db.prepare(`UPDATE ingredientes SET proveedor_id=?, proveedor_nombre=? WHERE user_id=? AND type=?`)
-        .run(provId, provDescr, uid, type)
+      db.prepare(`UPDATE ingredientes SET proveedor_id=?, proveedor_nombre=? WHERE user_id=? AND codi=?`)
+        .run(provId, provDescr, uid, codi)
     }
   }
 

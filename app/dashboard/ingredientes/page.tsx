@@ -102,19 +102,17 @@ export default function IngredientesPage() {
     setRows(prev => prev.filter(r => r.id !== id))
   }
 
-  const byType = filtered.reduce<Record<string, Ingrediente[]>>((acc, r) => {
-    const t = r.type || 'Sin categoría'
-    if (!acc[t]) acc[t] = []
-    acc[t].push(r)
-    return acc
-  }, {})
+  const sinProveedor = rows.filter(r => !r.proveedor_id).length
+  const conProveedor = rows.filter(r => r.proveedor_id).length
 
   return (
     <div className="p-8">
       <div className="page-header">
         <div>
           <h1 className="page-title">Ingredientes</h1>
-          <p className="page-subtitle">{rows.length} ingredientes · Asigna un proveedor a cada uno</p>
+          <p className="page-subtitle">
+            {rows.length} ingredientes · <span style={{ color: '#166534' }}>{conProveedor} con proveedor</span> · <span style={{ opacity: 0.5 }}>{sinProveedor} sin asignar</span>
+          </p>
         </div>
         <button onClick={openAdd} className="btn-primary">+ Añadir</button>
       </div>
@@ -134,79 +132,73 @@ export default function IngredientesPage() {
       {loading ? (
         <p className="page-subtitle">Cargando...</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {Object.entries(byType).sort(([a], [b]) => a.localeCompare(b)).map(([type, items]) => (
-            <div key={type}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <h3 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#3d3834', margin: 0 }}>{type}</h3>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4 }}>{items.length}</span>
-              </div>
-              <div style={{ backgroundColor: '#fff', borderRadius: 14, border: '1px solid #e8e2db', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#f8f7f5' }}>
-                      {['Código', 'Nombre', 'Unidad', 'Coste', 'Proveedor', ''].map(h => (
-                        <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, fontWeight: 600, borderBottom: '1px solid #e8e2db', whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((ing, idx) => (
-                      <tr key={ing.id} style={{ borderBottom: idx < items.length - 1 ? '1px solid #f0ece8' : 'none' }}>
-                        <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5 }}>{ing.codi || '-'}</td>
-                        <td style={{ padding: '8px 14px', fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834' }}>{ing.descr || '-'}</td>
-                        <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834' }}>{ing.unit || '-'}</td>
-                        <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', whiteSpace: 'nowrap' }}>{fmt(ing.cost)}</td>
+        <div style={{ backgroundColor: '#fff', borderRadius: 14, border: '1px solid #e8e2db', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f8f7f5' }}>
+                {['Código', 'Nombre', 'Tipo', 'Unidad', 'Coste', 'Proveedor', ''].map(h => (
+                  <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, fontWeight: 600, borderBottom: '1px solid #e8e2db', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((ing, idx) => (
+                <tr key={ing.id} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid #f0ece8' : 'none' }}>
+                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4 }}>{ing.codi || '-'}</td>
+                  <td style={{ padding: '8px 14px', fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834' }}>{ing.descr || '-'}</td>
+                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45 }}>{ing.type || '-'}</td>
+                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834' }}>{ing.unit || '-'}</td>
+                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', whiteSpace: 'nowrap' }}>{fmt(ing.cost)}</td>
 
-                        {/* Proveedor selector */}
-                        <td style={{ padding: '6px 14px', minWidth: 180 }}>
-                          {assigningId === ing.id ? (
-                            <select
-                              autoFocus
-                              defaultValue={ing.proveedor_id ?? ''}
-                              onChange={e => {
-                                const pid = e.target.value ? Number(e.target.value) : null
-                                const prov = pid ? proveedores.find(p => p.id === pid) || null : null
-                                assignProveedor(ing, prov)
-                              }}
-                              onBlur={() => setAssigningId(null)}
-                              style={{ width: '100%', padding: '5px 8px', borderRadius: 7, border: '1.5px solid #19f973', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', backgroundColor: '#fff', outline: 'none', cursor: 'pointer' }}
-                            >
-                              <option value="">Sin proveedor</option>
-                              {proveedores.map(p => (
-                                <option key={p.id} value={p.id}>{p.descr}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <button
-                              onClick={() => setAssigningId(ing.id)}
-                              style={{
-                                width: '100%', textAlign: 'left', padding: '5px 10px',
-                                backgroundColor: ing.proveedor_id ? '#f0fdf4' : '#f8f7f5',
-                                border: `1px solid ${ing.proveedor_id ? '#86efac' : '#e8e2db'}`,
-                                borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12,
-                                color: ing.proveedor_id ? '#166534' : '#3d3834',
-                                opacity: ing.proveedor_id ? 1 : 0.45,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              }}
-                              title="Haz clic para asignar proveedor"
-                            >
-                              {ing.proveedor_nombre || '+ Asignar proveedor'}
-                            </button>
-                          )}
-                        </td>
+                  {/* Proveedor selector */}
+                  <td style={{ padding: '6px 14px', minWidth: 200 }}>
+                    {assigningId === ing.id ? (
+                      <select
+                        autoFocus
+                        defaultValue={ing.proveedor_id ?? ''}
+                        onChange={e => {
+                          const pid = e.target.value ? Number(e.target.value) : null
+                          const prov = pid ? proveedores.find(p => p.id === pid) || null : null
+                          assignProveedor(ing, prov)
+                        }}
+                        onBlur={() => setAssigningId(null)}
+                        style={{ width: '100%', padding: '5px 8px', borderRadius: 7, border: '1.5px solid #19f973', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', backgroundColor: '#fff', outline: 'none', cursor: 'pointer' }}
+                      >
+                        <option value="">Sin proveedor</option>
+                        {proveedores.map(p => (
+                          <option key={p.id} value={p.id}>{p.descr}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <button
+                        onClick={() => setAssigningId(ing.id)}
+                        style={{
+                          width: '100%', textAlign: 'left', padding: '5px 10px',
+                          backgroundColor: ing.proveedor_id ? '#f0fdf4' : '#f8f7f5',
+                          border: `1px solid ${ing.proveedor_id ? '#86efac' : '#e8e2db'}`,
+                          borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12,
+                          color: ing.proveedor_id ? '#166534' : '#3d3834',
+                          opacity: ing.proveedor_id ? 1 : 0.45,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}
+                        title="Clic para asignar proveedor"
+                      >
+                        {ing.proveedor_nombre || '+ Asignar proveedor'}
+                      </button>
+                    )}
+                  </td>
 
-                        <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
-                          <button onClick={() => openEdit(ing)} style={{ padding: '4px 8px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.4, fontSize: 13 }}>✏️</button>
-                          <button onClick={() => del(ing.id)} style={{ padding: '4px 8px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#dc2626', opacity: 0.5, fontSize: 13 }}>✕</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
+                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => openEdit(ing)} style={{ padding: '4px 8px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.4, fontSize: 13 }}>✏️</button>
+                    <button onClick={() => del(ing.id)} style={{ padding: '4px 8px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#dc2626', opacity: 0.5, fontSize: 13 }}>✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && (
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', opacity: 0.4, padding: '20px 16px', textAlign: 'center' }}>Sin resultados</p>
+          )}
         </div>
       )}
 

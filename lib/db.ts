@@ -324,6 +324,9 @@ function initSchema(db: Database.Database) {
     VALUES ('pablo-admin', 'pabloperez@visualandgrowth.es', ?, 'Pablo Perez')
   `).run(hash)
 
+  // Safe column additions (ALTER TABLE IF NOT EXIST equivalent via try/catch)
+  try { db.exec(`ALTER TABLE proveedores ADD COLUMN canal_preferido TEXT`) } catch {}
+
   // Auto-seed demo data if DB is empty (new installation or after data loss)
   const ingCount = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=?').get('pablo-admin') as any).c
   if (ingCount === 0) {

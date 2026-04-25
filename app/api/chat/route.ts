@@ -349,6 +349,15 @@ const tools: any[] = [
       },
     },
   },
+  // ── SELECTOR PEDIDO ───────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'selector_pedido',
+      description: 'Muestra al usuario la lista de pedidos pendientes de enviar y todos los proveedores para que elija a quién hacer el pedido y por qué canal (email o WhatsApp). Usar cuando el usuario quiere hacer un pedido sin especificar aún el proveedor.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
   // ── EMAIL PEDIDOS ──────────────────────────────────────────
   {
     type: 'function',
@@ -736,6 +745,17 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     } catch (e: any) { return `Error: ${e.message}` }
   }
 
+  // ── SELECTOR PEDIDO ──────────────────────────────────────
+  if (name === 'selector_pedido') {
+    const pendientes = (db.prepare(
+      `SELECT id, descr, data, pending_receive FROM lista_pedidos WHERE user_id=? AND pending_send=1 ORDER BY data DESC LIMIT 10`
+    ).all(userId) as any[])
+    const proveedores = (db.prepare(
+      `SELECT id, descr, descr_type, mail, phone, canal_preferido FROM proveedores WHERE user_id=? ORDER BY descr LIMIT 40`
+    ).all(userId) as any[])
+    return `__PEDIDO_SELECTOR__${JSON.stringify({ pendientes, proveedores })}`
+  }
+
   // ── PROPONER PEDIDO EMAIL ─────────────────────────────────
   if (name === 'proponer_pedido_email') {
     const { proveedor_nombre, proveedor_email, items, notas } = args
@@ -807,8 +827,10 @@ REGLAS:
 - Para análisis de gasto → usa resumen_gastos o gasto_por_proveedor
 - Para actualizar precio → usa actualizar_ingrediente
 - Cuando crees o modifiques algo, confirma con el id generado
-- Para "hacer pedido a X", "pedir X a proveedor", "manda el pedido", "envía email" → usa proponer_pedido_email (el usuario revisará y enviará con un clic)
-- En el brief, si hay pedidos pendientes o ingredientes críticos, sugiere hacer el pedido y ofrece usar proponer_pedido_email`
+- Cuando el usuario quiera hacer un pedido SIN especificar proveedor → usa selector_pedido para mostrar la lista visual de proveedores
+- Cuando el usuario ya especificó proveedor e items (ej: "email a Mercabarna con X kg de tomates") → usa proponer_pedido_email directamente
+- Cuando el usuario pida "pedido por WhatsApp a X" → usa proponer_pedido_email con notas indicando que es por WhatsApp
+- En el brief, si hay pedidos pendientes, sugiere usar selector_pedido`
 
   const chatMessages: any[] = messages.map((m: any) => ({ role: m.role, content: m.content }))
 
@@ -842,6 +864,7 @@ REGLAS:
     const results: string[] = []
     let emailProposal: any = null
     let briefCards: any = null
+    let pedidoSelector: any = null
 
     for (const tc of choice.message.tool_calls) {
       const args = JSON.parse(tc.function.arguments)
@@ -852,6 +875,9 @@ REGLAS:
       } else if (result.startsWith('__BRIEF_CARDS__')) {
         briefCards = JSON.parse(result.slice('__BRIEF_CARDS__'.length))
         results.push('Brief generado.')
+      } else if (result.startsWith('__PEDIDO_SELECTOR__')) {
+        pedidoSelector = JSON.parse(result.slice('__PEDIDO_SELECTOR__'.length))
+        results.push('Selector de pedido generado.')
       } else {
         results.push(result)
       }
@@ -875,9 +901,12 @@ REGLAS:
 
     const toolNames = choice.message.tool_calls.map((tc: any) => tc.function.name).join(', ')
 
-    // Brief cards: skip follow-up LLM call, send cards directly
+    // Skip follow-up LLM call for visual card responses
     if (briefCards) {
       return NextResponse.json({ reply: '', action: toolNames, briefCards })
+    }
+    if (pedidoSelector) {
+      return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
     }
 
     const reply = followUp.choices[0]?.message?.content || 'Hecho.'

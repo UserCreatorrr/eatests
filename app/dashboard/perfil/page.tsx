@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 
 type UserData = {
   id: string
@@ -20,6 +21,7 @@ const S: Record<string, React.CSSProperties> = {
 }
 
 export default function PerfilPage() {
+  const router = useRouter()
   const [user, setUser] = useState<UserData | null>(null)
   const [name, setName] = useState('')
   const [savingName, setSavingName] = useState(false)
@@ -309,7 +311,7 @@ export default function PerfilPage() {
       {/* Account info */}
       <div style={S.section}>
         <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 15, color: '#3d3834', margin: '0 0 20px' }}>Cuenta</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
           {[
             { label: 'ID de usuario', value: user.id },
             { label: 'Email', value: user.email },
@@ -321,6 +323,24 @@ export default function PerfilPage() {
             </div>
           ))}
         </div>
+
+        <button
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' })
+            router.push('/login')
+          }}
+          style={{
+            width: '100%', padding: '13px 22px', borderRadius: 14, border: '1.5px solid #fca5a5',
+            backgroundColor: '#fff1f2', cursor: 'pointer', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: 10, fontFamily: 'DM Mono, monospace', fontSize: 13,
+            fontWeight: 600, color: '#dc2626',
+          }}
+        >
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Cerrar sesión
+        </button>
       </div>
     </div>
   )

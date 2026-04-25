@@ -25,12 +25,34 @@ interface BriefData {
   cards: BriefCard[]
 }
 
+interface PedidoPendiente {
+  id: number
+  descr: string
+  data: string
+  pending_receive: number
+}
+
+interface ProveedorSelectorItem {
+  id: number
+  descr: string
+  descr_type: string
+  mail: string
+  phone: string
+  canal_preferido: 'email' | 'whatsapp' | null
+}
+
+interface PedidoSelectorData {
+  pendientes: PedidoPendiente[]
+  proveedores: ProveedorSelectorItem[]
+}
+
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'brief_cards'
+  role: 'user' | 'assistant' | 'email_proposal' | 'brief_cards' | 'pedido_selector'
   content: string
   image?: string
   emailProposal?: EmailProposal
   briefCards?: BriefData
+  pedidoSelector?: PedidoSelectorData
 }
 
 const CARD_ICONS: Record<string, JSX.Element> = {
@@ -48,13 +70,131 @@ const URGENCIA_COLORS = {
   danger:  { bg: '#fff1f2', border: '#fca5a5', icon: '#991b1b', badge: '#ef4444' },
 }
 
+function parseInline(text: string): (JSX.Element | string)[] {
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**'))
+      return <strong key={i} style={{ fontWeight: 700, color: 'inherit' }}>{part.slice(2, -2)}</strong>
+    if (part.startsWith('`') && part.endsWith('`'))
+      return <code key={i} style={{ fontFamily: 'DM Mono, monospace', backgroundColor: '#f0ece8', padding: '1px 5px', borderRadius: 4, fontSize: '0.9em' }}>{part.slice(1, -1)}</code>
+    return part
+  })
+}
+
+// Full markdown renderer for assistant messages
+function MarkdownContent({ content }: { content: string }) {
+  const lines = content.split('\n')
+  const elements: JSX.Element[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // Headings
+    if (line.startsWith('#### ')) {
+      elements.push(<p key={i} style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 11, color: '#3d3834', opacity: 0.5, margin: '14px 0 4px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{parseInline(line.slice(5))}</p>)
+      i++; continue
+    }
+    if (line.startsWith('### ')) {
+      elements.push(<p key={i} style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#3d3834', margin: '16px 0 6px' }}>{parseInline(line.slice(4))}</p>)
+      i++; continue
+    }
+    if (line.startsWith('## ')) {
+      elements.push(<p key={i} style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#3d3834', margin: '18px 0 8px' }}>{parseInline(line.slice(3))}</p>)
+      i++; continue
+    }
+
+    // Horizontal rule
+    if (line.trim() === '---' || line.trim() === '***') {
+      elements.push(<hr key={i} style={{ border: 'none', borderTop: '1px solid #e8e2db', margin: '12px 0' }} />)
+      i++; continue
+    }
+
+    // Table
+    if (line.trim().startsWith('|')) {
+      const tableLines: string[] = []
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i])
+        i++
+      }
+      const isSep = (l: string) => /^\|[\s\-:|]+\|/.test(l.trim())
+      const dataRows = tableLines.filter(l => !isSep(l))
+      if (dataRows.length < 1) continue
+      const parseCells = (l: string) => l.split('|').slice(1, -1).map(c => c.trim())
+      elements.push(
+        <div key={i} style={{ overflowX: 'auto', margin: '10px 0', borderRadius: 10, border: '1px solid #e8e2db' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'DM Mono, monospace', fontSize: 12 }}>
+            <thead>
+              <tr>{parseCells(dataRows[0]).map((cell, j) => (
+                <th key={j} style={{ padding: '8px 14px', backgroundColor: '#f5f2ee', borderBottom: '1px solid #e8e2db', color: '#3d3834', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}>{parseInline(cell)}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {dataRows.slice(1).map((row, ri) => (
+                <tr key={ri} style={{ borderBottom: ri < dataRows.length - 2 ? '1px solid #f0ece8' : 'none' }}>
+                  {parseCells(row).map((cell, j) => (
+                    <td key={j} style={{ padding: '7px 14px', color: '#3d3834' }}>{parseInline(cell)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+      continue
+    }
+
+    // Bullet list
+    if (line.match(/^[-*] /)) {
+      const items: string[] = []
+      while (i < lines.length && lines[i].match(/^[-*] /)) {
+        items.push(lines[i].slice(2))
+        i++
+      }
+      elements.push(
+        <ul key={i} style={{ margin: '6px 0', paddingLeft: 18 }}>
+          {items.map((item, j) => (
+            <li key={j} style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', margin: '3px 0', lineHeight: 1.55 }}>{parseInline(item)}</li>
+          ))}
+        </ul>
+      )
+      continue
+    }
+
+    // Numbered list
+    if (line.match(/^\d+\. /)) {
+      const items: string[] = []
+      while (i < lines.length && lines[i].match(/^\d+\. /)) {
+        items.push(lines[i].replace(/^\d+\. /, ''))
+        i++
+      }
+      elements.push(
+        <ol key={i} style={{ margin: '6px 0', paddingLeft: 20 }}>
+          {items.map((item, j) => (
+            <li key={j} style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', margin: '3px 0', lineHeight: 1.55 }}>{parseInline(item)}</li>
+          ))}
+        </ol>
+      )
+      continue
+    }
+
+    // Empty line
+    if (line.trim() === '') { i++; continue }
+
+    // Regular paragraph
+    elements.push(
+      <p key={i} style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', margin: '4px 0', lineHeight: 1.65 }}>
+        {parseInline(line)}
+      </p>
+    )
+    i++
+  }
+
+  return <div style={{ minWidth: 0 }}>{elements}</div>
+}
+
 function renderBriefText(text: string) {
-  // Bold **text**
-  const parts = text.split(/\*\*(.*?)\*\*/g)
-  return parts.map((p, i) => i % 2 === 1
-    ? <strong key={i} style={{ fontWeight: 700, color: 'inherit' }}>{p}</strong>
-    : <span key={i}>{p}</span>
-  )
+  return parseInline(text)
 }
 
 function BriefCards({ data, onAction }: { data: BriefData; onAction: (chat: string) => void }) {
@@ -121,6 +261,141 @@ function BriefCards({ data, onAction }: { data: BriefData; onAction: (chat: stri
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAction: (chat: string) => void }) {
+  const [showOtro, setShowOtro] = useState(false)
+  const [otroText, setOtroText] = useState('')
+
+  const iconEmail = (
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  )
+  const iconWA = (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.854L0 24l6.303-1.654A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.214-3.733.979 1.001-3.64-.234-.374A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+    </svg>
+  )
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+        </div>
+        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#3d3834', margin: 0 }}>
+          ¿A qué proveedor quieres hacer el pedido?
+        </p>
+      </div>
+
+      {/* Pedidos pendientes */}
+      {data.pendientes.length > 0 && (
+        <div style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 12, padding: '10px 14px', marginBottom: 10 }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Pendientes de enviar
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {data.pendientes.map(lp => (
+              <div key={lp.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1 }}>
+                  📋 {lp.descr}
+                  {lp.data && <span style={{ opacity: 0.45, marginLeft: 6 }}>{lp.data}</span>}
+                </span>
+                <button
+                  onClick={() => onAction(`Gestiona el pedido pendiente "${lp.descr}": ayúdame a decidir qué necesito pedir y a qué proveedor enviarlo`)}
+                  style={{ padding: '4px 10px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
+                >
+                  Gestionar →
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Proveedores list */}
+      <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 12, overflow: 'hidden', marginBottom: 8 }}>
+        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, fontWeight: 600, margin: 0, padding: '8px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #f0ece8' }}>
+          Selecciona proveedor
+        </p>
+        <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+          {data.proveedores.map((p, i) => (
+            <div
+              key={p.id}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: i < data.proveedores.length - 1 ? '1px solid #f0ece8' : 'none' }}
+            >
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.descr}</p>
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: 0 }}>{p.descr_type || ''}</p>
+              </div>
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                <button
+                  onClick={() => onAction(`Preparar pedido por email a ${p.descr}`)}
+                  title={p.mail || 'Email'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, padding: '5px 9px',
+                    backgroundColor: p.canal_preferido === 'email' ? '#19f973' : '#f5f2ee',
+                    border: `1px solid ${p.canal_preferido === 'email' ? '#19f973' : '#e8e2db'}`,
+                    borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11,
+                    color: p.canal_preferido === 'email' ? '#1a3a2a' : '#3d3834',
+                    fontWeight: p.canal_preferido === 'email' ? 600 : 400,
+                  }}
+                >
+                  {iconEmail} Email
+                </button>
+                <button
+                  onClick={() => onAction(`Preparar pedido por WhatsApp a ${p.descr}`)}
+                  title={p.phone || 'WhatsApp'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, padding: '5px 9px',
+                    backgroundColor: p.canal_preferido === 'whatsapp' ? '#dcfce7' : '#f5f2ee',
+                    border: `1px solid ${p.canal_preferido === 'whatsapp' ? '#86efac' : '#e8e2db'}`,
+                    borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11,
+                    color: p.canal_preferido === 'whatsapp' ? '#166534' : '#3d3834',
+                    fontWeight: p.canal_preferido === 'whatsapp' ? 600 : 400,
+                  }}
+                >
+                  {iconWA} WA
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Otro */}
+      {!showOtro ? (
+        <button
+          onClick={() => setShowOtro(true)}
+          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #d4cec8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.5, textAlign: 'center' }}
+        >
+          + Especificar proveedor manualmente
+        </button>
+      ) : (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input
+            autoFocus
+            value={otroText}
+            onChange={e => setOtroText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && otroText.trim()) onAction(`Preparar pedido a ${otroText.trim()}`) }}
+            placeholder="Nombre del proveedor..."
+            style={{ flex: 1, padding: '8px 12px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 8, outline: 'none' }}
+          />
+          <button
+            onClick={() => { if (otroText.trim()) onAction(`Preparar pedido a ${otroText.trim()}`) }}
+            style={{ padding: '8px 14px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#2a2522' }}
+          >
+            →
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -259,7 +534,7 @@ function loadCurrent(): Message[] {
 
 function saveCurrent(messages: Message[]) {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal')))
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal')))
   } catch {}
 }
 
@@ -279,12 +554,18 @@ export default function KitchenChat() {
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
 
-  // Restore current conversation and history on mount
+  // Start fresh on every mount — history accessible via Historial button
   useEffect(() => {
     const h = new Date().getHours()
     setGreeting(h < 13 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches')
+    // Save any previous conversation to history before starting fresh
     const current = loadCurrent()
-    if (current.length > 0) setMessages(current)
+    if (current.length > 0) {
+      const existing = loadHistory()
+      const dedup = existing.filter(c => JSON.stringify(c.messages) !== JSON.stringify(current))
+      saveHistory([{ messages: current, lastUsed: Date.now() }, ...dedup])
+    }
+    setMessages([])
     setHistory(loadHistory())
   }, [])
 
@@ -336,6 +617,7 @@ export default function KitchenChat() {
     // Convert special message types for API: brief_cards → assistant placeholder, drop email_proposal/channel_choice/whatsapp_proposal
     const apiMessages = messages.flatMap(m => {
       if (m.role === 'brief_cards') return [{ role: 'assistant' as const, content: '[Brief diario generado y mostrado al usuario]' }]
+      if (m.role === 'pedido_selector') return [{ role: 'assistant' as const, content: '[Selector de proveedores mostrado al usuario]' }]
       if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice' || (m.role as string) === 'whatsapp_proposal') return []
       return [m]
     })
@@ -363,6 +645,8 @@ export default function KitchenChat() {
         if (json.action) setActionMsg(json.action)
         if (json.briefCards) {
           setMessages(prev => [...prev, { role: 'brief_cards', content: '', briefCards: json.briefCards }])
+        } else if (json.pedidoSelector) {
+          setMessages(prev => [...prev, { role: 'pedido_selector', content: '', pedidoSelector: json.pedidoSelector }])
         } else if (json.reply) {
           const newMsgs: Message[] = [{ role: 'assistant', content: json.reply }]
           if (json.emailProposal) {
@@ -565,6 +849,17 @@ export default function KitchenChat() {
                     </div>
                   )
                 }
+
+                // Pedido selector card
+                if (msg.role === 'pedido_selector' && msg.pedidoSelector) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <PedidoSelectorCard data={msg.pedidoSelector} onAction={(chat) => send(chat)} />
+                    </div>
+                  )
+                }
+
                 return (
                   <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', gap: 10 }}>
                     {msg.role === 'assistant' && (
@@ -572,9 +867,13 @@ export default function KitchenChat() {
                         {iconAI}
                       </div>
                     )}
-                    <div style={{ maxWidth: '78%', borderRadius: 18, padding: '12px 18px', backgroundColor: msg.role === 'user' ? '#3d3834' : '#ffffff', color: msg.role === 'user' ? '#dfd5c9' : '#3d3834', fontFamily: 'DM Mono, monospace', fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap', border: msg.role === 'assistant' ? '1px solid #e8e2db' : 'none' }}>
+                    <div style={{ maxWidth: '78%', borderRadius: 18, padding: '12px 18px', backgroundColor: msg.role === 'user' ? '#3d3834' : '#ffffff', color: msg.role === 'user' ? '#dfd5c9' : '#3d3834', border: msg.role === 'assistant' ? '1px solid #e8e2db' : 'none' }}>
                       {msg.image && <img src={msg.image} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 200, objectFit: 'cover' }} />}
-                      {msg.content}
+                      {msg.role === 'user' ? (
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, lineHeight: 1.65, color: '#dfd5c9', margin: 0 }}>{msg.content}</p>
+                      ) : (
+                        <MarkdownContent content={msg.content} />
+                      )}
                       {msg.role === 'assistant' && isLoading && i === messages.length - 1 && !msg.content && (
                         <span style={{ color: '#19f973' }}>|</span>
                       )}

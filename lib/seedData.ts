@@ -38,6 +38,29 @@ export function seedDemoData(db: Database.Database, uid: string) {
     provIds[p.codi] = r.lastInsertRowid as number
   }
 
+  // ── PROVEEDORES DETALLE (datos ERP/contabilidad) ─────────────────────────
+  const proveedoresDetalle = [
+    { codi:'PROV001', descr:'Mercabarna Express SL',          nif:'B12345678', mail_cc:'facturas@mercabarnaexpress.com',  web:'www.mercabarnaexpress.com',    creditor:1, address:'Mercabarna, Nave C-14',          city:'Barcelona',  cp:'08040', comment:'Entrega martes y viernes antes 8h' },
+    { codi:'PROV002', descr:'Pescados del Atlántico SA',      nif:'A87654321', mail_cc:'facturas@pescadosatlantico.es',   web:'www.pescadosatlantico.es',      creditor:1, address:'Polígono Ind. O Portiño, nave 8', city:'A Coruña',   cp:'15011', comment:'Pedido antes de las 18h del día anterior' },
+    { codi:'PROV003', descr:'Carnes Selectas Martínez',       nif:'B98765432', mail_cc:'admin@carnesmartinez.com',        web:'www.carnesmartinez.com',        creditor:1, address:'Carrer del Carme, 45',            city:'Vic',        cp:'08500', comment:'Mín. pedido 200 EUR. Envío gratuito >500 EUR' },
+    { codi:'PROV004', descr:'Lácteos Frescos del Pirineo',    nif:'B11223344', mail_cc:'contabilidad@lacteosfrescos.es',  web:'www.lacteosfrescos.es',         creditor:1, address:'Ctra. Lleida-Mollerussa, km 12',  city:'Lleida',     cp:'25001', comment:'Factura mensual consolidada' },
+    { codi:'PROV005', descr:'Aceites García e Hijos',         nif:'B55667788', mail_cc:'facturas@aceitesgarcia.com',      web:'www.aceitesgarcia.com',         creditor:1, address:'Polígono El Olivar, nave 3',      city:'Jaén',       cp:'23001', comment:'TRF 60 días fin de mes' },
+    { codi:'PROV006', descr:'Harinera del Norte SL',          nif:'B33445566', mail_cc:'admin@harineranorte.com',         web:'www.harineranorte.com',         creditor:1, address:'Barrio Industrial Ugarte, 12',    city:'Bilbao',     cp:'48001', comment:'Pedido mínimo 5 sacos 25kg' },
+    { codi:'PROV007', descr:'Bodegas Rioja Premium',          nif:'A22334455', mail_cc:'cuentas@bodegasrioja.com',        web:'www.bodegasriojapremium.com',   creditor:1, address:'Ctra. Nacional 232, km 18',       city:'Logroño',    cp:'26001', comment:'Comercial: Carlos Moya 636 100 200' },
+    { codi:'PROV008', descr:'Distribuciones Roca Alimentación',nif:'B77889900', mail_cc:'pedidos@distrroca.com',          web:'www.distribuciones-roca.es',    creditor:1, address:'Polígono Can Roqueta, nave 22',   city:'Sabadell',   cp:'08201', comment:'Distribuidor general. Entrega 24h' },
+    { codi:'PROV009', descr:'Verduras del Mediterráneo SL',   nif:'B44556677', mail_cc:'info@verduramediterraneo.es',     web:'www.verduramediterraneo.es',    creditor:1, address:'Mercat Central, puesto 18-B',     city:'Valencia',   cp:'46001', comment:'Solo entrega de lunes a viernes' },
+    { codi:'PROV010', descr:'Mariscos Costa Brava SL',        nif:'B99001122', mail_cc:'facturas@mariscoscostabrava.com', web:'www.mariscoscostabrava.com',    creditor:1, address:'Port de Palamós, moll 4',         city:'Girona',     cp:'17230', comment:'Disponibilidad sujeta a temporada' },
+    { codi:'PROV011', descr:'Charcutería Ibérica Extremeña',  nif:'B33221100', mail_cc:'ventas@ibericaextremena.es',      web:'www.ibericaextremena.es',       creditor:1, address:'Polígono El Prado, nave 7',       city:'Badajoz',    cp:'06001', comment:'Pago a 60 días. Mín. pedido 300 EUR' },
+    { codi:'PROV012', descr:'Pastelería Industrial Balear',   nif:'B55443322', mail_cc:'admin@pasteleriabalear.com',      web:'www.pasteleriabalear.com',      creditor:1, address:'Camí de Son Fuster, 8',           city:'Palma',      cp:'07007', comment:'Pedido antes del miércoles para entrega viernes' },
+    { codi:'PROV013', descr:'Cafés y Especias del Mundo',     nif:'B66778899', mail_cc:'facturas@cafesyespecias.com',     web:'www.cafesyespecias.com',        creditor:1, address:'Calle Gran Vía, 42, piso 3',      city:'Madrid',     cp:'28013', comment:'Pedido trimestral. Envío por mensajería' },
+    { codi:'PROV014', descr:'Congelados Premium Norte SA',    nif:'A11223344', mail_cc:'cuentas@congeladosnorte.es',      web:'www.congeladosnorte.es',        creditor:1, address:'Polígono Área 13, nave 8',        city:'Santander',  cp:'39011', comment:'Cadena de frío garantizada. Entrega con camión propio' },
+    { codi:'PROV015', descr:'Ecológicos del Valle SL',        nif:'B88990011', mail_cc:'eco@ecologicosvalle.es',          web:'www.ecologicosvalle.es',        creditor:1, address:'Finca El Olivo, Ctra. A-44, km 3',city:'Granada',   cp:'18001', comment:'Certificado ecológico ES-ECO-020-AN. Factura mensual' },
+  ]
+  for (const p of proveedoresDetalle) {
+    db.prepare(`INSERT INTO proveedores_detalle (user_id,codi,descr,nif,comment,mail_cc,web,creditor,address,city,cp) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(uid,p.codi,p.descr,p.nif,p.comment,p.mail_cc,p.web,p.creditor,p.address,p.city,p.cp)
+  }
+
   // ── INGREDIENTES ──────────────────────────────────────────────────────────
   const ingredientes = [
     // Pescados
@@ -312,57 +335,79 @@ export function seedDemoData(db: Database.Database, uid: string) {
       .run(uid,lp.descr,lp.year,lp.month,lp.pending_send,lp.pending_receive)
   }
 
+  // vendor metadata for enriching albaranes and facturas
+  const vInfo: Record<string, { codi: string; nif: string; contact: string }> = {
+    'Mercabarna Express SL':          { codi:'PROV001', nif:'B12345678', contact:'Josep Puig' },
+    'Pescados del Atlántico SA':      { codi:'PROV002', nif:'A87654321', contact:'María Fernández' },
+    'Carnes Selectas Martínez':       { codi:'PROV003', nif:'B98765432', contact:'Jordi Martínez' },
+    'Lácteos Frescos del Pirineo':    { codi:'PROV004', nif:'B11223344', contact:'Anna Solé' },
+    'Aceites García e Hijos':         { codi:'PROV005', nif:'B55667788', contact:'Antonio García' },
+    'Harinera del Norte SL':          { codi:'PROV006', nif:'B33445566', contact:'Iker Etxeberria' },
+    'Bodegas Rioja Premium':          { codi:'PROV007', nif:'A22334455', contact:'Carlos Moya' },
+    'Distribuciones Roca Alimentación':{ codi:'PROV008', nif:'B77889900', contact:'Pere Roca' },
+    'Distribuciones Roca':            { codi:'PROV008', nif:'B77889900', contact:'Pere Roca' },
+    'Verduras del Mediterráneo SL':   { codi:'PROV009', nif:'B44556677', contact:'Pilar Navarro' },
+    'Mariscos Costa Brava SL':        { codi:'PROV010', nif:'B99001122', contact:'Miquel Puigdomènech' },
+    'Charcutería Ibérica Extremeña':  { codi:'PROV011', nif:'B33221100', contact:'Manolo Bravo' },
+    'Charcutería Ibérica':            { codi:'PROV011', nif:'B33221100', contact:'Manolo Bravo' },
+    'Ecológicos del Valle SL':        { codi:'PROV015', nif:'B88990011', contact:'Isabel Ruiz' },
+    'Congelados Premium Norte SA':    { codi:'PROV014', nif:'A11223344', contact:'Laura González' },
+    'Cafés y Especias del Mundo':     { codi:'PROV013', nif:'B66778899', contact:'Roberto Santos' },
+  }
+
   // ── ALBARANES COMPRA ──────────────────────────────────────────────────────
   const albaranes = [
-    { delivery_num:'ALB-20260424-001', vendor:'Mercabarna Express SL',       date_delivery:dAgo(1),  base:283.30, taxes:59.49,  total:342.80, received_by:'Pablo', cost_type:'Variable', vendor_type:'Frutas y Verduras' },
-    { delivery_num:'ALB-20260423-001', vendor:'Pescados del Atlántico SA',   date_delivery:dAgo(1),  base:568.26, taxes:119.13, total:687.40, received_by:'Chef',  cost_type:'Variable', vendor_type:'Pescadería' },
-    { delivery_num:'ALB-20260422-001', vendor:'Carnes Selectas Martínez',    date_delivery:dAgo(2),  base:433.55, taxes:91.05,  total:524.60, received_by:'Pablo', cost_type:'Variable', vendor_type:'Carnicería' },
-    { delivery_num:'ALB-20260420-001', vendor:'Lácteos Frescos del Pirineo', date_delivery:dAgo(4),  base:163.88, taxes:34.41,  total:198.30, received_by:'Pablo', cost_type:'Variable', vendor_type:'Lácteos' },
-    { delivery_num:'ALB-20260419-001', vendor:'Aceites García e Hijos',      date_delivery:dAgo(5),  base:341.32, taxes:71.68,  total:413.00, received_by:'Pablo', cost_type:'Fijo',     vendor_type:'Aceites' },
-    { delivery_num:'ALB-20260417-001', vendor:'Mercabarna Express SL',       date_delivery:dAgo(7),  base:239.26, taxes:50.25,  total:289.50, received_by:'Chef',  cost_type:'Variable', vendor_type:'Frutas y Verduras' },
-    { delivery_num:'ALB-20260416-001', vendor:'Harinera del Norte SL',       date_delivery:dAgo(8),  base:129.55, taxes:27.21,  total:156.75, received_by:'Pablo', cost_type:'Fijo',     vendor_type:'Harinas' },
-    { delivery_num:'ALB-20260415-001', vendor:'Bodegas Rioja Premium',       date_delivery:dAgo(9),  base:737.19, taxes:154.81, total:892.00, received_by:'Pablo', cost_type:'Fijo',     vendor_type:'Bebidas' },
-    { delivery_num:'ALB-20260413-001', vendor:'Pescados del Atlántico SA',   date_delivery:dAgo(11), base:367.93, taxes:77.27,  total:445.20, received_by:'Chef',  cost_type:'Variable', vendor_type:'Pescadería' },
-    { delivery_num:'ALB-20260411-001', vendor:'Distribuciones Roca',         date_delivery:dAgo(13), base:560.66, taxes:117.74, total:678.40, received_by:'Pablo', cost_type:'Variable', vendor_type:'General' },
-    { delivery_num:'ALB-20260410-001', vendor:'Mariscos Costa Brava SL',     date_delivery:dAgo(14), base:432.56, taxes:90.84,  total:523.40, received_by:'Chef',  cost_type:'Variable', vendor_type:'Marisco' },
-    { delivery_num:'ALB-20260408-001', vendor:'Charcutería Ibérica',         date_delivery:dAgo(16), base:698.35, taxes:146.65, total:845.00, received_by:'Pablo', cost_type:'Fijo',     vendor_type:'Charcutería' },
-    { delivery_num:'ALB-20260322-001', vendor:'Mercabarna Express SL',       date_delivery:mAgo(1,22), base:263.14, taxes:55.26, total:318.40, received_by:'Pablo', cost_type:'Variable', vendor_type:'Frutas y Verduras' },
-    { delivery_num:'ALB-20260320-001', vendor:'Carnes Selectas Martínez',    date_delivery:mAgo(1,20), base:506.45, taxes:106.35, total:612.80, received_by:'Chef', cost_type:'Variable', vendor_type:'Carnicería' },
-    { delivery_num:'ALB-20260318-001', vendor:'Pescados del Atlántico SA',   date_delivery:mAgo(1,18), base:432.31, taxes:90.85, total:523.10, received_by:'Pablo', cost_type:'Variable', vendor_type:'Pescadería' },
-    { delivery_num:'ALB-20260315-001', vendor:'Mariscos Costa Brava SL',     date_delivery:mAgo(1,15), base:506.45, taxes:106.35, total:612.80, received_by:'Chef', cost_type:'Variable', vendor_type:'Marisco' },
+    { delivery_num:'ALB-20260424-001', vendor:'Mercabarna Express SL',       delivery_for:'Cocina',   date_delivery:dAgo(1),    date_sent:dAgo(1),    received_by:'Pablo', base:283.30, taxes:59.49,  total:342.80, cost_type:'Variable', vendor_type:'Frutas y Verduras' },
+    { delivery_num:'ALB-20260423-001', vendor:'Pescados del Atlántico SA',   delivery_for:'Cocina',   date_delivery:dAgo(1),    date_sent:dAgo(2),    received_by:'Chef',  base:568.26, taxes:119.13, total:687.40, cost_type:'Variable', vendor_type:'Pescadería' },
+    { delivery_num:'ALB-20260422-001', vendor:'Carnes Selectas Martínez',    delivery_for:'Cocina',   date_delivery:dAgo(2),    date_sent:dAgo(3),    received_by:'Pablo', base:433.55, taxes:91.05,  total:524.60, cost_type:'Variable', vendor_type:'Carnicería' },
+    { delivery_num:'ALB-20260420-001', vendor:'Lácteos Frescos del Pirineo', delivery_for:'Almacén',  date_delivery:dAgo(4),    date_sent:dAgo(5),    received_by:'Pablo', base:163.88, taxes:34.41,  total:198.30, cost_type:'Variable', vendor_type:'Lácteos' },
+    { delivery_num:'ALB-20260419-001', vendor:'Aceites García e Hijos',      delivery_for:'Almacén',  date_delivery:dAgo(5),    date_sent:dAgo(6),    received_by:'Pablo', base:341.32, taxes:71.68,  total:413.00, cost_type:'Fijo',     vendor_type:'Aceites' },
+    { delivery_num:'ALB-20260417-001', vendor:'Mercabarna Express SL',       delivery_for:'Cocina',   date_delivery:dAgo(7),    date_sent:dAgo(7),    received_by:'Chef',  base:239.26, taxes:50.25,  total:289.50, cost_type:'Variable', vendor_type:'Frutas y Verduras' },
+    { delivery_num:'ALB-20260416-001', vendor:'Harinera del Norte SL',       delivery_for:'Almacén',  date_delivery:dAgo(8),    date_sent:dAgo(9),    received_by:'Pablo', base:129.55, taxes:27.21,  total:156.75, cost_type:'Fijo',     vendor_type:'Harinas' },
+    { delivery_num:'ALB-20260415-001', vendor:'Bodegas Rioja Premium',       delivery_for:'Bodega',   date_delivery:dAgo(9),    date_sent:dAgo(10),   received_by:'Pablo', base:737.19, taxes:154.81, total:892.00, cost_type:'Fijo',     vendor_type:'Bebidas' },
+    { delivery_num:'ALB-20260413-001', vendor:'Pescados del Atlántico SA',   delivery_for:'Cocina',   date_delivery:dAgo(11),   date_sent:dAgo(12),   received_by:'Chef',  base:367.93, taxes:77.27,  total:445.20, cost_type:'Variable', vendor_type:'Pescadería' },
+    { delivery_num:'ALB-20260411-001', vendor:'Distribuciones Roca',         delivery_for:'Almacén',  date_delivery:dAgo(13),   date_sent:dAgo(14),   received_by:'Pablo', base:560.66, taxes:117.74, total:678.40, cost_type:'Variable', vendor_type:'General' },
+    { delivery_num:'ALB-20260410-001', vendor:'Mariscos Costa Brava SL',     delivery_for:'Cocina',   date_delivery:dAgo(14),   date_sent:dAgo(15),   received_by:'Chef',  base:432.56, taxes:90.84,  total:523.40, cost_type:'Variable', vendor_type:'Marisco' },
+    { delivery_num:'ALB-20260408-001', vendor:'Charcutería Ibérica',         delivery_for:'Almacén',  date_delivery:dAgo(16),   date_sent:dAgo(17),   received_by:'Pablo', base:698.35, taxes:146.65, total:845.00, cost_type:'Fijo',     vendor_type:'Charcutería' },
+    { delivery_num:'ALB-20260322-001', vendor:'Mercabarna Express SL',       delivery_for:'Cocina',   date_delivery:mAgo(1,22), date_sent:mAgo(1,22), received_by:'Pablo', base:263.14, taxes:55.26,  total:318.40, cost_type:'Variable', vendor_type:'Frutas y Verduras' },
+    { delivery_num:'ALB-20260320-001', vendor:'Carnes Selectas Martínez',    delivery_for:'Cocina',   date_delivery:mAgo(1,20), date_sent:mAgo(1,21), received_by:'Chef',  base:506.45, taxes:106.35, total:612.80, cost_type:'Variable', vendor_type:'Carnicería' },
+    { delivery_num:'ALB-20260318-001', vendor:'Pescados del Atlántico SA',   delivery_for:'Cocina',   date_delivery:mAgo(1,18), date_sent:mAgo(1,19), received_by:'Pablo', base:432.31, taxes:90.85,  total:523.10, cost_type:'Variable', vendor_type:'Pescadería' },
+    { delivery_num:'ALB-20260315-001', vendor:'Mariscos Costa Brava SL',     delivery_for:'Cocina',   date_delivery:mAgo(1,15), date_sent:mAgo(1,16), received_by:'Chef',  base:506.45, taxes:106.35, total:612.80, cost_type:'Variable', vendor_type:'Marisco' },
   ]
   for (const a of albaranes) {
-    db.prepare(`INSERT INTO albaranes_compra (user_id,delivery_num,vendor,date_delivery,base,taxes,total,received_by,cost_type,vendor_type) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .run(uid,a.delivery_num,a.vendor,a.date_delivery,a.base,a.taxes,a.total,a.received_by,a.cost_type,a.vendor_type)
+    const v = vInfo[a.vendor] ?? { codi: null, nif: null, contact: null }
+    db.prepare(`INSERT INTO albaranes_compra (user_id,delivery_num,vendor,code_vendor,nif,delivery_for,date_delivery,date_sent,sent_by,received_by,base,taxes,total,cost_type,vendor_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(uid,a.delivery_num,a.vendor,v.codi,v.nif,a.delivery_for,a.date_delivery,a.date_sent,v.contact,a.received_by,a.base,a.taxes,a.total,a.cost_type,a.vendor_type)
   }
 
   // ── FACTURAS COMPRA ───────────────────────────────────────────────────────
   const facturas = [
     // Vencidas (urgente)
-    { num:'FAC-2026-0089', vendor:'Mercabarna Express SL',       date_invoice:dAgo(30), date_due:dAgo(10), base:522.56,  taxes:109.74, total:632.30,  paid:0, validated:1 },
-    { num:'FAC-2026-0088', vendor:'Pescados del Atlántico SA',   date_invoice:dAgo(28), date_due:dAgo(8),  base:993.45,  taxes:208.62, total:1202.07, paid:0, validated:1 },
-    { num:'FAC-2026-0087', vendor:'Mariscos Costa Brava SL',     date_invoice:dAgo(25), date_due:dAgo(5),  base:432.56,  taxes:90.84,  total:523.40,  paid:0, validated:1 },
-    { num:'FAC-2026-0086', vendor:'Charcutería Ibérica',         date_invoice:dAgo(35), date_due:dAgo(15), base:698.35,  taxes:146.65, total:845.00,  paid:0, validated:1 },
-    { num:'FAC-2026-0085', vendor:'Distribuciones Roca',         date_invoice:dAgo(40), date_due:dAgo(20), base:560.66,  taxes:117.74, total:678.40,  paid:0, validated:0 },
+    { num:'FAC-2026-0089', doc:'DOC-2026-0312', vendor:'Mercabarna Express SL',       payment:'TRF30', date_invoice:dAgo(30), date_accounting:dAgo(29), date_due:dAgo(10), base:522.56,  taxes:109.74, total:632.30,  paid:0, validated:1, comment:'Verduras semana 15-16' },
+    { num:'FAC-2026-0088', doc:'DOC-2026-0308', vendor:'Pescados del Atlántico SA',   payment:'TRF30', date_invoice:dAgo(28), date_accounting:dAgo(27), date_due:dAgo(8),  base:993.45,  taxes:208.62, total:1202.07, paid:0, validated:1, comment:'Pedido pescados semana 15' },
+    { num:'FAC-2026-0087', doc:'DOC-2026-0305', vendor:'Mariscos Costa Brava SL',     payment:'TRF30', date_invoice:dAgo(25), date_accounting:dAgo(24), date_due:dAgo(5),  base:432.56,  taxes:90.84,  total:523.40,  paid:0, validated:1, comment:null },
+    { num:'FAC-2026-0086', doc:'DOC-2026-0298', vendor:'Charcutería Ibérica',         payment:'TRF60', date_invoice:dAgo(35), date_accounting:dAgo(34), date_due:dAgo(15), base:698.35,  taxes:146.65, total:845.00,  paid:0, validated:1, comment:'Ibéricos especiales evento' },
+    { num:'FAC-2026-0085', doc:'DOC-2026-0291', vendor:'Distribuciones Roca',         payment:'TRF60', date_invoice:dAgo(40), date_accounting:dAgo(39), date_due:dAgo(20), base:560.66,  taxes:117.74, total:678.40,  paid:0, validated:0, comment:'Pendiente revisar albarán' },
     // Próximas a vencer (7 días)
-    { num:'FAC-2026-0084', vendor:'Carnes Selectas Martínez',    date_invoice:dAgo(20), date_due:dAgo(-3), base:866.45,  taxes:181.95, total:1048.40, paid:0, validated:1 },
-    { num:'FAC-2026-0083', vendor:'Aceites García e Hijos',      date_invoice:dAgo(18), date_due:dAgo(-5), base:341.32,  taxes:71.68,  total:413.00,  paid:0, validated:1 },
+    { num:'FAC-2026-0084', doc:'DOC-2026-0281', vendor:'Carnes Selectas Martínez',    payment:'TRF30', date_invoice:dAgo(20), date_accounting:dAgo(19), date_due:dAgo(-3), base:866.45,  taxes:181.95, total:1048.40, paid:0, validated:1, comment:null },
+    { num:'FAC-2026-0083', doc:'DOC-2026-0275', vendor:'Aceites García e Hijos',      payment:'TRF60', date_invoice:dAgo(18), date_accounting:dAgo(17), date_due:dAgo(-5), base:341.32,  taxes:71.68,  total:413.00,  paid:0, validated:1, comment:'Aceites temporada primavera' },
     // Pendientes normales
-    { num:'FAC-2026-0082', vendor:'Lácteos Frescos del Pirineo', date_invoice:dAgo(15), date_due:dAgo(-15), base:163.88, taxes:34.41,  total:198.30,  paid:0, validated:1 },
-    { num:'FAC-2026-0081', vendor:'Harinera del Norte SL',       date_invoice:dAgo(12), date_due:dAgo(-18), base:129.55, taxes:27.21,  total:156.75,  paid:0, validated:1 },
-    { num:'FAC-2026-0080', vendor:'Ecológicos del Valle SL',     date_invoice:dAgo(10), date_due:dAgo(-20), base:258.35, taxes:54.25,  total:312.60,  paid:0, validated:1 },
+    { num:'FAC-2026-0082', doc:'DOC-2026-0268', vendor:'Lácteos Frescos del Pirineo', payment:'TRF30', date_invoice:dAgo(15), date_accounting:dAgo(14), date_due:dAgo(-15), base:163.88, taxes:34.41,  total:198.30,  paid:0, validated:1, comment:null },
+    { num:'FAC-2026-0081', doc:'DOC-2026-0261', vendor:'Harinera del Norte SL',       payment:'TRF60', date_invoice:dAgo(12), date_accounting:dAgo(11), date_due:dAgo(-18), base:129.55, taxes:27.21,  total:156.75,  paid:0, validated:1, comment:null },
+    { num:'FAC-2026-0080', doc:'DOC-2026-0255', vendor:'Ecológicos del Valle SL',     payment:'TRF30', date_invoice:dAgo(10), date_accounting:dAgo(9),  date_due:dAgo(-20), base:258.35, taxes:54.25,  total:312.60,  paid:0, validated:1, comment:'Productos eco temporada' },
     // Pagadas
-    { num:'FAC-2026-0079', vendor:'Bodegas Rioja Premium',       date_invoice:dAgo(45), date_due:dAgo(15), base:737.19,  taxes:154.81, total:892.00,  paid:1, validated:1 },
-    { num:'FAC-2026-0078', vendor:'Mercabarna Express SL',       date_invoice:dAgo(50), date_due:dAgo(20), base:263.14,  taxes:55.26,  total:318.40,  paid:1, validated:1 },
-    { num:'FAC-2026-0077', vendor:'Carnes Selectas Martínez',    date_invoice:dAgo(55), date_due:dAgo(25), base:506.45,  taxes:106.35, total:612.80,  paid:1, validated:1 },
-    { num:'FAC-2026-0076', vendor:'Pescados del Atlántico SA',   date_invoice:mAgo(2,10), date_due:mAgo(1,25), base:432.31, taxes:90.85, total:523.10, paid:1, validated:1 },
-    { num:'FAC-2026-0075', vendor:'Bodegas Rioja Premium',       date_invoice:mAgo(2,5),  date_due:mAgo(1,20), base:694.21, taxes:145.78, total:840.00, paid:1, validated:1 },
-    { num:'FAC-2025-0210', vendor:'Charcutería Ibérica',         date_invoice:mAgo(4,10), date_due:mAgo(3,25), base:1305.79, taxes:274.22, total:1580.00, paid:1, validated:1 },
-    { num:'FAC-2025-0185', vendor:'Bodegas Rioja Premium',       date_invoice:mAgo(4,5),  date_due:mAgo(3,20), base:1851.24, taxes:388.76, total:2240.00, paid:1, validated:1 },
+    { num:'FAC-2026-0079', doc:'DOC-2026-0241', vendor:'Bodegas Rioja Premium',       payment:'TRF60', date_invoice:dAgo(45), date_accounting:dAgo(44), date_due:dAgo(15), base:737.19,  taxes:154.81, total:892.00,  paid:1, validated:1, comment:'Vinos carta temporada' },
+    { num:'FAC-2026-0078', doc:'DOC-2026-0235', vendor:'Mercabarna Express SL',       payment:'TRF30', date_invoice:dAgo(50), date_accounting:dAgo(49), date_due:dAgo(20), base:263.14,  taxes:55.26,  total:318.40,  paid:1, validated:1, comment:null },
+    { num:'FAC-2026-0077', doc:'DOC-2026-0228', vendor:'Carnes Selectas Martínez',    payment:'TRF30', date_invoice:dAgo(55), date_accounting:dAgo(54), date_due:dAgo(25), base:506.45,  taxes:106.35, total:612.80,  paid:1, validated:1, comment:null },
+    { num:'FAC-2026-0076', doc:'DOC-2026-0198', vendor:'Pescados del Atlántico SA',   payment:'TRF30', date_invoice:mAgo(2,10), date_accounting:mAgo(2,9),  date_due:mAgo(1,25), base:432.31, taxes:90.85, total:523.10, paid:1, validated:1, comment:null },
+    { num:'FAC-2026-0075', doc:'DOC-2026-0192', vendor:'Bodegas Rioja Premium',       payment:'TRF60', date_invoice:mAgo(2,5),  date_accounting:mAgo(2,4),  date_due:mAgo(1,20), base:694.21, taxes:145.78, total:840.00, paid:1, validated:1, comment:'Vinos reserva' },
+    { num:'FAC-2025-0210', doc:'DOC-2025-0841', vendor:'Charcutería Ibérica',         payment:'TRF60', date_invoice:mAgo(4,10), date_accounting:mAgo(4,9),  date_due:mAgo(3,25), base:1305.79, taxes:274.22, total:1580.00, paid:1, validated:1, comment:'Ibéricos Navidad' },
+    { num:'FAC-2025-0185', doc:'DOC-2025-0798', vendor:'Bodegas Rioja Premium',       payment:'TRF60', date_invoice:mAgo(4,5),  date_accounting:mAgo(4,4),  date_due:mAgo(3,20), base:1851.24, taxes:388.76, total:2240.00, paid:1, validated:1, comment:'Gran pedido vinos Navidad' },
   ]
   for (const f of facturas) {
-    db.prepare(`INSERT INTO facturas_compra (user_id,invoice_num,vendor,date_invoice,date_due,base,taxes,total,paid,validated) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .run(uid,f.num,f.vendor,f.date_invoice,f.date_due,f.base,f.taxes,f.total,f.paid,f.validated)
+    const v = vInfo[f.vendor] ?? { codi: null, nif: null, contact: null }
+    db.prepare(`INSERT INTO facturas_compra (user_id,invoice_num,document_num,vendor,code_vendor,nif,account_vendor,date_invoice,date_accounting,date_due,code_payment_type,base,taxes,total,paid,validated,comment) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(uid,f.num,f.doc,f.vendor,v.codi,v.nif,`400${v.codi?.replace('PROV','')}`,f.date_invoice,f.date_accounting,f.date_due,f.payment,f.base,f.taxes,f.total,f.paid,f.validated,f.comment)
   }
 
   // ── ALBARANES VENTA ───────────────────────────────────────────────────────

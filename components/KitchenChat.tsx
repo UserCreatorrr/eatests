@@ -925,9 +925,17 @@ interface Sugerencia {
   scan?: boolean
 }
 
+interface AlertItem {
+  id: string
+  tipo: 'danger' | 'warning' | 'info'
+  titulo: string
+  detalle: string
+  chat?: string
+  href?: string
+}
+
 interface MomentoData {
   momento: string
-  emoji: string
   sugerencias: Sugerencia[]
 }
 
@@ -935,7 +943,6 @@ function getMomento(hour: number): MomentoData {
   if (hour >= 6 && hour < 11) {
     return {
       momento: 'Apertura',
-      emoji: '🌅',
       sugerencias: [
         { label: '¿Qué tengo que pedir?', sub: 'Análisis de reposición', chat: 'Quiero hacer un pedido' },
         { label: 'Entregas de hoy', sub: 'Albaranes esperados', chat: '¿Qué entregas tengo previstas para hoy?' },
@@ -947,7 +954,6 @@ function getMomento(hour: number): MomentoData {
   if (hour >= 11 && hour < 16) {
     return {
       momento: 'Servicio',
-      emoji: '🍳',
       sugerencias: [
         { label: 'Registrar producción', sub: 'Raciones del servicio', chat: 'Quiero registrar la producción del servicio de hoy' },
         { label: 'Escanear albarán', sub: 'Entrega recibida', chat: '', scan: true },
@@ -959,7 +965,6 @@ function getMomento(hour: number): MomentoData {
   if (hour >= 16 && hour < 20) {
     return {
       momento: 'Entre servicios',
-      emoji: '☕',
       sugerencias: [
         { label: 'Pedir para mañana', sub: 'Reposición urgente', chat: 'Quiero hacer un pedido para mañana' },
         { label: 'Merma del día', sub: 'Registrar pérdidas', chat: 'Quiero registrar la merma del servicio de hoy' },
@@ -970,7 +975,6 @@ function getMomento(hour: number): MomentoData {
   }
   return {
     momento: 'Cierre',
-    emoji: '🌙',
     sugerencias: [
       { label: 'Resumen del día', sub: 'Gastos, pedidos y merma', chat: 'Dame el resumen completo del día de hoy' },
       { label: 'Merma de cierre', sub: 'Registrar sobras', chat: 'Quiero registrar la merma de cierre' },
@@ -1017,6 +1021,8 @@ function saveCurrent(messages: Message[]) {
 export default function KitchenChat() {
   const [greeting, setGreeting] = useState('')
   const [momento, setMomento] = useState<MomentoData | null>(null)
+  const [alerts, setAlerts] = useState<AlertItem[]>([])
+  const [dismissedAlerts, setDismissedAlerts] = useState<Record<string, boolean>>({})
   const [messages, setMessages] = useState<Message[]>([])
   const [history, setHistory] = useState<StoredConvo[]>([])
   const [showHistory, setShowHistory] = useState(false)
@@ -1038,6 +1044,7 @@ export default function KitchenChat() {
     const h = new Date().getHours()
     setGreeting(h < 13 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches')
     setMomento(getMomento(h))
+    fetch('/api/alerts').then(r => r.json()).then(d => { if (d.alerts) setAlerts(d.alerts) }).catch(() => {})
     // Save any previous conversation to history before starting fresh
     const current = loadCurrent()
     if (current.length > 0) {
@@ -1320,10 +1327,44 @@ export default function KitchenChat() {
                   )}
                 </button>
 
+                {/* Proactive alerts */}
+                {alerts.filter(a => !dismissedAlerts[a.id]).length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                    {alerts.filter(a => !dismissedAlerts[a.id]).map(alert => {
+                      const colors = {
+                        danger:  { bg: '#fff1f2', border: '#fca5a5', title: '#991b1b', detail: '#dc2626' },
+                        warning: { bg: '#fffbeb', border: '#fcd34d', title: '#92400e', detail: '#b45309' },
+                        info:    { bg: '#f0f9ff', border: '#bae6fd', title: '#0c4a6e', detail: '#0369a1' },
+                      }[alert.tipo]
+                      return (
+                        <div key={alert.id} style={{ backgroundColor: colors.bg, border: `1.5px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 12, color: colors.title, margin: 0 }}>{alert.titulo}</p>
+                            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: colors.detail, opacity: 0.8, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.detalle}</p>
+                          </div>
+                          {alert.chat && (
+                            <button
+                              onClick={() => send(alert.chat!)}
+                              style={{ flexShrink: 0, padding: '5px 10px', backgroundColor: '#fff', border: `1px solid ${colors.border}`, borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 10, color: colors.title, fontWeight: 600 }}
+                            >
+                              Ver →
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setDismissedAlerts(prev => ({ ...prev, [alert.id]: true }))}
+                            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: colors.title, opacity: 0.4, fontSize: 14, lineHeight: 1, padding: '0 2px' }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
                 {momento && (
                   <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                      <span style={{ fontSize: 13 }}>{momento.emoji}</span>
+                    <div style={{ marginBottom: 8 }}>
                       <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         {momento.momento}
                       </span>

@@ -358,6 +358,21 @@ const tools: any[] = [
       },
     },
   },
+  // ── HISTORIAL PRECIO ──────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'historial_precio_ingrediente',
+      description: 'Muestra la evolución del precio de un ingrediente a lo largo del tiempo como gráfico de línea. Usar cuando el usuario pregunta cómo ha evolucionado o subido el precio de un producto concreto.',
+      parameters: {
+        type: 'object',
+        properties: {
+          nombre: { type: 'string', description: 'Nombre del ingrediente o producto' },
+        },
+        required: ['nombre'],
+      },
+    },
+  },
   // ── SELECTOR PEDIDO ───────────────────────────────────────
   {
     type: 'function',
@@ -505,7 +520,14 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const orden = args.orden === 'mas_barato' ? 'ASC' : 'DESC'
     const rows = db.prepare(`SELECT descr, unit, cost FROM ingredientes WHERE user_id=? AND cost>0 ORDER BY cost ${orden} LIMIT ?`).all(userId, n) as any[]
     if (!rows.length) return 'No hay ingredientes con coste registrado.'
-    return rows.map((r, i) => `${i + 1}. ${r.descr} — ${r.cost}€/${r.unit || 'ud'}`).join('\n')
+    const text = rows.map((r: any, i: number) => `${i + 1}. ${r.descr} — ${r.cost}€/${r.unit || 'ud'}`).join('\n')
+    const chart = {
+      tipo: 'bar',
+      titulo: args.orden === 'mas_caro' ? 'Ingredientes más caros' : 'Ingredientes más baratos',
+      datos: rows.slice(0, 8).map((r: any) => ({ label: r.descr, value: r.cost })),
+      unidad: '€',
+    }
+    return `__CHART__${JSON.stringify({ chart, text })}`
   }
 
   // ── BUSCAR PROVEEDOR ───────────────────────────────────
@@ -591,7 +613,15 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       `SELECT vendor, COUNT(*) as pedidos, ROUND(SUM(total),2) as total FROM pedidos_compra WHERE user_id=? ${f} AND vendor IS NOT NULL GROUP BY vendor ORDER BY total DESC LIMIT ?`
     ).all(userId, top) as any[]
     if (!rows.length) return 'No hay datos de pedidos.'
-    return rows.map((r, i) => `${i + 1}. ${r.vendor} — ${r.total || 0}€ (${r.pedidos} pedidos)`).join('\n')
+    const text = rows.map((r: any, i: number) => `${i + 1}. ${r.vendor} — ${r.total || 0}€ (${r.pedidos} pedidos)`).join('\n')
+    const periodoLabel = args.periodo ? args.periodo.replace(/_/g, ' ') : 'histórico'
+    const chart = {
+      tipo: 'bar',
+      titulo: `Gasto por proveedor · ${periodoLabel}`,
+      datos: rows.slice(0, 8).map((r: any) => ({ label: r.vendor, value: r.total || 0 })),
+      unidad: '€',
+    }
+    return `__CHART__${JSON.stringify({ chart, text })}`
   }
 
   // ── INFORME DIARIO ─────────────────────────────────────
@@ -762,8 +792,46 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const rows = db.prepare(q + ' ORDER BY fecha DESC LIMIT 20').all(...params) as any[]
     const total = (db.prepare(`SELECT ROUND(SUM(coste_estimado),2) as t FROM merma_registro WHERE user_id=? AND ${f}`).get(userId) as any).t
     if (!rows.length) return `No hay merma registrada para ${args.periodo || 'este mes'}.`
-    return `Merma ${args.periodo || 'este mes'} — Total: ${total || 0}€\n` +
-      rows.map(r => `• ${r.nombre} | ${r.cantidad || '?'} ${r.unidad || ''} | ${r.motivo} | ${r.coste_estimado ? r.coste_estimado + '€' : '-'} | ${r.fecha}`).join('\n')
+    const text = `Merma ${args.periodo || 'este mes'} — Total: ${total || 0}€\n` +
+      rows.map((r: any) => `• ${r.nombre} | ${r.cantidad || '?'} ${r.unidad || ''} | ${r.motivo} | ${r.coste_estimado ? r.coste_estimado + '€' : '-'} | ${r.fecha}`).join('\n')
+    // Chart: top products by cost
+    const byProduct: Record<string, number> = {}
+    for (const r of rows as any[]) {
+      byProduct[r.nombre] = (byProduct[r.nombre] || 0) + (r.coste_estimado || 0)
+    }
+    const chartDatos = Object.entries(byProduct)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([label, value]) => ({ label, value: Math.round(value * 100) / 100 }))
+    if (chartDatos.length > 1) {
+      const chart = {
+        tipo: 'bar',
+        titulo: `Merma por producto · ${args.periodo || 'este mes'}`,
+        datos: chartDatos,
+        unidad: '€',
+      }
+      return `__CHART__${JSON.stringify({ chart, text })}`
+    }
+    return text
+  }
+
+  // ── HISTORIAL PRECIO INGREDIENTE ─────────────────────────
+  if (name === 'historial_precio_ingrediente') {
+    const rows = db.prepare(
+      `SELECT precio, fecha, vendor FROM precio_historial WHERE user_id=? AND nombre LIKE ? ORDER BY fecha ASC LIMIT 30`
+    ).all(userId, '%' + args.nombre + '%') as any[]
+    if (rows.length < 2) return `No hay suficiente historial de precios para "${args.nombre}".`
+    const first = rows[0]
+    const last = rows[rows.length - 1]
+    const cambio = first.precio > 0 ? Math.round(((last.precio - first.precio) / first.precio) * 100) : 0
+    const text = `Historial de precio: ${args.nombre}\nPrimero: ${first.precio}€ (${first.fecha}) → Último: ${last.precio}€ (${last.fecha})\nVariación: ${cambio > 0 ? '+' : ''}${cambio}%`
+    const chart = {
+      tipo: 'line',
+      titulo: `Evolución precio · ${args.nombre}`,
+      datos: rows.map((r: any) => ({ label: r.fecha, value: r.precio })),
+      unidad: '€',
+    }
+    return `__CHART__${JSON.stringify({ chart, text })}`
   }
 
   // ── REGISTRAR PRECIO HISTORIAL ────────────────────────────
@@ -1033,7 +1101,10 @@ REGLAS:
 - Precios en euros. USA LAS HERRAMIENTAS para consultar datos — no inventes ni adivines.
 - FOTO albarán/factura → extrae todo en tabla markdown, pregunta si guardar. Si confirma → guardar_albaran_compra / guardar_factura_compra.
 - "resumen/informe/cómo estamos/brief" → informe_diario
-- "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor
+- "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor (genera gráfico automáticamente)
+- "ingredientes más caros/baratos" → top_ingredientes_coste (genera gráfico)
+- "merma/pérdidas" → ver_merma (genera gráfico si hay datos suficientes)
+- "evolución/precio/ha subido X" → historial_precio_ingrediente (genera gráfico de línea)
 - "busca/qué ingredientes/cuáles" → buscar_ingrediente
 - PEDIDOS — flujo obligatorio cuando el usuario diga "quiero pedir/hacer un pedido/qué tengo que pedir/repón":
   1. JAMÁS preguntes "qué proveedor". Llama YA a analizar_necesidades_pedido — genera una tarjeta interactiva con botones por proveedor.
@@ -1086,6 +1157,7 @@ REGLAS:
   let briefCards: any = null
   let pedidoSelector: any = null
   let necesidadesPedido: any = null
+  let chartData: any = null
 
   for (const tc of toolCalls) {
     const args = JSON.parse(tc.function.arguments)
@@ -1105,6 +1177,10 @@ REGLAS:
     } else if (result.startsWith('__NECESIDADES_PEDIDO__')) {
       necesidadesPedido = JSON.parse(result.slice('__NECESIDADES_PEDIDO__'.length))
       results.push('Análisis de necesidades generado.')
+    } else if (result.startsWith('__CHART__')) {
+      const parsed = JSON.parse(result.slice('__CHART__'.length))
+      chartData = parsed.chart
+      results.push(parsed.text)
     } else {
       results.push(result)
     }
@@ -1141,5 +1217,5 @@ REGLAS:
   })
 
   const reply = followUp.choices[0]?.message?.content || results.join('\n')
-  return NextResponse.json({ reply, action: toolNames, emailProposal })
+  return NextResponse.json({ reply, action: toolNames, emailProposal, chartData: chartData || undefined })
 }

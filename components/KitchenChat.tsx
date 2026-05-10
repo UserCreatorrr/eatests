@@ -94,6 +94,7 @@ interface Message {
   briefCards?: BriefData
   pedidoSelector?: PedidoSelectorData
   necesidadesPedido?: NecesidadesPedidoData
+  chartData?: ChartData
 }
 
 const CARD_ICONS: Record<string, JSX.Element> = {
@@ -662,6 +663,90 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
   )
 }
 
+function MiniBarChart({ data }: { data: ChartData }) {
+  const max = Math.max(...data.datos.map(d => d.value), 1)
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 8px' }}>
+        {data.titulo}
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {data.datos.map((d, i) => {
+          const pct = Math.round((d.value / max) * 100)
+          const label = d.label.length > 18 ? d.label.slice(0, 16) + '…' : d.label
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.6, width: 96, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {label}
+              </span>
+              <div style={{ flex: 1, height: 13, backgroundColor: '#f0ece8', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#d97706', borderRadius: 3 }} />
+              </div>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', width: 50, flexShrink: 0, textAlign: 'right' }}>
+                {d.value}{data.unidad}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function MiniLineChart({ data }: { data: ChartData }) {
+  const W = 280
+  const H = 88
+  const PL = 34, PR = 8, PT = 8, PB = 22
+  const cW = W - PL - PR
+  const cH = H - PT - PB
+  const vals = data.datos.map(d => d.value)
+  const minV = Math.min(...vals)
+  const maxV = Math.max(...vals)
+  const range = maxV - minV || 1
+  const n = data.datos.length
+  const pts = data.datos.map((d, i) => ({
+    x: PL + (n < 2 ? cW / 2 : (i / (n - 1)) * cW),
+    y: PT + (1 - (d.value - minV) / range) * cH,
+    label: d.label,
+    value: d.value,
+  }))
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>
+        {data.titulo}
+      </p>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', overflow: 'visible' }}>
+        {[0, 0.5, 1].map((t, i) => (
+          <line key={i} x1={PL} y1={PT + t * cH} x2={W - PR} y2={PT + t * cH} stroke="#e8e2db" strokeWidth={0.5} />
+        ))}
+        {[0, 1].map((t, i) => (
+          <text key={i} x={PL - 3} y={PT + t * cH + 3} textAnchor="end" fontFamily="DM Mono, monospace" fontSize={8} fill="#3d3834" fillOpacity={0.45}>
+            {Math.round(t === 0 ? maxV : minV)}{data.unidad}
+          </text>
+        ))}
+        <path d={pathD} fill="none" stroke="#d97706" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        {pts.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="#d97706" />
+        ))}
+        {[pts[0], pts[pts.length - 1]].filter(Boolean).map((p, i) => (
+          <text key={i} x={p.x} y={H - 4} textAnchor={i === 0 ? 'start' : 'end'} fontFamily="DM Mono, monospace" fontSize={8} fill="#3d3834" fillOpacity={0.5}>
+            {p.label.slice(0, 7)}
+          </text>
+        ))}
+      </svg>
+    </div>
+  )
+}
+
+function MiniChart({ data }: { data: ChartData }) {
+  return (
+    <div style={{ backgroundColor: '#faf9f7', border: '1px solid #e8e2db', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
+      {data.tipo === 'bar' ? <MiniBarChart data={data} /> : <MiniLineChart data={data} />}
+    </div>
+  )
+}
+
 function NecesidadesPedidoCard({
   data,
   onInsertMessage,
@@ -925,6 +1010,18 @@ interface Sugerencia {
   scan?: boolean
 }
 
+interface ChartPoint {
+  label: string
+  value: number
+}
+
+interface ChartData {
+  tipo: 'bar' | 'line'
+  titulo: string
+  datos: ChartPoint[]
+  unidad: string
+}
+
 interface AlertItem {
   id: string
   tipo: 'danger' | 'warning' | 'info'
@@ -1139,7 +1236,7 @@ export default function KitchenChat() {
         setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
         const newMsgs: Message[] = []
-        if (json.reply) newMsgs.push({ role: 'assistant', content: json.reply })
+        if (json.reply) newMsgs.push({ role: 'assistant', content: json.reply, chartData: json.chartData || undefined })
         if (json.emailProposal) newMsgs.push({ role: 'email_proposal', content: '', emailProposal: json.emailProposal })
         if (newMsgs.length) setMessages(prev => [...prev, ...newMsgs])
       }
@@ -1464,6 +1561,7 @@ export default function KitchenChat() {
                     )}
                     <div style={{ maxWidth: '78%', borderRadius: 18, padding: '12px 18px', backgroundColor: msg.role === 'user' ? '#3d3834' : '#ffffff', color: msg.role === 'user' ? '#dfd5c9' : '#3d3834', border: msg.role === 'assistant' ? '1px solid #e8e2db' : 'none' }}>
                       {msg.image && <img src={msg.image} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 200, objectFit: 'cover' }} />}
+                      {msg.chartData && <MiniChart data={msg.chartData} />}
                       {msg.role === 'user' ? (
                         <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, lineHeight: 1.65, color: '#dfd5c9', margin: 0 }}>{msg.content}</p>
                       ) : (

@@ -918,12 +918,67 @@ interface StoredConvo {
   lastUsed: number  // timestamp ms
 }
 
-const SUGGESTIONS = [
-  'Ingredientes sin coste registrado',
-  'Ultimos pedidos de compra',
-  'Proveedores principales',
-  'Resumen de costes',
-]
+interface Sugerencia {
+  label: string
+  sub: string
+  chat: string
+  scan?: boolean
+}
+
+interface MomentoData {
+  momento: string
+  emoji: string
+  sugerencias: Sugerencia[]
+}
+
+function getMomento(hour: number): MomentoData {
+  if (hour >= 6 && hour < 11) {
+    return {
+      momento: 'Apertura',
+      emoji: '🌅',
+      sugerencias: [
+        { label: '¿Qué tengo que pedir?', sub: 'Análisis de reposición', chat: 'Quiero hacer un pedido' },
+        { label: 'Entregas de hoy', sub: 'Albaranes esperados', chat: '¿Qué entregas tengo previstas para hoy?' },
+        { label: 'Facturas urgentes', sub: 'Vencen esta semana', chat: '¿Qué facturas vencen esta semana?' },
+        { label: 'Gasto del mes', sub: 'Vs mes anterior', chat: 'Dame el resumen de gasto de este mes comparado con el anterior' },
+      ],
+    }
+  }
+  if (hour >= 11 && hour < 16) {
+    return {
+      momento: 'Servicio',
+      emoji: '🍳',
+      sugerencias: [
+        { label: 'Registrar producción', sub: 'Raciones del servicio', chat: 'Quiero registrar la producción del servicio de hoy' },
+        { label: 'Escanear albarán', sub: 'Entrega recibida', chat: '', scan: true },
+        { label: 'Registrar merma', sub: 'Producto no aprovechado', chat: 'Quiero registrar una merma' },
+        { label: '¿Cómo vamos hoy?', sub: 'Gastos y pedidos', chat: 'Dame un resumen rápido de cómo vamos hoy' },
+      ],
+    }
+  }
+  if (hour >= 16 && hour < 20) {
+    return {
+      momento: 'Entre servicios',
+      emoji: '☕',
+      sugerencias: [
+        { label: 'Pedir para mañana', sub: 'Reposición urgente', chat: 'Quiero hacer un pedido para mañana' },
+        { label: 'Merma del día', sub: 'Registrar pérdidas', chat: 'Quiero registrar la merma del servicio de hoy' },
+        { label: 'Facturas pendientes', sub: 'Control de pagos', chat: '¿Qué facturas tengo pendientes de pagar?' },
+        { label: 'Precios que subieron', sub: 'Alertas de coste', chat: '¿Qué ingredientes han subido de precio recientemente?' },
+      ],
+    }
+  }
+  return {
+    momento: 'Cierre',
+    emoji: '🌙',
+    sugerencias: [
+      { label: 'Resumen del día', sub: 'Gastos, pedidos y merma', chat: 'Dame el resumen completo del día de hoy' },
+      { label: 'Merma de cierre', sub: 'Registrar sobras', chat: 'Quiero registrar la merma de cierre' },
+      { label: 'Pedidos sin recibir', sub: 'Entregas pendientes', chat: '¿Qué pedidos tengo pendientes de recibir?' },
+      { label: 'Balance del mes', sub: 'Cómo vamos de costes', chat: '¿Cómo vamos de gasto este mes?' },
+    ],
+  }
+}
 
 const STORAGE_KEY = 'mb_chat_history'
 const CURRENT_KEY = 'mb_chat_current'
@@ -961,6 +1016,7 @@ function saveCurrent(messages: Message[]) {
 
 export default function KitchenChat() {
   const [greeting, setGreeting] = useState('')
+  const [momento, setMomento] = useState<MomentoData | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [history, setHistory] = useState<StoredConvo[]>([])
   const [showHistory, setShowHistory] = useState(false)
@@ -981,6 +1037,7 @@ export default function KitchenChat() {
   useEffect(() => {
     const h = new Date().getHours()
     setGreeting(h < 13 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches')
+    setMomento(getMomento(h))
     // Save any previous conversation to history before starting fresh
     const current = loadCurrent()
     if (current.length > 0) {
@@ -1263,13 +1320,29 @@ export default function KitchenChat() {
                   )}
                 </button>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {SUGGESTIONS.map(s => (
-                    <button key={s} onClick={() => send(s)} style={{ textAlign: 'left', backgroundColor: '#ffffff', border: '1px solid #e8e2db', borderRadius: 14, padding: '14px 16px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', cursor: 'pointer' }}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                {momento && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                      <span style={{ fontSize: 13 }}>{momento.emoji}</span>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {momento.momento}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      {momento.sugerencias.map((s, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => s.scan ? scanRef.current?.click() : send(s.chat)}
+                          disabled={isLoading}
+                          style={{ textAlign: 'left', backgroundColor: '#ffffff', border: '1px solid #e8e2db', borderRadius: 14, padding: '13px 14px', cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.5 : 1, display: 'flex', flexDirection: 'column', gap: 3 }}
+                        >
+                          <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', lineHeight: 1.3 }}>{s.label}</span>
+                          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, lineHeight: 1.4 }}>{s.sub}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

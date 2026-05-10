@@ -669,8 +669,8 @@ function NecesidadesPedidoCard({
   data: NecesidadesPedidoData
   onInsertMessage: (msg: Message) => void
 }) {
-  const [dismissed, setDismissed] = useState<Set<number>>(new Set())
-  const [expanded, setExpanded] = useState<Set<number>>(new Set([0]))
+  const [dismissed, setDismissed] = useState<Record<number, boolean>>({})
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true })
 
   const iconEmail = (
     <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -685,11 +685,7 @@ function NecesidadesPedidoCard({
   )
 
   function toggleExpand(i: number) {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      next.has(i) ? next.delete(i) : next.add(i)
-      return next
-    })
+    setExpanded(prev => ({ ...prev, [i]: !prev[i] }))
   }
 
   function handleEmail(grupo: NecesidadGrupo) {
@@ -726,7 +722,7 @@ function NecesidadesPedidoCard({
     })
   }
 
-  const active = data.grupos.filter((_, i) => !dismissed.has(i))
+  const active = data.grupos.filter((_, i) => !dismissed[i])
 
   if (active.length === 0) {
     return (
@@ -755,8 +751,8 @@ function NecesidadesPedidoCard({
       {/* Supplier cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {data.grupos.map((grupo, i) => {
-          if (dismissed.has(i)) return null
-          const isExp = expanded.has(i)
+          if (dismissed[i]) return null
+          const isExp = expanded[i]
           return (
             <div key={i} style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 14, overflow: 'hidden' }}>
               {/* Supplier header row */}
@@ -803,14 +799,14 @@ function NecesidadesPedidoCard({
                 </button>
                 <div style={{ flex: 1 }} />
                 <button
-                  onClick={() => setDismissed(prev => new Set([...prev, i]))}
+                  onClick={() => setDismissed(prev => ({ ...prev, [i]: true }))}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.6 }}
                 >
                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   Más tarde
                 </button>
                 <button
-                  onClick={() => setDismissed(prev => new Set([...prev, i]))}
+                  onClick={() => setDismissed(prev => ({ ...prev, [i]: true }))}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#dc2626', opacity: 0.8 }}
                 >
                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>

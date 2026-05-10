@@ -950,16 +950,10 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
 
     const grupos = Object.values(needsReorder)
     if (!grupos.length) {
-      return 'Todos los ingredientes están dentro de su ciclo de pedido habitual. No hace falta reponer nada urgente. ¿Quieres ver el selector_pedido para hacer un pedido manual?'
+      return 'Todos los ingredientes están dentro de su ciclo de pedido habitual. No hace falta reponer nada urgente.'
     }
 
-    const summary = grupos.map(g => {
-      const head = `**${g.proveedor.nombre}** (${g.items.length} items):`
-      const lines = g.items.slice(0, 12).map((it: any) => `  • ${it.nombre} — ${it.cantidad} ${it.unidad || 'ud'} (${it.dias_sin_pedir} días sin pedir)`).join('\n')
-      return head + '\n' + lines
-    }).join('\n\n')
-
-    return `Detectado ${grupos.length} proveedor(es) con items que reponer:\n\n${summary}\n\nINSTRUCCIONES PARA EL ASISTENTE:\n1. Presenta este resumen al usuario en formato lista clara.\n2. Pregunta explícitamente: "¿Lo envío por email o por WhatsApp?"\n3. Cuando el usuario elija canal, llama a proponer_pedido_email o proponer_pedido_whatsapp UNA VEZ por cada proveedor con su lista de items exactos (nombre, cantidad, unidad).`
+    return `__NECESIDADES_PEDIDO__${JSON.stringify({ grupos })}`
   }
 
   // ── PROPONER PEDIDO WHATSAPP ──────────────────────────────
@@ -1042,10 +1036,8 @@ REGLAS:
 - "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor
 - "busca/qué ingredientes/cuáles" → buscar_ingrediente
 - PEDIDOS — flujo obligatorio cuando el usuario diga "quiero pedir/hacer un pedido/qué tengo que pedir/repón":
-  1. JAMÁS preguntes "qué proveedor". Llama YA a analizar_necesidades_pedido — esa tool detecta qué falta y por qué proveedor.
-  2. Presenta el resultado como lista agrupada por proveedor con items específicos y cantidades.
-  3. Termina SIEMPRE con la pregunta: "¿Lo envío por email o por WhatsApp?"
-  4. Cuando el usuario elija canal, llama a proponer_pedido_email o proponer_pedido_whatsapp UNA VEZ por proveedor (puede ser varias llamadas en paralelo) con la lista exacta de items.
+  1. JAMÁS preguntes "qué proveedor". Llama YA a analizar_necesidades_pedido — genera una tarjeta interactiva con botones por proveedor.
+  2. El usuario verá los artículos por proveedor y podrá elegir Email, WhatsApp, Más tarde o Eliminar directamente en la tarjeta. NO hace falta preguntar por el canal.
 - Si el usuario YA especifica un proveedor concreto: salta a sugerir_items_pedido({proveedor_nombre}) y luego al proponer_pedido_*.
 - selector_pedido SOLO si el usuario pide explícitamente "muéstrame los proveedores" o "quiero elegir manualmente".
 - PROHIBIDO usar nombres genéricos ("carne", "pescado", "verduras", "fruta") en items de pedido. SIEMPRE nombres específicos del catálogo: "Salmón fresco (lomo)", "Solomillo de ternera", "Tomate rama madurado", etc.
@@ -1093,6 +1085,7 @@ REGLAS:
   let whatsappProposal: any = null
   let briefCards: any = null
   let pedidoSelector: any = null
+  let necesidadesPedido: any = null
 
   for (const tc of toolCalls) {
     const args = JSON.parse(tc.function.arguments)
@@ -1109,15 +1102,19 @@ REGLAS:
     } else if (result.startsWith('__PEDIDO_SELECTOR__')) {
       pedidoSelector = JSON.parse(result.slice('__PEDIDO_SELECTOR__'.length))
       results.push('Selector de pedido generado.')
+    } else if (result.startsWith('__NECESIDADES_PEDIDO__')) {
+      necesidadesPedido = JSON.parse(result.slice('__NECESIDADES_PEDIDO__'.length))
+      results.push('Análisis de necesidades generado.')
     } else {
       results.push(result)
     }
   }
 
   // Visual cards → return immediately, no follow-up needed
-  if (briefCards)     return NextResponse.json({ reply: '', action: toolNames, briefCards })
-  if (pedidoSelector) return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
-  if (whatsappProposal) return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
+  if (briefCards)          return NextResponse.json({ reply: '', action: toolNames, briefCards })
+  if (pedidoSelector)      return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
+  if (necesidadesPedido)   return NextResponse.json({ reply: '', action: toolNames, necesidadesPedido })
+  if (whatsappProposal)    return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
 
   // Simple CRUD tools → return result directly, no follow-up LLM call
   const allSimple = toolCalls.every((tc: any) => SIMPLE_TOOLS.has(tc.function.name))

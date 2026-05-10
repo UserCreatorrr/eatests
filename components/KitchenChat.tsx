@@ -65,14 +65,35 @@ interface PedidoSelectorData {
   proveedores: ProveedorSelectorItem[]
 }
 
+interface NecesidadItem {
+  nombre: string
+  cantidad: number | null
+  unidad: string | null
+  dias_sin_pedir: number | 'nunca'
+}
+
+interface NecesidadGrupo {
+  proveedor: {
+    nombre: string
+    email: string | null
+    phone: string | null
+  }
+  items: NecesidadItem[]
+}
+
+interface NecesidadesPedidoData {
+  grupos: NecesidadGrupo[]
+}
+
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector'
+  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido'
   content: string
   image?: string
   emailProposal?: EmailProposal
   whatsappProposal?: WhatsAppProposal
   briefCards?: BriefData
   pedidoSelector?: PedidoSelectorData
+  necesidadesPedido?: NecesidadesPedidoData
 }
 
 const CARD_ICONS: Record<string, JSX.Element> = {
@@ -641,6 +662,169 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
   )
 }
 
+function NecesidadesPedidoCard({
+  data,
+  onInsertMessage,
+}: {
+  data: NecesidadesPedidoData
+  onInsertMessage: (msg: Message) => void
+}) {
+  const [dismissed, setDismissed] = useState<Set<number>>(new Set())
+  const [expanded, setExpanded] = useState<Set<number>>(new Set([0]))
+
+  const iconEmail = (
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  )
+  const iconWA = (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.854L0 24l6.303-1.654A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.214-3.733.979 1.001-3.64-.234-.374A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+    </svg>
+  )
+
+  function toggleExpand(i: number) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }
+
+  function handleEmail(grupo: NecesidadGrupo) {
+    const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const itemLines = grupo.items.map(it => `  - ${it.nombre}: ${it.cantidad ?? '?'}${it.unidad ? ' ' + it.unidad : ''}`).join('\n')
+    const subject = `Pedido ${today} - MarginBites`
+    const body = `Estimado equipo de ${grupo.proveedor.nombre},\n\nNecesitamos realizar el siguiente pedido para la próxima entrega:\n\n${itemLines}\n\nPor favor, confirmen disponibilidad y fecha estimada de entrega.\n\nMuchas gracias,\nEquipo MarginBites`
+    onInsertMessage({
+      role: 'email_proposal',
+      content: '',
+      emailProposal: {
+        proveedor: grupo.proveedor.nombre,
+        to: grupo.proveedor.email || '',
+        subject,
+        body,
+        items: grupo.items.map(it => ({ nombre: it.nombre, cantidad: it.cantidad ?? undefined, unidad: it.unidad ?? undefined })),
+      },
+    })
+  }
+
+  function handleWhatsApp(grupo: NecesidadGrupo) {
+    const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const itemLines = grupo.items.map(it => `• ${it.nombre}${it.cantidad ? ': ' + it.cantidad + (it.unidad ? ' ' + it.unidad : '') : ''}`).join('\n')
+    const message = `Hola, soy MarginBites 👋\n\nPedido para el ${today}:\n\n${itemLines}\n\nMuchas gracias 🙏`
+    onInsertMessage({
+      role: 'whatsapp_proposal',
+      content: '',
+      whatsappProposal: {
+        proveedor: grupo.proveedor.nombre,
+        phone: grupo.proveedor.phone || '',
+        message,
+        items: grupo.items.map(it => ({ nombre: it.nombre, cantidad: it.cantidad ?? undefined, unidad: it.unidad ?? undefined })),
+      },
+    })
+  }
+
+  const active = data.grupos.filter((_, i) => !dismissed.has(i))
+
+  if (active.length === 0) {
+    return (
+      <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 14, padding: '14px 18px', maxWidth: 580 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#166534' }}>Todos los pedidos gestionados</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 580 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+        </div>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#3d3834', margin: 0 }}>Pedidos pendientes</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45, margin: 0 }}>{active.length} proveedor{active.length !== 1 ? 'es' : ''} con reposición pendiente</p>
+        </div>
+      </div>
+
+      {/* Supplier cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {data.grupos.map((grupo, i) => {
+          if (dismissed.has(i)) return null
+          const isExp = expanded.has(i)
+          return (
+            <div key={i} style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 14, overflow: 'hidden' }}>
+              {/* Supplier header row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', cursor: 'pointer' }} onClick={() => toggleExpand(i)}>
+                <span style={{ fontSize: 10, color: '#3d3834', opacity: 0.35, flexShrink: 0, transform: isExp ? 'rotate(90deg)' : 'none', display: 'inline-block', transition: 'transform 0.15s' }}>▶</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{grupo.proveedor.nombre}</p>
+                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: 0 }}>{grupo.items.length} artículo{grupo.items.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+
+              {/* Expanded items list */}
+              {isExp && (
+                <div style={{ borderTop: '1px solid #f0ece8', padding: '8px 14px 10px' }}>
+                  {grupo.items.map((item, j) => (
+                    <div key={j} style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '4px 0', borderBottom: j < grupo.items.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1 }}>
+                        {item.nombre}
+                      </span>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.7, flexShrink: 0 }}>
+                        {item.cantidad ?? '?'} {item.unidad || 'ud'}
+                      </span>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.35, flexShrink: 0 }}>
+                        {item.dias_sin_pedir === 'nunca' ? 'nunca pedido' : `${item.dias_sin_pedir}d`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ borderTop: '1px solid #f0ece8', padding: '10px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', backgroundColor: '#fafaf9' }}>
+                <button
+                  onClick={() => handleEmail(grupo)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#1a3a2a', fontWeight: 600 }}
+                >
+                  {iconEmail} Email
+                </button>
+                <button
+                  onClick={() => handleWhatsApp(grupo)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', fontWeight: 600 }}
+                >
+                  {iconWA} WhatsApp
+                </button>
+                <div style={{ flex: 1 }} />
+                <button
+                  onClick={() => setDismissed(prev => new Set([...prev, i]))}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.6 }}
+                >
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Más tarde
+                </button>
+                <button
+                  onClick={() => setDismissed(prev => new Set([...prev, i]))}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#dc2626', opacity: 0.8 }}
+                >
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard: () => void }) {
   const [subject, setSubject] = useState(proposal.subject)
   const [body, setBody] = useState(proposal.body)
@@ -775,7 +959,7 @@ function loadCurrent(): Message[] {
 
 function saveCurrent(messages: Message[]) {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal')))
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && m.role !== 'necesidades_pedido' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal')))
   } catch {}
 }
 
@@ -859,6 +1043,7 @@ export default function KitchenChat() {
     const apiMessages = messages.flatMap(m => {
       if (m.role === 'brief_cards') return [{ role: 'assistant' as const, content: '[Brief diario generado y mostrado al usuario]' }]
       if (m.role === 'pedido_selector') return [{ role: 'assistant' as const, content: '[Selector de proveedores mostrado al usuario]' }]
+      if (m.role === 'necesidades_pedido') return [{ role: 'assistant' as const, content: '[Análisis de pedidos pendientes mostrado al usuario con opciones por proveedor]' }]
       if (m.role === 'whatsapp_proposal') return [{ role: 'assistant' as const, content: '[Borrador de WhatsApp generado y mostrado al usuario]' }]
       if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice') return []
       return [m]
@@ -886,6 +1071,8 @@ export default function KitchenChat() {
         setMessages(prev => [...prev, { role: 'brief_cards', content: '', briefCards: json.briefCards }])
       } else if (json.pedidoSelector) {
         setMessages(prev => [...prev, { role: 'pedido_selector', content: '', pedidoSelector: json.pedidoSelector }])
+      } else if (json.necesidadesPedido) {
+        setMessages(prev => [...prev, { role: 'necesidades_pedido', content: '', necesidadesPedido: json.necesidadesPedido }])
       } else if (json.whatsappProposal) {
         setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
@@ -1092,6 +1279,19 @@ export default function KitchenChat() {
                     <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ width: 28, height: 28, flexShrink: 0 }} />
                       <PedidoSelectorCard data={msg.pedidoSelector} onAction={(chat) => send(chat)} />
+                    </div>
+                  )
+                }
+
+                // Necesidades de pedido card
+                if (msg.role === 'necesidades_pedido' && msg.necesidadesPedido) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <NecesidadesPedidoCard
+                        data={msg.necesidadesPedido}
+                        onInsertMessage={(newMsg) => setMessages(prev => [...prev, newMsg])}
+                      />
                     </div>
                   )
                 }

@@ -969,11 +969,13 @@ export default function KitchenChat() {
   const [isRecording, setIsRecording] = useState(false)
   const [pendingImage, setPendingImage] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState('')
+  const [isScanning, setIsScanning] = useState(false)
   const mediaRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
+  const scanRef = useRef<HTMLInputElement>(null)
 
   // Start fresh on every mount — history accessible via Historial button
   useEffect(() => {
@@ -1121,6 +1123,23 @@ export default function KitchenChat() {
     e.target.value = ''
   }
 
+  function handleScan(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsScanning(true)
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = reader.result as string
+      e.target.value = ''
+      setIsScanning(false)
+      send(
+        'Analiza este documento. Extrae todos los datos en una tabla clara. Si es un albarán: proveedor, número, fecha, líneas de productos con cantidades y precios unitarios y totales. Si es una factura: número, proveedor, fecha de factura, fecha de vencimiento, base imponible, IVA, total. Al final pregúntame si quiero guardarlo.',
+        img
+      )
+    }
+    reader.readAsDataURL(file)
+  }
+
   const iconAI = (
     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -1204,7 +1223,7 @@ export default function KitchenChat() {
                 <button
                   onClick={startBrief}
                   disabled={isLoading}
-                  style={{ width: '100%', marginBottom: 16, padding: '16px 20px', backgroundColor: '#19f973', border: 'none', borderRadius: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+                  style={{ width: '100%', marginBottom: 10, padding: '16px 20px', backgroundColor: '#19f973', border: 'none', borderRadius: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
                 >
                   <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -1212,6 +1231,36 @@ export default function KitchenChat() {
                   <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#2a2522' }}>
                     {greeting || 'Buenos días'} — Brief del día
                   </span>
+                </button>
+
+                {/* Scan button */}
+                <button
+                  onClick={() => scanRef.current?.click()}
+                  disabled={isLoading || isScanning}
+                  style={{ width: '100%', marginBottom: 16, padding: '16px 20px', backgroundColor: '#3d3834', border: 'none', borderRadius: 16, cursor: isLoading || isScanning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, opacity: isLoading || isScanning ? 0.6 : 1 }}
+                >
+                  {isScanning ? (
+                    <>
+                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#f5f2ee" strokeWidth={2} style={{ flexShrink: 0 }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <div style={{ textAlign: 'left' }}>
+                        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#f5f2ee', margin: 0 }}>Analizando documento...</p>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#f5f2ee', opacity: 0.5, margin: 0 }}>El AI está extrayendo los datos</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#f5f2ee" strokeWidth={1.8} style={{ flexShrink: 0 }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <div style={{ textAlign: 'left' }}>
+                        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#f5f2ee', margin: 0 }}>Escanear albarán o factura</p>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#f5f2ee', opacity: 0.5, margin: 0 }}>Foto → datos extraídos automáticamente</p>
+                      </div>
+                    </>
+                  )}
                 </button>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -1338,7 +1387,7 @@ export default function KitchenChat() {
                 </svg>
               </button>
               {/* Cámara */}
-              <button onClick={() => cameraRef.current?.click()} title="Abrir camara" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3d3834', opacity: 0.55 }}>
+              <button onClick={() => scanRef.current?.click()} title="Escanear albarán o factura" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#3d3834', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f5f2ee', opacity: isLoading ? 0.4 : 0.85 }}>
                 <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1346,6 +1395,7 @@ export default function KitchenChat() {
               </button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImage} />
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleImage} />
+              <input ref={scanRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleScan} />
               {/* Micro */}
               <button onClick={isRecording ? stopRecording : startRecording} title={isRecording ? 'Detener' : 'Nota de voz'} style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: isRecording ? '#19f973' : '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isRecording ? '#2a2522' : '#3d3834', opacity: isRecording ? 1 : 0.55 }}>
                 {isRecording

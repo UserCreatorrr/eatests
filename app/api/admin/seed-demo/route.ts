@@ -15,8 +15,11 @@ export async function POST(req: NextRequest) {
   if (uidParam) {
     uid = uidParam
   } else if (email) {
-    const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as any
-    if (!user) return NextResponse.json({ ok: false, error: `User with email ${email} not found` }, { status: 404 })
+    const user = db.prepare('SELECT id, email FROM users WHERE email = ? OR email LIKE ?').get(email, '%' + email + '%') as any
+    if (!user) {
+      const all = db.prepare('SELECT id, email FROM users').all() as any[]
+      return NextResponse.json({ ok: false, error: `User with email "${email}" not found`, available_users: all }, { status: 404 })
+    }
     uid = user.id
   } else {
     uid = 'pablo-admin'

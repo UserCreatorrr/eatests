@@ -86,7 +86,7 @@ interface NecesidadesPedidoData {
 }
 
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido'
+  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal'
   content: string
   image?: string
   emailProposal?: EmailProposal
@@ -94,6 +94,7 @@ interface Message {
   briefCards?: BriefData
   pedidoSelector?: PedidoSelectorData
   necesidadesPedido?: NecesidadesPedidoData
+  compraSemanal?: CompraSemanalData
   chartData?: ChartData
 }
 
@@ -663,6 +664,157 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
   )
 }
 
+function CompraSemanalCard({ data, onInsertMessage }: { data: CompraSemanalData; onInsertMessage: (m: Message) => void }) {
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({})
+
+  const platosOk = data.platos.filter(p => p.encontrada)
+  const platosNok = data.platos.filter(p => !p.encontrada)
+
+  function toggle(i: number) {
+    setExpanded(prev => ({ ...prev, [i]: !prev[i] }))
+  }
+
+  function pedirEmail(grupo: CompraSemanalGrupo) {
+    const items = grupo.items.map(i => `  - ${i.nombre}: ${i.cantidad} ${i.unidad || 'ud'}`).join('\n')
+    const body = `Estimado equipo de ${grupo.proveedor.nombre},\n\nNecesitamos el siguiente pedido para esta semana:\n\n${items}\n\nPor favor, confirmen disponibilidad y fecha de entrega.\n\nMuchas gracias,\nEquipo MarginBites`
+    const mailtoItems = grupo.items.map(i => `• ${i.nombre}: ${i.cantidad} ${i.unidad || 'ud'}`).join('%0A')
+    const subject = encodeURIComponent(`Pedido semanal - MarginBites`)
+    const bodyEncoded = encodeURIComponent(body)
+    const to = grupo.proveedor.email || ''
+    window.open(`mailto:${to}?subject=${subject}&body=${bodyEncoded}`)
+  }
+
+  function pedirWhatsApp(grupo: CompraSemanalGrupo) {
+    const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const lines = grupo.items.map(i => `• ${i.nombre}: ${i.cantidad} ${i.unidad || 'ud'}`).join('\n')
+    const msg = encodeURIComponent(`Hola, pedido para la semana (${today}):\n\n${lines}\n\nMuchas gracias`)
+    const phone = (grupo.proveedor.phone || '').replace(/\s+/g, '')
+    window.open(`https://wa.me/${phone}?text=${msg}`)
+  }
+
+  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid #f0ebe4' }
+  const labelStyle: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834' }
+  const dimStyle: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45 }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      {/* Header */}
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#dfd5c9', margin: '0 0 3px' }}>Lista de la compra semanal</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
+            {platosOk.map(p => `${p.nombre} ×${p.raciones}`).join(' · ')}
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#dfd5c9', opacity: 0.45, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coste estimado</p>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: '#19f973', margin: 0 }}>{data.coste_total_estimado}€</p>
+        </div>
+      </div>
+
+      {/* Platos no encontrados */}
+      {platosNok.length > 0 && (
+        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderTop: 'none', padding: '8px 18px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', margin: 0 }}>
+            Sin escandallo: {platosNok.map(p => p.nombre).join(', ')}
+          </p>
+        </div>
+      )}
+
+      {/* Grupos por proveedor */}
+      {data.grupos.map((grupo, gi) => (
+        <div key={gi} style={{ border: '1px solid #e8e2db', borderTop: gi === 0 && platosNok.length === 0 ? '1px solid #e8e2db' : 'none' }}>
+          {/* Supplier header */}
+          <div
+            onClick={() => toggle(gi)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 18px', cursor: 'pointer', backgroundColor: expanded[gi] ? '#faf9f7' : '#fff' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#19f973', flexShrink: 0 }} />
+              <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#3d3834' }}>{grupo.proveedor.nombre}</span>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4 }}>{grupo.items.length} art.</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {grupo.coste_total > 0 && (
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', fontWeight: 700 }}>{grupo.coste_total}€</span>
+              )}
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#3d3834" strokeWidth={2} style={{ opacity: 0.4, transform: expanded[gi] ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Items */}
+          {expanded[gi] && (
+            <div style={{ padding: '0 18px 12px', backgroundColor: '#faf9f7' }}>
+              <div style={{ marginBottom: 10 }}>
+                {grupo.items.map((item, ii) => (
+                  <div key={ii} style={rowStyle}>
+                    <div>
+                      <span style={labelStyle}>{item.nombre}</span>
+                      {item.recetas.length > 1 && (
+                        <span style={{ ...dimStyle, marginLeft: 6 }}>{item.recetas.join(', ')}</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', fontWeight: 700 }}>
+                        {item.cantidad} {item.unidad || 'ud'}
+                      </span>
+                      {item.subtotal != null && (
+                        <span style={dimStyle}>{item.subtotal}€</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
+                {grupo.proveedor.email && (
+                  <button
+                    onClick={() => pedirEmail(grupo)}
+                    style={{ flex: 1, padding: '7px 0', backgroundColor: '#3d3834', border: 'none', borderRadius: 9, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#dfd5c9' }}
+                  >
+                    Email
+                  </button>
+                )}
+                {grupo.proveedor.phone && (
+                  <button
+                    onClick={() => pedirWhatsApp(grupo)}
+                    style={{ flex: 1, padding: '7px 0', backgroundColor: '#25d366', border: 'none', borderRadius: 9, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#fff' }}
+                  >
+                    WhatsApp
+                  </button>
+                )}
+                {!grupo.proveedor.email && !grupo.proveedor.phone && (
+                  <span style={{ ...dimStyle, padding: '7px 0' }}>Sin contacto registrado</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Sin proveedor */}
+      {data.sinProveedor.length > 0 && (
+        <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '11px 18px', backgroundColor: '#faf9f7' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>Sin proveedor asignado</p>
+          {data.sinProveedor.map((item, i) => (
+            <div key={i} style={rowStyle}>
+              <span style={labelStyle}>{item.nombre}</span>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', fontWeight: 700 }}>{item.cantidad} {item.unidad || 'ud'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.grupos.length > 0 && data.sinProveedor.length === 0 && (
+        <div style={{ height: 16, borderRadius: '0 0 16px 16px', border: '1px solid #e8e2db', borderTop: 'none', backgroundColor: '#fff' }} />
+      )}
+    </div>
+  )
+}
+
 function MiniBarChart({ data }: { data: ChartData }) {
   const max = Math.max(...data.datos.map(d => d.value), 1)
   return (
@@ -1022,6 +1174,34 @@ interface ChartData {
   unidad: string
 }
 
+interface CompraSemanalItem {
+  nombre: string
+  cantidad: number
+  unidad: string | null
+  coste_unitario: number | null
+  subtotal: number | null
+  recetas: string[]
+}
+
+interface CompraSemanalGrupo {
+  proveedor: { nombre: string; email: string | null; phone: string | null }
+  items: CompraSemanalItem[]
+  coste_total: number
+}
+
+interface CompraSemanalPlato {
+  nombre: string
+  raciones: number
+  encontrada: boolean
+}
+
+interface CompraSemanalData {
+  platos: CompraSemanalPlato[]
+  grupos: CompraSemanalGrupo[]
+  sinProveedor: (CompraSemanalItem & { proveedor: null })[]
+  coste_total_estimado: number
+}
+
 interface AlertItem {
   id: string
   tipo: 'danger' | 'warning' | 'info'
@@ -1203,6 +1383,7 @@ export default function KitchenChat() {
       if (m.role === 'brief_cards') return [{ role: 'assistant' as const, content: '[Brief diario generado y mostrado al usuario]' }]
       if (m.role === 'pedido_selector') return [{ role: 'assistant' as const, content: '[Selector de proveedores mostrado al usuario]' }]
       if (m.role === 'necesidades_pedido') return [{ role: 'assistant' as const, content: '[Análisis de pedidos pendientes mostrado al usuario con opciones por proveedor]' }]
+      if (m.role === 'compra_semanal') return [{ role: 'assistant' as const, content: '[Lista de la compra semanal generada y mostrada al usuario, agrupada por proveedor con cantidades y coste estimado]' }]
       if (m.role === 'whatsapp_proposal') return [{ role: 'assistant' as const, content: '[Borrador de WhatsApp generado y mostrado al usuario]' }]
       if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice') return []
       return [m]
@@ -1232,6 +1413,8 @@ export default function KitchenChat() {
         setMessages(prev => [...prev, { role: 'pedido_selector', content: '', pedidoSelector: json.pedidoSelector }])
       } else if (json.necesidadesPedido) {
         setMessages(prev => [...prev, { role: 'necesidades_pedido', content: '', necesidadesPedido: json.necesidadesPedido }])
+      } else if (json.compraSemanal) {
+        setMessages(prev => [...prev, { role: 'compra_semanal', content: '', compraSemanal: json.compraSemanal }])
       } else if (json.whatsappProposal) {
         setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
@@ -1546,6 +1729,18 @@ export default function KitchenChat() {
                       <div style={{ width: 28, height: 28, flexShrink: 0 }} />
                       <NecesidadesPedidoCard
                         data={msg.necesidadesPedido}
+                        onInsertMessage={(newMsg) => setMessages(prev => [...prev, newMsg])}
+                      />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'compra_semanal' && msg.compraSemanal) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <CompraSemanalCard
+                        data={msg.compraSemanal}
                         onInsertMessage={(newMsg) => setMessages(prev => [...prev, newMsg])}
                       />
                     </div>

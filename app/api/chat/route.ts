@@ -358,6 +358,32 @@ const tools: any[] = [
       },
     },
   },
+  // ── COMPRA SEMANAL ────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'calcular_compra_semanal',
+      description: 'Calcula la lista de la compra necesaria para producir una serie de platos durante la semana, basándose en los escandallos. Escala cantidades por raciones, aplica merma y agrupa por proveedor con coste estimado. USAR cuando el usuario diga cuántas raciones va a hacer de cada plato esta semana o quiera planificar la producción.',
+      parameters: {
+        type: 'object',
+        properties: {
+          platos: {
+            type: 'array',
+            description: 'Lista de platos con sus raciones planificadas',
+            items: {
+              type: 'object',
+              properties: {
+                nombre: { type: 'string', description: 'Nombre del plato (se busca en el escandallo)' },
+                raciones: { type: 'number', description: 'Número de raciones a producir' },
+              },
+              required: ['nombre', 'raciones'],
+            },
+          },
+        },
+        required: ['platos'],
+      },
+    },
+  },
   // ── HISTORIAL PRECIO ──────────────────────────────────────
   {
     type: 'function',
@@ -815,6 +841,94 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     return text
   }
 
+  // ── CALCULAR COMPRA SEMANAL ───────────────────────────────
+  if (name === 'calcular_compra_semanal') {
+    const platos = (args.platos || []) as { nombre: string; raciones: number }[]
+    const resultado: any[] = []
+
+    for (const plato of platos) {
+      const receta = db.prepare(
+        `SELECT id, nombre, raciones, merma_pct FROM escandallo_receta WHERE user_id=? AND nombre LIKE ? AND activo=1 LIMIT 1`
+      ).get(userId, '%' + plato.nombre + '%') as any
+
+      if (!receta) { resultado.push({ nombre: plato.nombre, raciones: plato.raciones, encontrada: false, lineas: [] }); continue }
+
+      const lineas = db.prepare(`
+        SELECT l.nombre_libre, l.cantidad, l.unidad, l.coste_unitario,
+               i.descr AS ing_nombre, i.cost AS ing_coste, i.unit AS ing_unidad,
+               p.descr AS proveedor_nombre, p.mail AS proveedor_email, p.phone AS proveedor_phone
+        FROM escandallo_lineas l
+        LEFT JOIN ingredientes i ON l.ingrediente_id = i.id
+        LEFT JOIN proveedores p ON p.id = i.proveedor_id
+        WHERE l.receta_id=? AND l.user_id=?
+      `).all(receta.id, userId) as any[]
+
+      const mermaFactor = 1 + ((receta.merma_pct || 0) / 100)
+      const ratio = plato.raciones / (receta.raciones || 1)
+
+      resultado.push({
+        nombre: receta.nombre,
+        raciones: plato.raciones,
+        encontrada: true,
+        lineas: lineas.map((l: any) => ({
+          nombre: l.ing_nombre || l.nombre_libre || 'Ingrediente',
+          cantidad: Math.round(l.cantidad * ratio * mermaFactor * 1000) / 1000,
+          unidad: l.unidad || l.ing_unidad || null,
+          coste_unitario: l.ing_coste ?? l.coste_unitario ?? null,
+          proveedor: l.proveedor_nombre || null,
+          proveedor_email: l.proveedor_email || null,
+          proveedor_phone: l.proveedor_phone || null,
+          receta: receta.nombre,
+        })),
+      })
+    }
+
+    const platosEncontrados = resultado.filter(p => p.encontrada)
+    if (!platosEncontrados.length) {
+      const nombres = platos.map(p => p.nombre).join(', ')
+      return `No encontré ninguna de las recetas: ${nombres}. Comprueba que están en el escandallo.`
+    }
+
+    // Agrupar por proveedor, sumando cantidades del mismo ingrediente
+    const grupos: Record<string, { proveedor: any; itemsMap: Record<string, any> }> = {}
+    const sinProveedorMap: Record<string, any> = {}
+
+    for (const plato of platosEncontrados) {
+      for (const linea of plato.lineas) {
+        const key = linea.nombre.toLowerCase()
+        if (!linea.proveedor) {
+          if (!sinProveedorMap[key]) sinProveedorMap[key] = { ...linea, recetas: [] }
+          sinProveedorMap[key].cantidad = Math.round((sinProveedorMap[key].cantidad + linea.cantidad) * 1000) / 1000
+          if (!sinProveedorMap[key].recetas.includes(linea.receta)) sinProveedorMap[key].recetas.push(linea.receta)
+        } else {
+          if (!grupos[linea.proveedor]) grupos[linea.proveedor] = { proveedor: { nombre: linea.proveedor, email: linea.proveedor_email, phone: linea.proveedor_phone }, itemsMap: {} }
+          if (!grupos[linea.proveedor].itemsMap[key]) grupos[linea.proveedor].itemsMap[key] = { ...linea, recetas: [] }
+          grupos[linea.proveedor].itemsMap[key].cantidad = Math.round((grupos[linea.proveedor].itemsMap[key].cantidad + linea.cantidad) * 1000) / 1000
+          if (!grupos[linea.proveedor].itemsMap[key].recetas.includes(linea.receta)) grupos[linea.proveedor].itemsMap[key].recetas.push(linea.receta)
+        }
+      }
+    }
+
+    const gruposArr = Object.values(grupos).map(g => {
+      const items = Object.values(g.itemsMap).map((item: any) => ({
+        ...item,
+        subtotal: item.coste_unitario ? Math.round(item.cantidad * item.coste_unitario * 100) / 100 : null,
+      }))
+      const coste_total = items.reduce((s: number, i: any) => s + (i.subtotal ?? 0), 0)
+      return { proveedor: g.proveedor, items, coste_total: Math.round(coste_total * 100) / 100 }
+    })
+
+    const sinProveedor = Object.values(sinProveedorMap)
+    const coste_total_estimado = gruposArr.reduce((s, g) => s + g.coste_total, 0)
+
+    return `__COMPRA_SEMANAL__${JSON.stringify({
+      platos: resultado,
+      grupos: gruposArr,
+      sinProveedor,
+      coste_total_estimado: Math.round(coste_total_estimado * 100) / 100,
+    })}`
+  }
+
   // ── HISTORIAL PRECIO INGREDIENTE ─────────────────────────
   if (name === 'historial_precio_ingrediente') {
     const rows = db.prepare(
@@ -1106,6 +1220,7 @@ REGLAS:
 - "merma/pérdidas" → ver_merma (genera gráfico si hay datos suficientes)
 - "evolución/precio/ha subido X" → historial_precio_ingrediente (genera gráfico de línea)
 - "busca/qué ingredientes/cuáles" → buscar_ingrediente
+- "esta semana hago/voy a hacer/planificar producción/cuánto tengo que pedir para X raciones" → calcular_compra_semanal con los platos y raciones mencionados
 - PEDIDOS — flujo obligatorio cuando el usuario diga "quiero pedir/hacer un pedido/qué tengo que pedir/repón":
   1. JAMÁS preguntes "qué proveedor". Llama YA a analizar_necesidades_pedido — genera una tarjeta interactiva con botones por proveedor.
   2. El usuario verá los artículos por proveedor y podrá elegir Email, WhatsApp, Más tarde o Eliminar directamente en la tarjeta. NO hace falta preguntar por el canal.
@@ -1157,6 +1272,7 @@ REGLAS:
   let briefCards: any = null
   let pedidoSelector: any = null
   let necesidadesPedido: any = null
+  let compraSemanal: any = null
   let chartData: any = null
 
   for (const tc of toolCalls) {
@@ -1177,6 +1293,9 @@ REGLAS:
     } else if (result.startsWith('__NECESIDADES_PEDIDO__')) {
       necesidadesPedido = JSON.parse(result.slice('__NECESIDADES_PEDIDO__'.length))
       results.push('Análisis de necesidades generado.')
+    } else if (result.startsWith('__COMPRA_SEMANAL__')) {
+      compraSemanal = JSON.parse(result.slice('__COMPRA_SEMANAL__'.length))
+      results.push('Lista de la compra semanal generada.')
     } else if (result.startsWith('__CHART__')) {
       const parsed = JSON.parse(result.slice('__CHART__'.length))
       chartData = parsed.chart
@@ -1190,6 +1309,7 @@ REGLAS:
   if (briefCards)          return NextResponse.json({ reply: '', action: toolNames, briefCards })
   if (pedidoSelector)      return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
   if (necesidadesPedido)   return NextResponse.json({ reply: '', action: toolNames, necesidadesPedido })
+  if (compraSemanal)       return NextResponse.json({ reply: '', action: toolNames, compraSemanal })
   if (whatsappProposal)    return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
 
   // Simple CRUD tools → return result directly, no follow-up LLM call

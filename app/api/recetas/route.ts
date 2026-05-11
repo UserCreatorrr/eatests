@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
   const recetas = db.prepare(`
     SELECT r.*,
       (SELECT ROUND(SUM(
-        CASE WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
-             WHEN i.cost IS NOT NULL THEN l.cantidad * i.cost
+        CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
+             WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
              ELSE 0 END
       ),4) FROM escandallo_lineas l
        LEFT JOIN ingredientes i ON l.ingrediente_id = i.id

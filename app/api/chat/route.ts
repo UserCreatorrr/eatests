@@ -358,6 +358,30 @@ const tools: any[] = [
       },
     },
   },
+  // ── FACTURAS PAGAR ────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'listar_facturas_para_pagar',
+      description: 'Muestra todas las facturas de compra pendientes de pago como una tarjeta interactiva donde el usuario puede marcar cada una como pagada con un clic. Usar cuando el usuario quiera ver, gestionar o pagar facturas pendientes.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'marcar_factura_pagada',
+      description: 'Marca una o varias facturas como pagadas directamente desde el chat, buscando por proveedor, número de factura o ambos. Usar cuando el usuario diga "he pagado", "marca como pagada", "ya pagué a X".',
+      parameters: {
+        type: 'object',
+        properties: {
+          vendor: { type: 'string', description: 'Nombre del proveedor (parcial)' },
+          invoice_num: { type: 'string', description: 'Número de factura exacto' },
+          todas: { type: 'boolean', description: 'Si true, marca TODAS las facturas pendientes como pagadas' },
+        },
+      },
+    },
+  },
   // ── COMPARAR PRECIOS PROVEEDOR ────────────────────────────
   {
     type: 'function',
@@ -911,6 +935,39 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     return text
   }
 
+  // ── FACTURAS PAGAR ────────────────────────────────────────
+  if (name === 'listar_facturas_para_pagar') {
+    const facturas = db.prepare(`
+      SELECT id, invoice_num, vendor, total, date_due, date_invoice, base, taxes, comment
+      FROM facturas_compra
+      WHERE user_id = ? AND (paid = 0 OR paid IS NULL)
+      ORDER BY date_due ASC NULLS LAST
+      LIMIT 40
+    `).all(userId) as any[]
+    if (!facturas.length) return '__FACTURAS_PAGAR__' + JSON.stringify({ facturas: [] })
+    const today = new Date().toISOString().split('T')[0]
+    const enriched = facturas.map((f: any) => ({
+      ...f,
+      vencida: f.date_due && f.date_due < today,
+      dias_vencida: f.date_due ? Math.floor((Date.now() - new Date(f.date_due).getTime()) / 86400000) : null,
+    }))
+    return '__FACTURAS_PAGAR__' + JSON.stringify({ facturas: enriched })
+  }
+
+  if (name === 'marcar_factura_pagada') {
+    let q = 'UPDATE facturas_compra SET paid=1 WHERE user_id=? AND (paid=0 OR paid IS NULL)'
+    const params: any[] = [userId]
+    if (args.todas) { /* no extra filter */ }
+    else if (args.vendor && args.invoice_num) { q += ' AND vendor LIKE ? AND invoice_num=?'; params.push('%' + args.vendor + '%', args.invoice_num) }
+    else if (args.vendor) { q += ' AND vendor LIKE ?'; params.push('%' + args.vendor + '%') }
+    else if (args.invoice_num) { q += ' AND invoice_num=?'; params.push(args.invoice_num) }
+    else return 'Necesito al menos el proveedor o el número de factura.'
+    const r = db.prepare(q).run(...params)
+    return r.changes > 0
+      ? `${r.changes} factura${r.changes > 1 ? 's' : ''} marcada${r.changes > 1 ? 's' : ''} como pagada${r.changes > 1 ? 's' : ''}.`
+      : 'No encontré facturas pendientes con esos criterios.'
+  }
+
   // ── COMPARAR PRECIOS PROVEEDOR ────────────────────────────
   if (name === 'comparar_precios_proveedor') {
     // Latest price per ingredient + vendor
@@ -1397,6 +1454,8 @@ REGLAS:
 - "ingredientes más caros/baratos" → top_ingredientes_coste (genera gráfico)
 - "food cost/rentabilidad/qué platos revisar/margen de platos" → analizar_food_cost_recetas
 - "quién cobra más barato/comparativa precios/ahorro proveedor/precio X entre proveedores" → comparar_precios_proveedor
+- "facturas pendientes/qué debo pagar/pagar facturas" → listar_facturas_para_pagar
+- "he pagado/marca como pagada/ya pagué a X" → marcar_factura_pagada
 - "merma/pérdidas" → ver_merma (genera gráfico si hay datos suficientes)
 - "evolución/precio/ha subido X" → historial_precio_ingrediente (genera gráfico de línea)
 - "busca/qué ingredientes/cuáles" → buscar_ingrediente
@@ -1453,6 +1512,7 @@ REGLAS:
   let pedidoSelector: any = null
   let necesidadesPedido: any = null
   let compraSemanal: any = null
+  let facturasPagar: any = null
   let chartData: any = null
 
   for (const tc of toolCalls) {
@@ -1473,6 +1533,9 @@ REGLAS:
     } else if (result.startsWith('__NECESIDADES_PEDIDO__')) {
       necesidadesPedido = JSON.parse(result.slice('__NECESIDADES_PEDIDO__'.length))
       results.push('Análisis de necesidades generado.')
+    } else if (result.startsWith('__FACTURAS_PAGAR__')) {
+      facturasPagar = JSON.parse(result.slice('__FACTURAS_PAGAR__'.length))
+      results.push('Lista de facturas pendientes generada.')
     } else if (result.startsWith('__COMPRA_SEMANAL__')) {
       compraSemanal = JSON.parse(result.slice('__COMPRA_SEMANAL__'.length))
       results.push('Lista de la compra semanal generada.')
@@ -1490,6 +1553,7 @@ REGLAS:
   if (pedidoSelector)      return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
   if (necesidadesPedido)   return NextResponse.json({ reply: '', action: toolNames, necesidadesPedido })
   if (compraSemanal)       return NextResponse.json({ reply: '', action: toolNames, compraSemanal })
+  if (facturasPagar)       return NextResponse.json({ reply: '', action: toolNames, facturasPagar })
   if (whatsappProposal)    return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
 
   // Simple CRUD tools → return result directly, no follow-up LLM call

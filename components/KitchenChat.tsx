@@ -86,7 +86,7 @@ interface NecesidadesPedidoData {
 }
 
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal'
+  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar'
   content: string
   image?: string
   emailProposal?: EmailProposal
@@ -95,6 +95,7 @@ interface Message {
   pedidoSelector?: PedidoSelectorData
   necesidadesPedido?: NecesidadesPedidoData
   compraSemanal?: CompraSemanalData
+  facturasPagar?: FacturasPagarData
   chartData?: ChartData
 }
 
@@ -664,6 +665,106 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
   )
 }
 
+function FacturasCard({ data }: { data: FacturasPagarData }) {
+  const [pendientes, setPendientes] = useState<FacturaPendiente[]>(data.facturas)
+  const [paying, setPaying] = useState<Record<number, boolean>>({})
+  const [payingAll, setPayingAll] = useState(false)
+
+  if (pendientes.length === 0) {
+    return (
+      <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: 16, padding: '16px 20px', maxWidth: 520 }}>
+        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#16a34a', margin: 0 }}>Todas las facturas están pagadas</p>
+      </div>
+    )
+  }
+
+  const total = pendientes.reduce((s, f) => s + (f.total || 0), 0)
+  const vencidas = pendientes.filter(f => f.vencida)
+
+  async function pagarUna(id: number) {
+    setPaying(prev => ({ ...prev, [id]: true }))
+    await fetch(`/api/facturas/${id}/pay`, { method: 'PATCH' })
+    setPendientes(prev => prev.filter(f => f.id !== id))
+    setPaying(prev => { const n = { ...prev }; delete n[id]; return n })
+  }
+
+  async function pagarTodas() {
+    setPayingAll(true)
+    await Promise.all(pendientes.map(f => fetch(`/api/facturas/${f.id}/pay`, { method: 'PATCH' })))
+    setPendientes([])
+    setPayingAll(false)
+  }
+
+  const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid #f0ebe4' }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      {/* Header */}
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#dfd5c9', margin: '0 0 2px' }}>Facturas pendientes de pago</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
+            {pendientes.length} factura{pendientes.length > 1 ? 's' : ''}{vencidas.length > 0 ? ` · ${vencidas.length} vencida${vencidas.length > 1 ? 's' : ''}` : ''}
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#dfd5c9', opacity: 0.45, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total pendiente</p>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: vencidas.length > 0 ? '#fca5a5' : '#19f973', margin: 0 }}>{total.toFixed(2)}€</p>
+        </div>
+      </div>
+
+      {/* Lista */}
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', padding: '4px 20px 0', backgroundColor: '#fff' }}>
+        {pendientes.map(f => {
+          const overdue = f.vencida
+          const soon = !overdue && f.date_due && (new Date(f.date_due).getTime() - Date.now()) < 5 * 86400000
+          const dueBadgeColor = overdue ? '#fef2f2' : soon ? '#fffbeb' : '#f0f9ff'
+          const dueBadgeText = overdue ? '#dc2626' : soon ? '#92400e' : '#0369a1'
+          const dueBorderColor = overdue ? '#fca5a5' : soon ? '#fcd34d' : '#bae6fd'
+          return (
+            <div key={f.id} style={rowStyle}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#3d3834', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {f.vendor || 'Sin proveedor'}
+                </p>
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: 0 }}>
+                  {f.invoice_num || 'S/N'}{f.date_invoice ? ` · ${f.date_invoice}` : ''}
+                </p>
+              </div>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: '#3d3834', flexShrink: 0 }}>
+                {f.total != null ? `${f.total}€` : '-'}
+              </span>
+              {f.date_due && (
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, padding: '2px 6px', borderRadius: 5, backgroundColor: dueBadgeColor, color: dueBadgeText, border: `1px solid ${dueBorderColor}`, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  {overdue ? `${Math.abs(f.dias_vencida ?? 0)}d vencida` : f.date_due}
+                </span>
+              )}
+              <button
+                onClick={() => pagarUna(f.id)}
+                disabled={paying[f.id]}
+                style={{ flexShrink: 0, padding: '5px 12px', backgroundColor: paying[f.id] ? '#f0fdf4' : '#19f973', border: 'none', borderRadius: 8, cursor: paying[f.id] ? 'default' : 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#2a2522', opacity: paying[f.id] ? 0.6 : 1 }}
+              >
+                {paying[f.id] ? '...' : 'Pagada'}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer */}
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '12px 20px', backgroundColor: '#faf9f7', display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          onClick={pagarTodas}
+          disabled={payingAll}
+          style={{ padding: '8px 18px', backgroundColor: '#3d3834', border: 'none', borderRadius: 10, cursor: payingAll ? 'default' : 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#dfd5c9', opacity: payingAll ? 0.6 : 1 }}
+        >
+          {payingAll ? 'Procesando...' : 'Marcar todas como pagadas'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function CompraSemanalCard({ data, onInsertMessage }: { data: CompraSemanalData; onInsertMessage: (m: Message) => void }) {
   const [expanded, setExpanded] = useState<Record<number, boolean>>({})
 
@@ -1174,6 +1275,21 @@ interface ChartData {
   unidad: string
 }
 
+interface FacturaPendiente {
+  id: number
+  invoice_num: string | null
+  vendor: string | null
+  total: number | null
+  date_due: string | null
+  date_invoice: string | null
+  vencida: boolean
+  dias_vencida: number | null
+}
+
+interface FacturasPagarData {
+  facturas: FacturaPendiente[]
+}
+
 interface CompraSemanalItem {
   nombre: string
   cantidad: number
@@ -1384,6 +1500,7 @@ export default function KitchenChat() {
       if (m.role === 'pedido_selector') return [{ role: 'assistant' as const, content: '[Selector de proveedores mostrado al usuario]' }]
       if (m.role === 'necesidades_pedido') return [{ role: 'assistant' as const, content: '[Análisis de pedidos pendientes mostrado al usuario con opciones por proveedor]' }]
       if (m.role === 'compra_semanal') return [{ role: 'assistant' as const, content: '[Lista de la compra semanal generada y mostrada al usuario, agrupada por proveedor con cantidades y coste estimado]' }]
+      if (m.role === 'facturas_pagar') return [{ role: 'assistant' as const, content: '[Lista de facturas pendientes mostrada al usuario con botón para marcar cada una como pagada]' }]
       if (m.role === 'whatsapp_proposal') return [{ role: 'assistant' as const, content: '[Borrador de WhatsApp generado y mostrado al usuario]' }]
       if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice') return []
       return [m]
@@ -1415,6 +1532,8 @@ export default function KitchenChat() {
         setMessages(prev => [...prev, { role: 'necesidades_pedido', content: '', necesidadesPedido: json.necesidadesPedido }])
       } else if (json.compraSemanal) {
         setMessages(prev => [...prev, { role: 'compra_semanal', content: '', compraSemanal: json.compraSemanal }])
+      } else if (json.facturasPagar) {
+        setMessages(prev => [...prev, { role: 'facturas_pagar', content: '', facturasPagar: json.facturasPagar }])
       } else if (json.whatsappProposal) {
         setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
@@ -1731,6 +1850,15 @@ export default function KitchenChat() {
                         data={msg.necesidadesPedido}
                         onInsertMessage={(newMsg) => setMessages(prev => [...prev, newMsg])}
                       />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'facturas_pagar' && msg.facturasPagar) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <FacturasCard data={msg.facturasPagar} />
                     </div>
                   )
                 }

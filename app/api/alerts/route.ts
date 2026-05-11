@@ -120,7 +120,41 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // 6. Recetas con food cost crítico (>35% con precios actuales)
+  // 6. Ingredientes con diferencia de precio >20% entre proveedores
+  const preciosConVendor = db.prepare(
+    'SELECT nombre, vendor, precio FROM precio_historial WHERE user_id=? AND vendor IS NOT NULL ORDER BY nombre, vendor, id DESC'
+  ).all(userId) as any[]
+
+  const latestByIngVendor: Record<string, Record<string, number>> = {}
+  for (const p of preciosConVendor) {
+    if (!latestByIngVendor[p.nombre]) latestByIngVendor[p.nombre] = {}
+    if (!latestByIngVendor[p.nombre][p.vendor]) latestByIngVendor[p.nombre][p.vendor] = p.precio
+  }
+
+  const oportunidades = Object.entries(latestByIngVendor)
+    .filter(([, vendors]) => Object.keys(vendors).length >= 2)
+    .map(([nombre, vendors]) => {
+      const precios = Object.values(vendors)
+      const min = Math.min(...precios)
+      const max = Math.max(...precios)
+      const diffPct = min > 0 ? Math.round(((max - min) / min) * 100) : 0
+      return { nombre, diffPct, min, max }
+    })
+    .filter(o => o.diffPct >= 20)
+    .sort((a, b) => b.diffPct - a.diffPct)
+    .slice(0, 3)
+
+  if (oportunidades.length > 0) {
+    alerts.push({
+      id: 'precio_diferencial',
+      tipo: 'warning',
+      titulo: `${oportunidades.length} ingrediente${oportunidades.length > 1 ? 's' : ''} con diferencial de precio entre proveedores`,
+      detalle: oportunidades.map(o => `${o.nombre} +${o.diffPct}%`).join(' · '),
+      chat: 'Muéstrame las oportunidades de ahorro comparando precios entre proveedores',
+    })
+  }
+
+  // 8. Recetas con food cost crítico (>35% con precios actuales)
   const recetasCriticas = db.prepare(`
     SELECT r.nombre, r.precio_venta,
            ROUND(SUM(

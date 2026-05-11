@@ -358,6 +358,21 @@ const tools: any[] = [
       },
     },
   },
+  // ── COMPARAR PRECIOS PROVEEDOR ────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'comparar_precios_proveedor',
+      description: 'Compara el precio de un ingrediente entre todos los proveedores que lo han suministrado, usando el último precio registrado de cada uno. Si no se indica nombre, muestra los ingredientes con mayor diferencia de precio entre proveedores. Usar cuando el usuario pregunte quién cobra más barato, comparativa de precios, ahorro potencial, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          nombre: { type: 'string', description: 'Nombre del ingrediente a comparar. Opcional — si se omite muestra los top oportunidades.' },
+          top: { type: 'number', description: 'Cuántos ingredientes mostrar cuando nombre es null. Default 8.' },
+        },
+      },
+    },
+  },
   // ── FOOD COST ANÁLISIS ────────────────────────────────────
   {
     type: 'function',
@@ -896,6 +911,76 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     return text
   }
 
+  // ── COMPARAR PRECIOS PROVEEDOR ────────────────────────────
+  if (name === 'comparar_precios_proveedor') {
+    // Latest price per ingredient + vendor
+    const rows = db.prepare(`
+      SELECT ph.nombre, ph.vendor, ph.precio, ph.unidad, ph.fecha
+      FROM precio_historial ph
+      WHERE ph.user_id = ?
+        AND ph.vendor IS NOT NULL
+        AND ph.id = (
+          SELECT MAX(ph2.id) FROM precio_historial ph2
+          WHERE ph2.user_id = ph.user_id AND ph2.nombre = ph.nombre AND ph2.vendor = ph.vendor
+        )
+      ${args.nombre ? 'AND ph.nombre LIKE ?' : ''}
+      ORDER BY ph.nombre, ph.precio ASC
+    `).all(...(args.nombre ? [userId, '%' + args.nombre + '%'] : [userId])) as any[]
+
+    if (!rows.length) return args.nombre
+      ? `No hay historial de precios para "${args.nombre}" con proveedor registrado.`
+      : 'No hay historial de precios con proveedor registrado aún.'
+
+    // Group by ingredient
+    const byIng: Record<string, { vendor: string; precio: number; unidad: string | null; fecha: string }[]> = {}
+    for (const r of rows) {
+      if (!byIng[r.nombre]) byIng[r.nombre] = []
+      byIng[r.nombre].push({ vendor: r.vendor, precio: r.precio, unidad: r.unidad, fecha: r.fecha })
+    }
+
+    // Only keep ingredients with 2+ vendors
+    const comparables = Object.entries(byIng)
+      .filter(([, vs]) => vs.length >= 2)
+      .map(([nombre, vs]) => {
+        const sorted = [...vs].sort((a, b) => a.precio - b.precio)
+        const min = sorted[0]
+        const max = sorted[sorted.length - 1]
+        const diffPct = Math.round(((max.precio - min.precio) / min.precio) * 100)
+        return { nombre, vendors: sorted, min, max, diffPct }
+      })
+      .sort((a, b) => b.diffPct - a.diffPct)
+
+    if (!comparables.length) {
+      if (args.nombre) return `Solo hay un proveedor con precio registrado para "${args.nombre}". Necesitas comprar a dos o más para comparar.`
+      return 'No hay ingredientes comprados a dos o más proveedores distintos aún.'
+    }
+
+    // Single ingredient → return bar chart
+    if (args.nombre && comparables.length === 1) {
+      const ing = comparables[0]
+      const text = `Comparativa de precio para ${ing.nombre}:\n` +
+        ing.vendors.map((v, i) => `${i + 1}. ${v.vendor}: ${v.precio}€/${v.unidad || 'ud'} (${v.fecha})`).join('\n') +
+        `\n\nMás barato: ${ing.min.vendor} (${ing.min.precio}€)\nMás caro: ${ing.max.vendor} (${ing.max.precio}€)\nDiferencia: ${ing.diffPct}%`
+      const chart = {
+        tipo: 'bar',
+        titulo: `Precio de ${ing.nombre} por proveedor`,
+        datos: ing.vendors.map(v => ({ label: v.vendor, value: v.precio })),
+        unidad: `€/${ing.vendors[0].unidad || 'ud'}`,
+      }
+      return `__CHART__${JSON.stringify({ chart, text })}`
+    }
+
+    // Multiple ingredients → text table of top opportunities
+    const top = args.top || 8
+    const lista = comparables.slice(0, top)
+    const text = `Top oportunidades de ahorro por proveedor:\n\n` +
+      lista.map(ing => {
+        const vendors = ing.vendors.map(v => `${v.vendor} ${v.precio}€`).join(' · ')
+        return `• ${ing.nombre}: ${vendors} → ${ing.min.vendor} es ${ing.diffPct}% más barato`
+      }).join('\n')
+    return text
+  }
+
   // ── ANALIZAR FOOD COST RECETAS ────────────────────────────
   if (name === 'analizar_food_cost_recetas') {
     const umbral = (args.umbral_pct || 33) / 100
@@ -1311,6 +1396,7 @@ REGLAS:
 - "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor (genera gráfico automáticamente)
 - "ingredientes más caros/baratos" → top_ingredientes_coste (genera gráfico)
 - "food cost/rentabilidad/qué platos revisar/margen de platos" → analizar_food_cost_recetas
+- "quién cobra más barato/comparativa precios/ahorro proveedor/precio X entre proveedores" → comparar_precios_proveedor
 - "merma/pérdidas" → ver_merma (genera gráfico si hay datos suficientes)
 - "evolución/precio/ha subido X" → historial_precio_ingrediente (genera gráfico de línea)
 - "busca/qué ingredientes/cuáles" → buscar_ingrediente

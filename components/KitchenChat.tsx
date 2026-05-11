@@ -86,7 +86,7 @@ interface NecesidadesPedidoData {
 }
 
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar'
+  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar' | 'albaran_guardado' | 'informe_semanal'
   content: string
   image?: string
   emailProposal?: EmailProposal
@@ -96,6 +96,8 @@ interface Message {
   necesidadesPedido?: NecesidadesPedidoData
   compraSemanal?: CompraSemanalData
   facturasPagar?: FacturasPagarData
+  albaranGuardado?: AlbaranGuardadoData
+  informeSemanal?: InformeSemanalData
   chartData?: ChartData
 }
 
@@ -1251,6 +1253,223 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
   )
 }
 
+function AlbaranGuardadoCard({ data }: { data: AlbaranGuardadoData }) {
+  const priceMap: Record<string, AlbaranGuardadoPriceChange> = {}
+  for (const pc of data.price_changes) priceMap[pc.nombre] = pc
+
+  const hasFoodCostWarning = data.food_cost_impact && data.food_cost_impact.trim().length > 0
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      {/* Header */}
+      <div style={{ backgroundColor: '#1a3a2a', borderRadius: '16px 16px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#19f973" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#dfd5c9', margin: 0 }}>Albarán guardado</p>
+          </div>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: '3px 0 0' }}>
+            {data.vendor || 'Proveedor'}{data.delivery_num ? ` · #${data.delivery_num}` : ''} · {data.date_delivery}
+          </p>
+        </div>
+        {data.total != null && (
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#dfd5c9', opacity: 0.45, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total</p>
+            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: '#19f973', margin: 0 }}>{data.total}€</p>
+          </div>
+        )}
+      </div>
+
+      {/* Lines */}
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', backgroundColor: '#fff' }}>
+        {data.lineas.map((l, i) => {
+          const pc = priceMap[l.nombre]
+          const hasDelta = pc && pc.diff_pct !== null
+          const isUp = hasDelta && pc.diff_pct! > 0
+          const isDown = hasDelta && pc.diff_pct! < 0
+          const deltaBg = isUp ? '#fff1f2' : '#f0fdf4'
+          const deltaColor = isUp ? '#dc2626' : '#16a34a'
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 20px', borderBottom: i < data.lineas.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.nombre}</span>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, flexShrink: 0 }}>{l.cantidad != null ? `${l.cantidad}${l.unidad ? ' ' + l.unidad : ''}` : ''}</span>
+              {l.precio_unitario != null && (
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', flexShrink: 0 }}>{l.precio_unitario}€</span>
+              )}
+              {hasDelta && (
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, padding: '2px 5px', borderRadius: 4, backgroundColor: deltaBg, color: deltaColor, fontWeight: 700, flexShrink: 0 }}>
+                  {isUp ? '+' : ''}{pc.diff_pct}%
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Price change alerts */}
+      {data.price_changes.filter(pc => pc.diff_pct !== null && Math.abs(pc.diff_pct) >= 5).length > 0 && (
+        <div style={{ border: '1px solid #fcd34d', borderTop: 'none', backgroundColor: '#fffbeb', padding: '10px 20px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Variaciones de precio</p>
+          {data.price_changes.filter(pc => pc.diff_pct !== null && Math.abs(pc.diff_pct) >= 5).map((pc, i) => (
+            <p key={i} style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', margin: '2px 0' }}>
+              {pc.nombre}: {pc.precio_anterior != null ? `${pc.precio_anterior}€ → ` : ''}{pc.precio_nuevo}€
+              {' '}
+              <span style={{ fontWeight: 700, color: pc.diff_pct! > 0 ? '#dc2626' : '#16a34a' }}>
+                ({pc.diff_pct! > 0 ? '+' : ''}{pc.diff_pct}%)
+              </span>
+              {pc.recetas_afectadas.length > 0 && (
+                <span style={{ opacity: 0.6 }}> · afecta a: {pc.recetas_afectadas.join(', ')}</span>
+              )}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Food cost warning */}
+      {hasFoodCostWarning && (
+        <div style={{ border: '1px solid #fca5a5', borderTop: 'none', backgroundColor: '#fff1f2', padding: '10px 20px', borderRadius: '0 0 16px 16px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#991b1b', margin: 0, whiteSpace: 'pre-line' }}>
+            {data.food_cost_impact.replace(/^[\n]+/, '')}
+          </p>
+        </div>
+      )}
+
+      {!hasFoodCostWarning && (
+        <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '10px 20px', backgroundColor: '#faf9f7' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: 0 }}>
+            {data.lineas.length} línea{data.lineas.length !== 1 ? 's' : ''} · precios actualizados en ingredientes
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
+  const variacionColor = data.gasto.variacion === null ? '#3d3834' : data.gasto.variacion > 0 ? '#dc2626' : '#16a34a'
+  const variacionLabel = data.gasto.variacion === null ? '—' : `${data.gasto.variacion > 0 ? '+' : ''}${data.gasto.variacion}%`
+
+  function compartirWhatsApp() {
+    const lines: string[] = [
+      `📊 *Informe semanal MarginBites*`,
+      `${data.fecha}`,
+      '',
+      `💰 Gasto compras: ${data.gasto.total}€ (${data.gasto.pedidos} pedidos)${data.gasto.variacion !== null ? ` ${variacionLabel} vs semana anterior` : ''}`,
+      data.merma.total > 0 ? `🗑 Merma: ${data.merma.total}€ (${data.merma.eventos} registros)` : '',
+      data.facturas.vencidas_c > 0 ? `⚠️ Facturas vencidas: ${data.facturas.vencidas_c} (${data.facturas.vencidas_t}€)` : '',
+      data.facturas.pendientes_c > 0 ? `📄 Facturas pendientes: ${data.facturas.pendientes_c} (${data.facturas.pendientes_t}€)` : '',
+      data.precios_subida.length > 0 ? `📈 Subidas precio: ${data.precios_subida.map(p => `${p.nombre} +${p.diff_pct}%`).join(', ')}` : '',
+      data.food_cost_critico.length > 0 ? `🔴 Food cost crítico: ${data.food_cost_critico.map(r => `${r.nombre} ${r.pct}%`).join(', ')}` : '',
+    ].filter(Boolean)
+    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`)
+  }
+
+  const metricStyle: React.CSSProperties = { backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 12, padding: '12px 14px' }
+  const metricLabel: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#3d3834', opacity: 0.45, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }
+  const metricValue: React.CSSProperties = { fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 20, color: '#3d3834', margin: 0 }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      {/* Header */}
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#dfd5c9', margin: '0 0 2px' }}>Informe semanal</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>{data.fecha}</p>
+        </div>
+        <button
+          onClick={compartirWhatsApp}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#1a3a2a' }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.854L0 24l6.303-1.654A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.214-3.733.979 1.001-3.64-.234-.374A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/></svg>
+          Compartir
+        </button>
+      </div>
+
+      {/* Metrics grid */}
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', backgroundColor: '#faf9f7', padding: '14px 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          {/* Gasto */}
+          <div style={metricStyle}>
+            <p style={metricLabel}>Gasto semana</p>
+            <p style={metricValue}>{data.gasto.total}€</p>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: variacionColor, margin: '3px 0 0' }}>
+              {variacionLabel} vs anterior
+            </p>
+          </div>
+          {/* Merma */}
+          <div style={metricStyle}>
+            <p style={metricLabel}>Merma</p>
+            <p style={{ ...metricValue, color: data.merma.total > 0 ? '#b45309' : '#16a34a' }}>{data.merma.total}€</p>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: '3px 0 0' }}>
+              {data.merma.eventos} registro{data.merma.eventos !== 1 ? 's' : ''}
+            </p>
+          </div>
+          {/* Facturas vencidas */}
+          <div style={{ ...metricStyle, backgroundColor: data.facturas.vencidas_c > 0 ? '#fff1f2' : '#fff', borderColor: data.facturas.vencidas_c > 0 ? '#fca5a5' : '#e8e2db' }}>
+            <p style={metricLabel}>Facturas vencidas</p>
+            <p style={{ ...metricValue, color: data.facturas.vencidas_c > 0 ? '#dc2626' : '#16a34a' }}>
+              {data.facturas.vencidas_c > 0 ? `${data.facturas.vencidas_c} (${data.facturas.vencidas_t}€)` : 'Ninguna'}
+            </p>
+          </div>
+          {/* Facturas pendientes */}
+          <div style={metricStyle}>
+            <p style={metricLabel}>Pendientes pago</p>
+            <p style={metricValue}>{data.facturas.pendientes_c}</p>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: '3px 0 0' }}>
+              {data.facturas.pendientes_t}€ total
+            </p>
+          </div>
+        </div>
+
+        {/* Top proveedores */}
+        {data.gasto.top.length > 0 && (
+          <div style={{ backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
+            <p style={metricLabel}>Top proveedores</p>
+            {data.gasto.top.map((v, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834' }}>{v.vendor}</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', fontWeight: 700 }}>{v.t}€</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Subidas de precio */}
+        {data.precios_subida.length > 0 && (
+          <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
+            <p style={{ ...metricLabel, color: '#92400e' }}>Subidas de precio esta semana</p>
+            {data.precios_subida.map((p, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e' }}>{p.nombre}</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#dc2626', backgroundColor: '#fff1f2', padding: '2px 6px', borderRadius: 4 }}>+{p.diff_pct}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Food cost crítico */}
+        {data.food_cost_critico.length > 0 && (
+          <div style={{ backgroundColor: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px' }}>
+            <p style={{ ...metricLabel, color: '#991b1b' }}>Food cost crítico (&gt;35%)</p>
+            {data.food_cost_critico.map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#991b1b' }}>{r.nombre}</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#991b1b', backgroundColor: '#fca5a5', padding: '2px 6px', borderRadius: 4 }}>{r.pct}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '10px 20px', backgroundColor: '#faf9f7' }}>
+        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.35, margin: 0, textAlign: 'center' }}>
+          Datos del periodo: últimos 7 días
+        </p>
+      </div>
+    </div>
+  )
+}
+
 interface StoredConvo {
   messages: Message[]
   lastUsed: number  // timestamp ms
@@ -1327,6 +1546,44 @@ interface AlertItem {
   href?: string
 }
 
+interface AlbaranGuardadoLinea {
+  nombre: string
+  cantidad: number | null
+  unidad: string | null
+  precio_unitario: number | null
+  total_linea: number | null
+}
+
+interface AlbaranGuardadoPriceChange {
+  nombre: string
+  precio_anterior: number | null
+  precio_nuevo: number
+  diff_pct: number | null
+  recetas_afectadas: string[]
+}
+
+interface AlbaranGuardadoData {
+  albaran_id: number
+  vendor: string | null
+  delivery_num: string | null
+  date_delivery: string
+  base: number | null
+  taxes: number | null
+  total: number | null
+  lineas: AlbaranGuardadoLinea[]
+  price_changes: AlbaranGuardadoPriceChange[]
+  food_cost_impact: string
+}
+
+interface InformeSemanalData {
+  fecha: string
+  gasto: { total: number; pedidos: number; variacion: number | null; top: { vendor: string; t: number }[] }
+  merma: { total: number; eventos: number; top: { nombre: string; t: number }[] }
+  facturas: { vencidas_c: number; vencidas_t: number; pendientes_c: number; pendientes_t: number }
+  precios_subida: { nombre: string; diff_pct: number; precio: number; vendor: string }[]
+  food_cost_critico: { nombre: string; pct: number }[]
+}
+
 interface MomentoData {
   momento: string
   sugerencias: Sugerencia[]
@@ -1334,14 +1591,22 @@ interface MomentoData {
 
 function getMomento(hour: number): MomentoData {
   if (hour >= 6 && hour < 11) {
+    const isMonday = new Date().getDay() === 1
     return {
-      momento: 'Apertura',
-      sugerencias: [
-        { label: '¿Qué tengo que pedir?', sub: 'Análisis de reposición', chat: 'Quiero hacer un pedido' },
-        { label: 'Entregas de hoy', sub: 'Albaranes esperados', chat: '¿Qué entregas tengo previstas para hoy?' },
-        { label: 'Facturas urgentes', sub: 'Vencen esta semana', chat: '¿Qué facturas vencen esta semana?' },
-        { label: 'Gasto del mes', sub: 'Vs mes anterior', chat: 'Dame el resumen de gasto de este mes comparado con el anterior' },
-      ],
+      momento: isMonday ? 'Lunes · Apertura' : 'Apertura',
+      sugerencias: isMonday
+        ? [
+            { label: 'Informe semanal', sub: 'Resumen de la semana pasada', chat: 'Dame el informe de la semana pasada' },
+            { label: '¿Qué tengo que pedir?', sub: 'Análisis de reposición', chat: 'Quiero hacer un pedido' },
+            { label: 'Facturas urgentes', sub: 'Vencen esta semana', chat: '¿Qué facturas vencen esta semana?' },
+            { label: 'Gasto del mes', sub: 'Vs mes anterior', chat: 'Dame el resumen de gasto de este mes comparado con el anterior' },
+          ]
+        : [
+            { label: '¿Qué tengo que pedir?', sub: 'Análisis de reposición', chat: 'Quiero hacer un pedido' },
+            { label: 'Entregas de hoy', sub: 'Albaranes esperados', chat: '¿Qué entregas tengo previstas para hoy?' },
+            { label: 'Facturas urgentes', sub: 'Vencen esta semana', chat: '¿Qué facturas vencen esta semana?' },
+            { label: 'Gasto del mes', sub: 'Vs mes anterior', chat: 'Dame el resumen de gasto de este mes comparado con el anterior' },
+          ],
     }
   }
   if (hour >= 11 && hour < 16) {
@@ -1501,6 +1766,8 @@ export default function KitchenChat() {
       if (m.role === 'necesidades_pedido') return [{ role: 'assistant' as const, content: '[Análisis de pedidos pendientes mostrado al usuario con opciones por proveedor]' }]
       if (m.role === 'compra_semanal') return [{ role: 'assistant' as const, content: '[Lista de la compra semanal generada y mostrada al usuario, agrupada por proveedor con cantidades y coste estimado]' }]
       if (m.role === 'facturas_pagar') return [{ role: 'assistant' as const, content: '[Lista de facturas pendientes mostrada al usuario con botón para marcar cada una como pagada]' }]
+      if (m.role === 'albaran_guardado') return [{ role: 'assistant' as const, content: '[Albarán guardado con todas sus líneas — precios actualizados en el sistema]' }]
+      if (m.role === 'informe_semanal') return [{ role: 'assistant' as const, content: '[Informe semanal generado y mostrado al usuario con gasto, merma, facturas y alertas]' }]
       if (m.role === 'whatsapp_proposal') return [{ role: 'assistant' as const, content: '[Borrador de WhatsApp generado y mostrado al usuario]' }]
       if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice') return []
       return [m]
@@ -1534,6 +1801,10 @@ export default function KitchenChat() {
         setMessages(prev => [...prev, { role: 'compra_semanal', content: '', compraSemanal: json.compraSemanal }])
       } else if (json.facturasPagar) {
         setMessages(prev => [...prev, { role: 'facturas_pagar', content: '', facturasPagar: json.facturasPagar }])
+      } else if (json.albaranGuardado) {
+        setMessages(prev => [...prev, { role: 'albaran_guardado', content: '', albaranGuardado: json.albaranGuardado }])
+      } else if (json.informeSemanal) {
+        setMessages(prev => [...prev, { role: 'informe_semanal', content: '', informeSemanal: json.informeSemanal }])
       } else if (json.whatsappProposal) {
         setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
@@ -1871,6 +2142,24 @@ export default function KitchenChat() {
                         data={msg.compraSemanal}
                         onInsertMessage={(newMsg) => setMessages(prev => [...prev, newMsg])}
                       />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'albaran_guardado' && msg.albaranGuardado) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <AlbaranGuardadoCard data={msg.albaranGuardado} />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'informe_semanal' && msg.informeSemanal) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <InformeSemanalCard data={msg.informeSemanal} />
                     </div>
                   )
                 }

@@ -358,6 +358,51 @@ const tools: any[] = [
       },
     },
   },
+  // ── GUARDAR ALBARÁN COMPLETO ──────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'guardar_albaran_completo',
+      description: 'Guarda un albarán de compra completo: cabecero + todas las líneas de producto en una sola operación. USAR SIEMPRE al escanear un albarán con foto en vez de guardar_albaran_compra + múltiples guardar_linea_albaran por separado. Extrae TODOS los artículos de la imagen.',
+      parameters: {
+        type: 'object',
+        properties: {
+          vendor:         { type: 'string' },
+          delivery_num:   { type: 'string' },
+          date_delivery:  { type: 'string', description: 'YYYY-MM-DD' },
+          base:           { type: 'number' },
+          taxes:          { type: 'number' },
+          total:          { type: 'number' },
+          nif:            { type: 'string' },
+          lineas: {
+            type: 'array',
+            description: 'Todos los artículos del albarán',
+            items: {
+              type: 'object',
+              properties: {
+                nombre:          { type: 'string' },
+                cantidad:        { type: 'number' },
+                unidad:          { type: 'string' },
+                precio_unitario: { type: 'number' },
+                total_linea:     { type: 'number' },
+              },
+              required: ['nombre'],
+            },
+          },
+        },
+        required: ['vendor'],
+      },
+    },
+  },
+  // ── INFORME SEMANAL ───────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'informe_semanal',
+      description: 'Genera el informe de la semana pasada: gasto de compras vs semana anterior, merma, food cost de recetas, facturas pendientes y subidas de precio. Usar los lunes o cuando el usuario pida el resumen semanal.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
   // ── FACTURAS PAGAR ────────────────────────────────────────
   {
     type: 'function',
@@ -935,6 +980,86 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     return text
   }
 
+  // ── GUARDAR ALBARÁN COMPLETO ──────────────────────────────
+  if (name === 'guardar_albaran_completo') {
+    try {
+      const { vendor, delivery_num, date_delivery, base, taxes, total, nif, lineas = [] } = args
+      const fecha = date_delivery ?? new Date().toISOString().split('T')[0]
+
+      const albaran = db.prepare(
+        `INSERT INTO albaranes_compra (user_id, vendor, delivery_num, date_delivery, base, taxes, total, nif) VALUES (?,?,?,?,?,?,?,?)`
+      ).run(userId, vendor ?? null, delivery_num ?? null, fecha, base ?? null, taxes ?? null, total ?? null, nif ?? null)
+
+      const priceChanges: { nombre: string; precio_anterior: number | null; precio_nuevo: number; diff_pct: number | null; recetas_afectadas: string[] }[] = []
+
+      const tx = db.transaction(() => {
+        for (const l of lineas as any[]) {
+          const { nombre, cantidad, unidad, precio_unitario, total_linea } = l
+          if (!nombre) continue
+          db.prepare(`INSERT INTO lineas_albaran_compra (user_id, vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha) VALUES (?,?,?,?,?,?,?,?)`)
+            .run(userId, vendor ?? null, nombre, cantidad ?? null, unidad ?? null, precio_unitario ?? null, total_linea ?? null, fecha)
+          if (precio_unitario != null) {
+            const prev = db.prepare(`SELECT precio FROM precio_historial WHERE user_id=? AND nombre LIKE ? ORDER BY id DESC LIMIT 1`).get(userId, '%' + nombre + '%') as any
+            db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente) VALUES (?,?,?,?,?,?)`).run(userId, nombre, vendor ?? null, precio_unitario, unidad ?? null, 'albaran')
+            const ing = db.prepare(`SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1`).get(userId, '%' + nombre + '%') as any
+            if (ing) db.prepare(`UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?`).run(precio_unitario, ing.id, userId)
+            const prevPrice = prev?.precio ?? null
+            const diffPct = prevPrice && prevPrice > 0 ? Math.round(((precio_unitario - prevPrice) / prevPrice) * 100) : null
+            // Find affected recipes
+            const recetas = ing ? db.prepare(`SELECT r.nombre FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id WHERE l.ingrediente_id=? AND r.user_id=? AND r.activo=1`).all(ing.id, userId) as any[] : []
+            priceChanges.push({ nombre, precio_anterior: prevPrice, precio_nuevo: precio_unitario, diff_pct: diffPct, recetas_afectadas: recetas.map(r => r.nombre) })
+          }
+        }
+      })
+      tx()
+
+      const foodCostImpact = checkFoodCostImpact(userId, (lineas as any[]).map((l: any) => l.nombre).join(','))
+
+      return `__ALBARAN_GUARDADO__${JSON.stringify({
+        albaran_id: albaran.lastInsertRowid,
+        vendor, delivery_num, date_delivery: fecha, base, taxes, total,
+        lineas: args.lineas || [],
+        price_changes: priceChanges,
+        food_cost_impact: foodCostImpact.trim(),
+      })}`
+    } catch (e: any) { return `Error: ${e.message}` }
+  }
+
+  // ── INFORME SEMANAL ───────────────────────────────────────
+  if (name === 'informe_semanal') {
+    const gastoSemana = (db.prepare(`SELECT ROUND(SUM(total),2) as t, COUNT(*) as c FROM pedidos_compra WHERE user_id=? AND date(date_order)>=date('now','-7 days')`).get(userId) as any)
+    const gastoSemAnt = (db.prepare(`SELECT ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND date(date_order) BETWEEN date('now','-14 days') AND date('now','-8 days')`).get(userId) as any)
+    const variacion = gastoSemAnt.t > 0 ? Math.round(((gastoSemana.t - gastoSemAnt.t) / gastoSemAnt.t) * 100) : null
+
+    const topProv = db.prepare(`SELECT vendor, ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND date(date_order)>=date('now','-7 days') GROUP BY vendor ORDER BY t DESC LIMIT 3`).all(userId) as any[]
+
+    const merma = (db.prepare(`SELECT ROUND(SUM(coste_estimado),2) as t, COUNT(*) as n FROM merma_registro WHERE user_id=? AND date(fecha)>=date('now','-7 days')`).get(userId) as any)
+    const topMerma = db.prepare(`SELECT nombre, ROUND(SUM(coste_estimado),2) as t FROM merma_registro WHERE user_id=? AND date(fecha)>=date('now','-7 days') GROUP BY nombre ORDER BY t DESC LIMIT 3`).all(userId) as any[]
+
+    const facVenc = (db.prepare(`SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL) AND date_due<date('now')`).get(userId) as any)
+    const facPend = (db.prepare(`SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL)`).get(userId) as any)
+
+    const preciosSemana = db.prepare(`SELECT nombre, precio, vendor FROM precio_historial WHERE user_id=? AND date(fecha)>=date('now','-7 days') ORDER BY nombre, id ASC`).all(userId) as any[]
+    const precMap: Record<string, { first: number; last: number; vendor: string }> = {}
+    for (const p of preciosSemana) {
+      if (!precMap[p.nombre]) precMap[p.nombre] = { first: p.precio, last: p.precio, vendor: p.vendor }
+      precMap[p.nombre].last = p.precio
+    }
+    const subidas = Object.entries(precMap).filter(([, v]) => v.first > 0 && ((v.last - v.first) / v.first) > 0.05).sort((a, b) => ((b[1].last - b[1].first) / b[1].first) - ((a[1].last - a[1].first) / a[1].first)).slice(0, 4)
+
+    const recetasCrit = db.prepare(`SELECT r.nombre, r.precio_venta, ROUND(SUM(CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad*i.cost WHEN l.coste_unitario IS NOT NULL THEN l.cantidad*l.coste_unitario ELSE 0 END),4) AS coste FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id AND l.user_id=r.user_id LEFT JOIN ingredientes i ON i.id=l.ingrediente_id WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0 GROUP BY r.id HAVING CAST(coste AS REAL)/r.precio_venta>0.35 ORDER BY CAST(coste AS REAL)/r.precio_venta DESC LIMIT 4`).all(userId) as any[]
+
+    const semana = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+    return `__INFORME_SEMANAL__${JSON.stringify({
+      fecha: semana,
+      gasto: { total: gastoSemana.t || 0, pedidos: gastoSemana.c || 0, variacion, top: topProv },
+      merma: { total: merma.t || 0, eventos: merma.n || 0, top: topMerma },
+      facturas: { vencidas_c: facVenc.c, vencidas_t: facVenc.t || 0, pendientes_c: facPend.c, pendientes_t: facPend.t || 0 },
+      precios_subida: subidas.map(([n, v]) => ({ nombre: n, diff_pct: Math.round(((v.last - v.first) / v.first) * 100), precio: v.last, vendor: v.vendor })),
+      food_cost_critico: recetasCrit.map(r => ({ nombre: r.nombre, pct: Math.round((r.coste / r.precio_venta) * 100) })),
+    })}`
+  }
+
   // ── FACTURAS PAGAR ────────────────────────────────────────
   if (name === 'listar_facturas_para_pagar') {
     const facturas = db.prepare(`
@@ -1448,7 +1573,9 @@ Ingredientes: ${ctx.counts.ingredientes} (${ctx.counts.ing_sin_proveedor} sin pr
 REGLAS:
 - Responde en español, directo y conciso. Listas markdown, nunca párrafos.
 - Precios en euros. USA LAS HERRAMIENTAS para consultar datos — no inventes ni adivines.
-- FOTO albarán/factura → extrae todo en tabla markdown, pregunta si guardar. Si confirma → guardar_albaran_compra / guardar_factura_compra.
+- FOTO albarán → usa guardar_albaran_completo con TODAS las líneas en una sola llamada (vendor, delivery_num, fecha, líneas con nombre/cantidad/unidad/precio_unitario/total_linea). NUNCA uses guardar_albaran_compra + guardar_linea_albaran por separado al escanear.
+- FOTO factura → extrae todo en tabla markdown, pregunta si guardar. Si confirma → guardar_factura_compra.
+- "informe semanal/resumen de la semana/qué tal la semana/balance semanal" (especialmente los lunes) → informe_semanal
 - "resumen/informe/cómo estamos/brief" → informe_diario
 - "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor (genera gráfico automáticamente)
 - "ingredientes más caros/baratos" → top_ingredientes_coste (genera gráfico)
@@ -1514,6 +1641,8 @@ REGLAS:
   let compraSemanal: any = null
   let facturasPagar: any = null
   let chartData: any = null
+  let albaranGuardado: any = null
+  let informeSemanal: any = null
 
   for (const tc of toolCalls) {
     const args = JSON.parse(tc.function.arguments)
@@ -1539,6 +1668,12 @@ REGLAS:
     } else if (result.startsWith('__COMPRA_SEMANAL__')) {
       compraSemanal = JSON.parse(result.slice('__COMPRA_SEMANAL__'.length))
       results.push('Lista de la compra semanal generada.')
+    } else if (result.startsWith('__ALBARAN_GUARDADO__')) {
+      albaranGuardado = JSON.parse(result.slice('__ALBARAN_GUARDADO__'.length))
+      results.push('Albarán guardado.')
+    } else if (result.startsWith('__INFORME_SEMANAL__')) {
+      informeSemanal = JSON.parse(result.slice('__INFORME_SEMANAL__'.length))
+      results.push('Informe semanal generado.')
     } else if (result.startsWith('__CHART__')) {
       const parsed = JSON.parse(result.slice('__CHART__'.length))
       chartData = parsed.chart
@@ -1554,6 +1689,8 @@ REGLAS:
   if (necesidadesPedido)   return NextResponse.json({ reply: '', action: toolNames, necesidadesPedido })
   if (compraSemanal)       return NextResponse.json({ reply: '', action: toolNames, compraSemanal })
   if (facturasPagar)       return NextResponse.json({ reply: '', action: toolNames, facturasPagar })
+  if (albaranGuardado)     return NextResponse.json({ reply: '', action: toolNames, albaranGuardado })
+  if (informeSemanal)      return NextResponse.json({ reply: '', action: toolNames, informeSemanal })
   if (whatsappProposal)    return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
 
   // Simple CRUD tools → return result directly, no follow-up LLM call

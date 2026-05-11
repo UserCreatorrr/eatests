@@ -358,6 +358,20 @@ const tools: any[] = [
       },
     },
   },
+  // ── FOOD COST ANÁLISIS ────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'analizar_food_cost_recetas',
+      description: 'Analiza el food cost actual de todas las recetas activas usando precios reales. Identifica las que están por encima del umbral y sugiere ajustes de precio de venta. Usar cuando el usuario pregunte por rentabilidad de platos, food cost alto, qué platos revisar, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          umbral_pct: { type: 'number', description: 'Umbral de food cost % para alertar. Default 33.' },
+        },
+      },
+    },
+  },
   // ── COMPRA SEMANAL ────────────────────────────────────────
   {
     type: 'function',
@@ -491,6 +505,47 @@ const tools: any[] = [
     },
   },
 ]
+
+function checkFoodCostImpact(userId: string, ingredienteName: string): string {
+  const afectadas = db.prepare(`
+    SELECT r.nombre, r.precio_venta,
+           ROUND(SUM(
+             CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
+                  WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
+                  ELSE 0 END
+           ), 4) AS coste_total
+    FROM escandallo_receta r
+    JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
+    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+    WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
+      AND r.id IN (
+        SELECT DISTINCT l2.receta_id FROM escandallo_lineas l2
+        JOIN ingredientes i2 ON i2.id = l2.ingrediente_id
+        WHERE l2.user_id = ? AND i2.descr LIKE ?
+      )
+    GROUP BY r.id
+    HAVING coste_total > 0
+    ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
+  `).all(userId, userId, '%' + ingredienteName + '%') as any[]
+
+  if (!afectadas.length) return ''
+
+  const criticas = afectadas.filter(r => (r.coste_total / r.precio_venta) > 0.35)
+  const warnings = afectadas.filter(r => {
+    const pct = r.coste_total / r.precio_venta
+    return pct > 0.30 && pct <= 0.35
+  })
+
+  if (!criticas.length && !warnings.length) return ''
+
+  const lines: string[] = ['\n\nIMPACTO EN FOOD COST:']
+  for (const r of [...criticas, ...warnings]) {
+    const pct = Math.round((r.coste_total / r.precio_venta) * 100)
+    const nivel = pct > 35 ? 'CRITICO' : 'REVISAR'
+    lines.push(`• ${r.nombre}: ${pct}% food cost [${nivel}]`)
+  }
+  return lines.join('\n')
+}
 
 async function executeTool(name: string, args: any, userId: string): Promise<string> {
   // ── INSERT helpers ─────────────────────────────────────
@@ -841,6 +896,42 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     return text
   }
 
+  // ── ANALIZAR FOOD COST RECETAS ────────────────────────────
+  if (name === 'analizar_food_cost_recetas') {
+    const umbral = (args.umbral_pct || 33) / 100
+    const recetas = db.prepare(`
+      SELECT r.nombre, r.precio_venta, r.raciones,
+             ROUND(SUM(
+               CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
+                    WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
+                    ELSE 0 END
+             ), 4) AS coste_total
+      FROM escandallo_receta r
+      JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
+      LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+      WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
+      GROUP BY r.id
+      ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
+    `).all(userId) as any[]
+
+    if (!recetas.length) return 'No hay recetas con precio de venta definido.'
+
+    const result = recetas.map(r => {
+      const pct = Math.round((r.coste_total / r.precio_venta) * 100)
+      const nivel = pct > 40 ? 'CRITICO' : pct > 33 ? 'REVISAR' : pct > 28 ? 'ACEPTABLE' : 'EXCELENTE'
+      const pvSugerido = r.coste_total > 0 ? Math.ceil(r.coste_total / 0.30 * 100) / 100 : null
+      return `• ${r.nombre}: coste ${r.coste_total}€ / PVP ${r.precio_venta}€ → ${pct}% [${nivel}]${nivel !== 'EXCELENTE' && nivel !== 'ACEPTABLE' && pvSugerido ? ` — PVP sugerido: ${pvSugerido}€` : ''}`
+    })
+
+    const criticas = recetas.filter(r => (r.coste_total / r.precio_venta) > umbral)
+    const header = `Food cost por receta (precios actuales):\n`
+    const footer = criticas.length > 0
+      ? `\n\n${criticas.length} receta${criticas.length > 1 ? 's' : ''} por encima del ${Math.round(umbral * 100)}%.`
+      : `\n\nTodas las recetas están dentro del umbral del ${Math.round(umbral * 100)}%.`
+
+    return header + result.join('\n') + footer
+  }
+
   // ── CALCULAR COMPRA SEMANAL ───────────────────────────────
   if (name === 'calcular_compra_semanal') {
     const platos = (args.platos || []) as { nombre: string; raciones: number }[]
@@ -957,7 +1048,8 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       // Also update ingredientes cost if match found
       const ing = db.prepare('SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
       if (ing) db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(precio, ing.id, userId)
-      return `Precio registrado: ${nombre} → ${precio}€${unidad ? '/' + unidad : ''}${vendor ? ' (' + vendor + ')' : ''}`
+      const impacto = checkFoodCostImpact(userId, nombre)
+      return `Precio registrado: ${nombre} → ${precio}€${unidad ? '/' + unidad : ''}${vendor ? ' (' + vendor + ')' : ''}${impacto}`
     } catch (e: any) { return `Error: ${e.message}` }
   }
 
@@ -974,7 +1066,8 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
         const ing = db.prepare('SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
         if (ing) db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(precio_unitario, ing.id, userId)
       }
-      return `Línea guardada: ${nombre} × ${cantidad || '?'} ${unidad || ''} a ${precio_unitario || '?'}€`
+      const impacto = precio_unitario ? checkFoodCostImpact(userId, nombre) : ''
+      return `Línea guardada: ${nombre} × ${cantidad || '?'} ${unidad || ''} a ${precio_unitario || '?'}€${impacto}`
     } catch (e: any) { return `Error: ${e.message}` }
   }
 
@@ -1217,6 +1310,7 @@ REGLAS:
 - "resumen/informe/cómo estamos/brief" → informe_diario
 - "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor (genera gráfico automáticamente)
 - "ingredientes más caros/baratos" → top_ingredientes_coste (genera gráfico)
+- "food cost/rentabilidad/qué platos revisar/margen de platos" → analizar_food_cost_recetas
 - "merma/pérdidas" → ver_merma (genera gráfico si hay datos suficientes)
 - "evolución/precio/ha subido X" → historial_precio_ingrediente (genera gráfico de línea)
 - "busca/qué ingredientes/cuáles" → buscar_ingrediente

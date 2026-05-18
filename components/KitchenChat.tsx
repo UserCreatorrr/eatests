@@ -85,8 +85,25 @@ interface NecesidadesPedidoData {
   grupos: NecesidadGrupo[]
 }
 
+interface IngredienteItem {
+  id: number
+  descr: string
+  type: string | null
+  unit: string | null
+  cost: number | null
+}
+
+interface ProveedorItem {
+  id: number
+  codi: string | null
+  descr: string
+  descr_type: string | null
+  mail: string | null
+  phone: string | null
+}
+
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar' | 'albaran_guardado' | 'informe_semanal'
+  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar' | 'albaran_guardado' | 'informe_semanal' | 'ingredientes_cards' | 'proveedores_cards'
   content: string
   image?: string
   emailProposal?: EmailProposal
@@ -99,6 +116,8 @@ interface Message {
   albaranGuardado?: AlbaranGuardadoData
   informeSemanal?: InformeSemanalData
   chartData?: ChartData
+  ingredientesCards?: { ingredientes: IngredienteItem[]; filtro: string }
+  proveedoresCards?: { proveedores: ProveedorItem[] }
 }
 
 const CARD_ICONS: Record<string, JSX.Element> = {
@@ -762,6 +781,105 @@ function FacturasCard({ data }: { data: FacturasPagarData }) {
         >
           {payingAll ? 'Procesando...' : 'Marcar todas como pagadas'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+function IngredientesCard({ data }: { data: { ingredientes: IngredienteItem[]; filtro: string } }) {
+  const sinCoste = data.ingredientes.filter(i => !i.cost || i.cost === 0)
+  const conCoste = data.ingredientes.filter(i => i.cost && i.cost > 0)
+  const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(v)
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#dfd5c9', margin: '0 0 1px' }}>
+            Ingredientes{data.filtro ? ` · ${data.filtro}` : ''}
+          </p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
+            {data.ingredientes.length} resultado{data.ingredientes.length !== 1 ? 's' : ''}
+            {sinCoste.length > 0 && <span style={{ color: '#fca5a5' }}> · {sinCoste.length} sin coste</span>}
+          </p>
+        </div>
+        <a href="/dashboard/ingredientes" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#19f973', textDecoration: 'none', opacity: 0.8 }}>
+          Ver todos →
+        </a>
+      </div>
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
+        {data.ingredientes.map((ing, i) => {
+          const hasCost = ing.cost && ing.cost > 0
+          return (
+            <div key={ing.id} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px',
+              borderBottom: i < data.ingredientes.length - 1 ? '1px solid #f5f2ee' : 'none',
+            }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                backgroundColor: hasCost ? '#16a34a' : '#dc2626',
+              }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {ing.descr}
+                </p>
+                {ing.type && (
+                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#9c958f', margin: 0 }}>{ing.type}</p>
+                )}
+              </div>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', flexShrink: 0 }}>
+                {ing.unit || '—'}
+              </span>
+              <span style={{
+                fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, flexShrink: 0,
+                color: hasCost ? '#3d3834' : '#dc2626',
+                minWidth: 60, textAlign: 'right' as const,
+              }}>
+                {hasCost ? fmt(ing.cost!) : 'Sin coste'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ProveedoresCard({ data }: { data: { proveedores: ProveedorItem[] } }) {
+  return (
+    <div style={{ width: '100%', maxWidth: 520 }}>
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#dfd5c9', margin: '0 0 1px' }}>Proveedores</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
+            {data.proveedores.length} resultado{data.proveedores.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <a href="/dashboard/proveedores" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#19f973', textDecoration: 'none', opacity: 0.8 }}>
+          Ver todos →
+        </a>
+      </div>
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
+        {data.proveedores.map((p, i) => (
+          <div key={p.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+            borderBottom: i < data.proveedores.length - 1 ? '1px solid #f5f2ee' : 'none',
+          }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#f5f2ee', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 12, color: '#3d3834' }}>
+                {p.descr.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {p.descr}
+              </p>
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
+                {p.descr_type || '—'}{p.mail ? ` · ${p.mail}` : ''}{p.phone ? ` · ${p.phone}` : ''}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -1672,7 +1790,7 @@ function loadCurrent(): Message[] {
 
 function saveCurrent(messages: Message[]) {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && m.role !== 'necesidades_pedido' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal')))
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && m.role !== 'necesidades_pedido' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal' && m.role !== 'ingredientes_cards' && m.role !== 'proveedores_cards')))
   } catch {}
 }
 
@@ -1768,6 +1886,8 @@ export default function KitchenChat() {
       if (m.role === 'facturas_pagar') return [{ role: 'assistant' as const, content: '[Lista de facturas pendientes mostrada al usuario con botón para marcar cada una como pagada]' }]
       if (m.role === 'albaran_guardado') return [{ role: 'assistant' as const, content: '[Albarán guardado con todas sus líneas — precios actualizados en el sistema]' }]
       if (m.role === 'informe_semanal') return [{ role: 'assistant' as const, content: '[Informe semanal generado y mostrado al usuario con gasto, merma, facturas y alertas]' }]
+      if (m.role === 'ingredientes_cards') return [{ role: 'assistant' as const, content: `[Lista de ${m.ingredientesCards?.ingredientes?.length ?? 0} ingredientes mostrada al usuario en tarjetas]` }]
+      if (m.role === 'proveedores_cards') return [{ role: 'assistant' as const, content: `[Lista de ${m.proveedoresCards?.proveedores?.length ?? 0} proveedores mostrada al usuario en tarjetas]` }]
       if (m.role === 'whatsapp_proposal') return [{ role: 'assistant' as const, content: '[Borrador de WhatsApp generado y mostrado al usuario]' }]
       if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice') return []
       return [m]
@@ -1805,6 +1925,10 @@ export default function KitchenChat() {
         setMessages(prev => [...prev, { role: 'albaran_guardado', content: '', albaranGuardado: json.albaranGuardado }])
       } else if (json.informeSemanal) {
         setMessages(prev => [...prev, { role: 'informe_semanal', content: '', informeSemanal: json.informeSemanal }])
+      } else if (json.ingredientesCards) {
+        setMessages(prev => [...prev, { role: 'ingredientes_cards', content: '', ingredientesCards: json.ingredientesCards }])
+      } else if (json.proveedoresCards) {
+        setMessages(prev => [...prev, { role: 'proveedores_cards', content: '', proveedoresCards: json.proveedoresCards }])
       } else if (json.whatsappProposal) {
         setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
@@ -2160,6 +2284,24 @@ export default function KitchenChat() {
                     <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ width: 28, height: 28, flexShrink: 0 }} />
                       <InformeSemanalCard data={msg.informeSemanal} />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'ingredientes_cards' && msg.ingredientesCards) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <IngredientesCard data={msg.ingredientesCards} />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'proveedores_cards' && msg.proveedoresCards) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <ProveedoresCard data={msg.proveedoresCards} />
                     </div>
                   )
                 }

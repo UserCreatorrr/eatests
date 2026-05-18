@@ -246,6 +246,14 @@ const tools: any[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'informe_diario',
+      description: 'Briefing completo del estado actual del negocio: facturas, pedidos, merma, precios, food cost',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
   // ── MERMA ─────────────────────────────────────────────────
   {
     type: 'function',
@@ -634,9 +642,9 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     if (args.nombre) { q += ' AND descr LIKE ?'; p.push('%' + args.nombre + '%') }
     if (args.sin_coste) q += ' AND (cost IS NULL OR cost = 0)'
     if (args.tipo) { q += ' AND type LIKE ?'; p.push('%' + args.tipo + '%') }
-    const rows = db.prepare(q + ' LIMIT 25').all(...p) as any[]
+    const rows = db.prepare(q + ' ORDER BY descr ASC LIMIT 30').all(...p) as any[]
     if (!rows.length) return 'No se encontraron ingredientes.'
-    return rows.map(r => `• [${r.id}] ${r.descr} | ${r.type || '-'} | ${r.unit || '-'} | ${r.cost ? r.cost + '€' : 'SIN COSTE'}`).join('\n')
+    return `__INGREDIENTES_CARDS__${JSON.stringify({ ingredientes: rows, filtro: args.nombre || args.tipo || (args.sin_coste ? 'sin coste' : '') })}`
   }
 
   // ── ACTUALIZAR INGREDIENTE ─────────────────────────────
@@ -680,9 +688,9 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const p: any[] = [userId]
     if (args.nombre) { q += ' AND descr LIKE ?'; p.push('%' + args.nombre + '%') }
     if (args.tipo) { q += ' AND descr_type LIKE ?'; p.push('%' + args.tipo + '%') }
-    const rows = db.prepare(q + ' LIMIT 20').all(...p) as any[]
+    const rows = db.prepare(q + ' ORDER BY descr ASC LIMIT 20').all(...p) as any[]
     if (!rows.length) return 'No se encontraron proveedores.'
-    return rows.map(r => `• [${r.id}] ${r.descr} [${r.descr_type || '-'}] | ${r.mail || ''} | ${r.phone || ''}`).join('\n')
+    return `__PROVEEDORES_CARDS__${JSON.stringify({ proveedores: rows })}`
   }
 
   // ── VER ALBARANES RECIENTES ────────────────────────────
@@ -756,6 +764,112 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       unidad: '€',
     }
     return `__CHART__${JSON.stringify({ chart, text })}`
+  }
+
+  // ── INFORME DIARIO ─────────────────────────────────────
+  if (name === 'informe_diario') {
+    const hoy = new Date().toISOString().split('T')[0]
+    const h = new Date().getHours()
+    const saludo = h < 13 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches'
+
+    const gastoMes = (db.prepare("SELECT ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND strftime('%Y-%m',date_order)=strftime('%Y-%m','now')").get(userId) as any).t
+    const gastoMesAnt = (db.prepare("SELECT ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND strftime('%Y-%m',date_order)=strftime('%Y-%m',date('now','-1 month'))").get(userId) as any).t
+    const variacion = gastoMesAnt > 0 ? Math.round(((gastoMes - gastoMesAnt) / gastoMesAnt) * 100) : null
+    const topProv = db.prepare("SELECT vendor, ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND strftime('%Y-%m',date_order)=strftime('%Y-%m','now') GROUP BY vendor ORDER BY t DESC LIMIT 3").all(userId) as any[]
+    const pedPendEnvio = (db.prepare('SELECT COUNT(*) as c FROM lista_pedidos WHERE user_id=? AND pending_send>0').get(userId) as any).c
+    const pedPendRec = (db.prepare('SELECT COUNT(*) as c FROM lista_pedidos WHERE user_id=? AND pending_receive>0').get(userId) as any).c
+    const facVencidas = db.prepare("SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL) AND date_due<date('now')").get(userId) as any
+    const facVencen7 = db.prepare("SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL) AND date_due BETWEEN date('now') AND date('now','+7 days')").get(userId) as any
+    const facPendTotal = db.prepare("SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL)").get(userId) as any
+    const ingSinCoste = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=? AND (cost IS NULL OR cost=0)').get(userId) as any).c
+    const mermaMes = db.prepare("SELECT ROUND(SUM(coste_estimado),2) as t, COUNT(*) as n FROM merma_registro WHERE user_id=? AND strftime('%Y-%m',fecha)=strftime('%Y-%m','now')").get(userId) as any
+    const topMerma = db.prepare("SELECT nombre, ROUND(SUM(coste_estimado),2) as t FROM merma_registro WHERE user_id=? AND strftime('%Y-%m',fecha)=strftime('%Y-%m','now') GROUP BY nombre ORDER BY t DESC LIMIT 3").all(userId) as any[]
+
+    const allPrecios = db.prepare('SELECT nombre, precio, fecha FROM precio_historial WHERE user_id=? ORDER BY nombre, fecha ASC').all(userId) as any[]
+    const precioMap: Record<string, { first: number; last: number }> = {}
+    for (const p of allPrecios) {
+      if (!precioMap[p.nombre]) precioMap[p.nombre] = { first: p.precio, last: p.precio }
+      precioMap[p.nombre].last = p.precio
+    }
+    const alertasPrecios = Object.entries(precioMap)
+      .map(([nombre, v]) => ({ nombre, precio_actual: v.last, precio_anterior: v.first, variacion_pct: v.first > 0 ? Math.round(((v.last - v.first) / v.first) * 100) : 0 }))
+      .filter(a => a.variacion_pct > 7).sort((a, b) => b.variacion_pct - a.variacion_pct).slice(0, 4)
+
+    const cards: any[] = []
+    cards.push({
+      id: 'gastos', titulo: 'Gasto compras', icon: 'chart',
+      urgencia: variacion !== null && variacion > 15 ? 'warning' : 'normal',
+      items: [
+        `Este mes: **${gastoMes || 0} EUR**${variacion !== null ? ` (${variacion > 0 ? '+' : ''}${variacion}% vs mes anterior)` : ''}`,
+        ...(topProv.length > 0 ? topProv.map((p: any) => `${p.vendor}: ${p.t} EUR`) : ['Sin datos este mes']),
+      ],
+      acciones: [
+        { label: 'Ver analytics', href: '/dashboard/analytics' },
+        { label: 'Desglose por proveedor', chat: 'Dame el gasto por proveedor este mes' },
+      ],
+    })
+    if (pedPendEnvio > 0 || pedPendRec > 0) {
+      cards.push({
+        id: 'pedidos', titulo: 'Pedidos', icon: 'truck',
+        urgencia: pedPendEnvio > 0 ? 'warning' : 'normal',
+        items: [
+          pedPendEnvio > 0 ? `**${pedPendEnvio}** pendientes de enviar` : null,
+          pedPendRec > 0 ? `**${pedPendRec}** pendientes de recibir` : null,
+        ].filter(Boolean),
+        acciones: [
+          { label: 'Ver pedidos', href: '/dashboard/compras/pedidos' },
+          { label: 'Hacer pedido', chat: 'Quiero hacer un pedido a un proveedor' },
+        ],
+      })
+    }
+    cards.push({
+      id: 'facturas', titulo: 'Facturas pendientes', icon: 'invoice',
+      urgencia: facVencidas.c > 0 ? 'danger' : facVencen7.c > 0 ? 'warning' : 'normal',
+      items: [
+        facVencidas.c > 0 ? `**${facVencidas.c} vencidas** · ${facVencidas.t || 0} EUR` : null,
+        facVencen7.c > 0 ? `${facVencen7.c} vencen en 7 días · ${facVencen7.t || 0} EUR` : null,
+        `Total pendiente: **${facPendTotal.c} facturas** (${facPendTotal.t || 0} EUR)`,
+      ].filter(Boolean),
+      acciones: [
+        { label: 'Ver facturas', href: '/dashboard/compras/facturas' },
+        { label: 'Pagar facturas', chat: 'Muéstrame las facturas pendientes para pagarlas' },
+      ],
+    })
+    if (mermaMes.n > 0) {
+      cards.push({
+        id: 'merma', titulo: 'Merma este mes', icon: 'merma',
+        urgencia: mermaMes.t > 100 ? 'warning' : 'normal',
+        items: [
+          `**${mermaMes.t || 0} EUR** en ${mermaMes.n} eventos`,
+          ...topMerma.map((m: any) => `${m.nombre}: ${m.t} EUR`),
+        ],
+        acciones: [
+          { label: 'Ver sangrado', href: '/dashboard/sangrado' },
+          { label: 'Registrar merma', chat: 'Quiero registrar una merma' },
+        ],
+      })
+    }
+    if (alertasPrecios.length > 0) {
+      cards.push({
+        id: 'precios', titulo: 'Alertas de precio', icon: 'alert', urgencia: 'warning',
+        items: alertasPrecios.map(a => `**${a.nombre}**: +${a.variacion_pct}% → ${a.precio_actual} EUR`),
+        acciones: [
+          { label: 'Ver analytics', href: '/dashboard/analytics' },
+          { label: 'Actualizar precios', chat: 'Ayúdame a actualizar los precios que han subido' },
+        ],
+      })
+    }
+    if (ingSinCoste > 0) {
+      cards.push({
+        id: 'sin_coste', titulo: 'Ingredientes sin coste', icon: 'warning', urgencia: 'warning',
+        items: [`**${ingSinCoste} ingredientes** sin precio registrado (afecta al escandallo)`],
+        acciones: [
+          { label: 'Ver ingredientes', href: '/dashboard/ingredientes' },
+          { label: 'Cuáles son', chat: 'Dime qué ingredientes no tienen coste registrado' },
+        ],
+      })
+    }
+    return `__BRIEF_CARDS__${JSON.stringify({ saludo, fecha: hoy, cards })}`
   }
 
   // ── REGISTRAR MERMA ───────────────────────────────────────
@@ -1405,12 +1519,12 @@ REGLAS:
 - FOTO albarán → usa guardar_albaran_completo con TODAS las líneas en una sola llamada (vendor, delivery_num, fecha, líneas con nombre/cantidad/unidad/precio_unitario/total_linea). NUNCA uses guardar_albaran_compra + guardar_linea_albaran por separado al escanear.
 - FOTO factura → extrae todo en tabla markdown, pregunta si guardar. Si confirma → guardar_factura_compra.
 - "informe semanal/resumen de la semana/qué tal la semana/balance semanal" (especialmente los lunes) → informe_semanal
-- "resumen/informe/cómo estamos/panel/dashboard" → Di al usuario que las alertas y el estado general se ven directamente en el Panel de control (pantalla de inicio). El asistente no reproduce esa información.
+- "resumen/informe/cómo estamos/brief/qué pasa/estado general/panel" → informe_diario (genera tarjetas visuales)
 - "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor (genera gráfico automáticamente)
 - "ingredientes más caros/baratos" → top_ingredientes_coste (genera gráfico)
 - "food cost/rentabilidad/qué platos revisar/margen de platos" → analizar_food_cost_recetas
 - "quién cobra más barato/comparativa precios/ahorro proveedor/precio X entre proveedores" → comparar_precios_proveedor
-- "facturas pendientes/qué debo pagar/ver facturas" → Di al usuario que las facturas pendientes se ven en el Panel de control o en Compras → Facturas. Si quiere marcar como pagada usa marcar_factura_pagada.
+- "facturas pendientes/qué debo pagar/pagar facturas" → listar_facturas_para_pagar (genera tarjeta interactiva con botón de pago por factura)
 - "he pagado/marca como pagada/ya pagué a X" → marcar_factura_pagada
 - "merma/pérdidas" → ver_merma (genera gráfico si hay datos suficientes)
 - "evolución/precio/ha subido X" → historial_precio_ingrediente (genera gráfico de línea)
@@ -1472,6 +1586,8 @@ REGLAS:
   let chartData: any = null
   let albaranGuardado: any = null
   let informeSemanal: any = null
+  let ingredientesCards: any = null
+  let proveedoresCards: any = null
 
   for (const tc of toolCalls) {
     const args = JSON.parse(tc.function.arguments)
@@ -1503,6 +1619,12 @@ REGLAS:
     } else if (result.startsWith('__INFORME_SEMANAL__')) {
       informeSemanal = JSON.parse(result.slice('__INFORME_SEMANAL__'.length))
       results.push('Informe semanal generado.')
+    } else if (result.startsWith('__INGREDIENTES_CARDS__')) {
+      ingredientesCards = JSON.parse(result.slice('__INGREDIENTES_CARDS__'.length))
+      results.push('Lista de ingredientes generada.')
+    } else if (result.startsWith('__PROVEEDORES_CARDS__')) {
+      proveedoresCards = JSON.parse(result.slice('__PROVEEDORES_CARDS__'.length))
+      results.push('Lista de proveedores generada.')
     } else if (result.startsWith('__CHART__')) {
       const parsed = JSON.parse(result.slice('__CHART__'.length))
       chartData = parsed.chart
@@ -1520,6 +1642,8 @@ REGLAS:
   if (facturasPagar)       return NextResponse.json({ reply: '', action: toolNames, facturasPagar })
   if (albaranGuardado)     return NextResponse.json({ reply: '', action: toolNames, albaranGuardado })
   if (informeSemanal)      return NextResponse.json({ reply: '', action: toolNames, informeSemanal })
+  if (ingredientesCards)   return NextResponse.json({ reply: '', action: toolNames, ingredientesCards })
+  if (proveedoresCards)    return NextResponse.json({ reply: '', action: toolNames, proveedoresCards })
   if (whatsappProposal)    return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
 
   // Simple CRUD tools → return result directly, no follow-up LLM call

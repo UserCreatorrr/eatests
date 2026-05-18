@@ -145,9 +145,13 @@ function TabResumen() {
 }
 
 // ─── TAB: DESVIACIONES DE PRECIO ─────────────────────────────────────────────
+type DesvTab = 'todas' | 'subidas' | 'bajadas' | 'proveedores' | 'inconsistencias'
+
 function TabDesviaciones() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [subTab, setSubTab] = useState<DesvTab>('todas')
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/analytics/deviaciones').then(r => r.json()).then(setData).finally(() => setLoading(false))
@@ -158,97 +162,245 @@ function TabDesviaciones() {
   const desviaciones: any[] = data?.desviaciones ?? []
   const vendorTrend: any[] = data?.vendorTrend ?? []
   const inconsistencias: any[] = data?.inconsistencias ?? []
+  const historialByIng: Record<string, any[]> = data?.historialByIngrediente ?? {}
+  const lineasByIng: Record<string, any[]> = data?.lineasByIngrediente ?? {}
+
   const sinDatos = desviaciones.length === 0 && vendorTrend.length === 0 && inconsistencias.length === 0
+
+  const subidas = desviaciones.filter((d: any) => d.variacion_pct > 0)
+  const bajadas = desviaciones.filter((d: any) => d.variacion_pct < 0)
+  const filteredDesv = subTab === 'subidas' ? subidas : subTab === 'bajadas' ? bajadas : desviaciones
+
+  const SUB_TABS: { key: DesvTab; label: string; count?: number }[] = [
+    { key: 'todas', label: 'Todas', count: desviaciones.length },
+    { key: 'subidas', label: '▲ Subidas', count: subidas.length },
+    { key: 'bajadas', label: '▼ Bajadas', count: bajadas.length },
+    { key: 'proveedores', label: 'Por proveedor', count: vendorTrend.length },
+    { key: 'inconsistencias', label: 'Inconsistencias', count: inconsistencias.length },
+  ]
+
+  function toggleDetail(nombre: string) {
+    setExpanded(prev => prev === nombre ? null : nombre)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Sub-tabs */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #e8e2db', paddingBottom: 0 }}>
+        {SUB_TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setSubTab(t.key)}
+            style={{
+              ...mono(11), padding: '6px 14px', border: 'none', background: 'none', cursor: 'pointer',
+              color: subTab === t.key ? '#19f973' : '#3d3834',
+              borderBottom: subTab === t.key ? '2px solid #19f973' : '2px solid transparent',
+              fontWeight: subTab === t.key ? 700 : 400,
+              marginBottom: -1, transition: 'all .15s',
+            }}
+          >
+            {t.label}
+            {t.count !== undefined && t.count > 0 && (
+              <span style={{ marginLeft: 5, backgroundColor: subTab === t.key ? '#19f97322' : '#f0ece8', color: subTab === t.key ? '#16a34a' : '#3d3834', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>
+                {t.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {sinDatos && (
         <div style={{ ...card, textAlign: 'center', padding: '48px 24px' }}>
           <p style={{ ...chillax(16), color: '#3d3834', marginBottom: 8 }}>Sin datos de desviación aún</p>
           <p style={{ ...mono(), color: '#3d3834', opacity: 0.5, maxWidth: 400, margin: '0 auto' }}>
-            Las desviaciones se detectan automáticamente cuando la IA escanea albaranes con foto
-            o cuando actualizas precios de ingredientes. Prueba a enviar una foto de un albarán al chat.
+            Las desviaciones se detectan automáticamente cuando actualizas precios de ingredientes
+            o cuando la IA escanea albaranes. Prueba a enviar una foto de un albarán al chat.
           </p>
         </div>
       )}
 
-      {/* Desviaciones de precio por ingrediente */}
-      {desviaciones.length > 0 && (
+      {/* Desviaciones por ingrediente */}
+      {(subTab === 'todas' || subTab === 'subidas' || subTab === 'bajadas') && filteredDesv.length > 0 && (
         <div style={card}>
-          <p style={label}>Subidas de precio detectadas en ingredientes</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <p style={label}>
+              {subTab === 'subidas' ? 'Subidas de precio' : subTab === 'bajadas' ? 'Bajadas de precio' : 'Variaciones de precio'} — ingredientes
+            </p>
+            <p style={{ ...mono(10), color: '#3d3834', opacity: 0.4, margin: 0 }}>
+              Clic en fila para ver detalle
+            </p>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {desviaciones.map((d: any, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < desviaciones.length - 1 ? '1px solid #f0ebe4' : 'none' }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: '0 0 2px' }}>{d.nombre}</p>
-                  <p style={{ ...mono(10), color: '#3d3834', opacity: 0.5, margin: 0 }}>{d.vendor || 'Sin proveedor'} · {d.fecha}</p>
+            {filteredDesv.map((d: any, i: number) => {
+              const isUp = d.variacion_pct > 0
+              const color = isUp ? '#dc2626' : '#16a34a'
+              const isExpanded = expanded === d.nombre
+              return (
+                <div key={d.nombre}>
+                  <div
+                    onClick={() => toggleDetail(d.nombre)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 10px',
+                      borderBottom: !isExpanded && i < filteredDesv.length - 1 ? '1px solid #f0ebe4' : 'none',
+                      cursor: 'pointer', borderRadius: isExpanded ? '8px 8px 0 0' : 8,
+                      backgroundColor: isExpanded ? (isUp ? '#fef2f220' : '#f0fdf420') : 'transparent',
+                      transition: 'background-color 0.15s',
+                    }}
+                    onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLDivElement).style.backgroundColor = '#faf9f7' }}
+                    onMouseLeave={e => { if (!isExpanded) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent' }}
+                  >
+                    {/* Arrow */}
+                    <div style={{ width: 20, flexShrink: 0, textAlign: 'center' }}>
+                      <span style={{ fontSize: 14, color, fontWeight: 700 }}>{isUp ? '▲' : '▼'}</span>
+                    </div>
+
+                    {/* Name + vendor */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {d.nombre}
+                      </p>
+                      <p style={{ ...mono(10), color: '#3d3834', opacity: 0.5, margin: 0 }}>
+                        {d.vendor || 'Sin proveedor'} · {d.fecha}
+                      </p>
+                    </div>
+
+                    {/* Price change */}
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <p style={{ ...mono(11), color: '#3d3834', margin: '0 0 4px' }}>
+                        <span style={{ opacity: 0.45, textDecoration: 'line-through' }}>{d.precio_anterior}€</span>
+                        <span style={{ margin: '0 4px', opacity: 0.3 }}>→</span>
+                        <strong style={{ color }}>{d.precio_actual}€</strong>
+                        {d.unidad && <span style={{ opacity: 0.4, fontSize: 9 }}>/{d.unidad}</span>}
+                      </p>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <Badge color={color}>{isUp ? '+' : ''}{d.variacion_pct}%</Badge>
+                        {d.impacto_mensual != null && (
+                          <Badge color={isUp ? '#f97316' : '#16a34a'}>
+                            {isUp ? '+' : ''}{eur(d.impacto_mensual)}/mes
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expand icon */}
+                    <span style={{ ...mono(10), color: '#3d3834', opacity: 0.3, marginLeft: 4, transform: isExpanded ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▼</span>
+                  </div>
+
+                  {/* Inline detail */}
+                  {isExpanded && (
+                    <div style={{
+                      backgroundColor: '#faf9f7', borderRadius: '0 0 8px 8px',
+                      border: `1px solid ${color}22`, borderTop: 'none',
+                      padding: '14px 16px', marginBottom: i < filteredDesv.length - 1 ? 1 : 0,
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                        {/* Historial de precios */}
+                        <div>
+                          <p style={{ ...label, marginBottom: 10 }}>Historial de precios</p>
+                          {(historialByIng[d.nombre] ?? []).map((h: any, j: number) => (
+                            <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: j < (historialByIng[d.nombre]?.length - 1) ? '1px solid #f0ebe4' : 'none' }}>
+                              <span style={{ ...mono(10), color: '#3d3834', opacity: 0.6 }}>{h.fecha}</span>
+                              <span style={{ ...mono(11), fontWeight: 700, color: '#3d3834' }}>{h.precio}€/{h.unidad || 'ud'}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Líneas de albarán recientes */}
+                        <div>
+                          <p style={{ ...label, marginBottom: 10 }}>Compras recientes</p>
+                          {(lineasByIng[d.nombre] ?? []).length === 0 ? (
+                            <p style={{ ...mono(10), color: '#3d3834', opacity: 0.4 }}>Sin registros de compra</p>
+                          ) : (lineasByIng[d.nombre] ?? []).slice(0, 6).map((l: any, j: number) => (
+                            <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: j < 5 ? '1px solid #f0ebe4' : 'none' }}>
+                              <span style={{ ...mono(10), color: '#3d3834', opacity: 0.6 }}>{l.fecha} · {l.vendor || '-'}</span>
+                              <span style={{ ...mono(11), fontWeight: 700, color: '#3d3834' }}>
+                                {l.cantidad ? `${l.cantidad}${l.unidad || ''} · ` : ''}{l.precio_unitario}€/ud
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ ...mono(11), color: '#3d3834', margin: '0 0 4px' }}>
-                    <span style={{ opacity: 0.5, textDecoration: 'line-through' }}>{d.precio_anterior}€</span>
-                    {' → '}
-                    <strong>{d.precio_actual}€</strong>
-                    {d.unidad && <span style={{ opacity: 0.4 }}>/{d.unidad}</span>}
-                  </p>
-                  <Badge color={d.variacion_pct > 0 ? '#dc2626' : '#16a34a'}>
-                    {d.variacion_pct > 0 ? '▲' : '▼'} {Math.abs(d.variacion_pct)}%
-                  </Badge>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* Variación gasto por proveedor mes a mes */}
-      {vendorTrend.length > 0 && (
-        <div style={card}>
-          <p style={label}>Variación de gasto por proveedor (mes actual vs anterior)</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {vendorTrend.map((v: any, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < vendorTrend.length - 1 ? '1px solid #f0ebe4' : 'none' }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: '0 0 2px' }}>{v.vendor}</p>
-                  <p style={{ ...mono(10), color: '#3d3834', opacity: 0.5, margin: 0 }}>
-                    Anterior: {eur(v.mes_anterior)} → Actual: {eur(v.este_mes)}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                  <Badge color={v.variacion_pct > 0 ? '#dc2626' : '#16a34a'}>
-                    {v.variacion_pct > 0 ? '▲' : '▼'} {Math.abs(v.variacion_pct)}%
-                  </Badge>
-                  <span style={{ ...mono(10), color: v.variacion_eur > 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
-                    {v.variacion_eur > 0 ? '+' : ''}{eur(v.variacion_eur)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+      {(subTab === 'todas' || subTab === 'subidas' || subTab === 'bajadas') && filteredDesv.length === 0 && !sinDatos && (
+        <div style={{ ...card, textAlign: 'center', padding: '32px 24px' }}>
+          <p style={{ ...mono(), color: '#3d3834', opacity: 0.4 }}>
+            {subTab === 'subidas' ? 'No hay subidas de precio registradas' : 'No hay bajadas de precio registradas'}
+          </p>
         </div>
+      )}
+
+      {/* Por proveedor */}
+      {subTab === 'proveedores' && (
+        vendorTrend.length === 0 ? (
+          <div style={{ ...card, textAlign: 'center', padding: '32px 24px' }}>
+            <p style={{ ...mono(), color: '#3d3834', opacity: 0.4 }}>Sin datos de gasto mensual por proveedor</p>
+          </div>
+        ) : (
+          <div style={card}>
+            <p style={label}>Variación de gasto por proveedor — mes actual vs anterior</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {vendorTrend.map((v: any, i: number) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < vendorTrend.length - 1 ? '1px solid #f0ebe4' : 'none' }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: '0 0 2px' }}>{v.vendor}</p>
+                    <p style={{ ...mono(10), color: '#3d3834', opacity: 0.5, margin: 0 }}>
+                      Anterior: {eur(v.mes_anterior)} → Actual: {eur(v.este_mes)}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <Badge color={v.variacion_pct > 0 ? '#dc2626' : '#16a34a'}>
+                      {v.variacion_pct > 0 ? '▲ +' : '▼ '}{Math.abs(v.variacion_pct)}%
+                    </Badge>
+                    <span style={{ ...mono(11), color: v.variacion_eur > 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
+                      {v.variacion_eur > 0 ? '+' : ''}{eur(v.variacion_eur)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
       )}
 
       {/* Inconsistencias entre proveedores */}
-      {inconsistencias.length > 0 && (
-        <div style={card}>
-          <p style={label}>Mismo producto, precios distintos entre proveedores</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {inconsistencias.map((inc: any, i: number) => (
-              <div key={i} style={{ padding: 16, backgroundColor: '#fff9f0', borderRadius: 10, border: '1px solid #fde68a' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: 0 }}>{inc.nombre}</p>
-                  <Badge color='#f97316'>Diferencia {inc.diff_pct}%</Badge>
-                </div>
-                <div style={{ display: 'flex', gap: 16 }}>
-                  {inc.vendors.map((v: any, j: number) => (
-                    <p key={j} style={{ ...mono(10), color: '#3d3834', margin: 0 }}>
-                      {v.vendor}: <strong>{v.precio}€</strong>
-                    </p>
-                  ))}
-                </div>
-              </div>
-            ))}
+      {subTab === 'inconsistencias' && (
+        inconsistencias.length === 0 ? (
+          <div style={{ ...card, textAlign: 'center', padding: '32px 24px' }}>
+            <p style={{ ...mono(), color: '#3d3834', opacity: 0.4 }}>No se detectan inconsistencias de precio entre proveedores</p>
           </div>
-        </div>
+        ) : (
+          <div style={card}>
+            <p style={label}>Mismo producto, precios distintos entre proveedores</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {inconsistencias.map((inc: any, i: number) => (
+                <div key={i} style={{ padding: 16, backgroundColor: '#fff9f0', borderRadius: 10, border: '1px solid #fde68a' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: 0 }}>{inc.nombre}</p>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Badge color='#f97316'>Δ {inc.diff_pct}%</Badge>
+                      {inc.ahorro_potencial > 0 && <Badge color='#16a34a'>Ahorro {eur(inc.ahorro_potencial)}/ud</Badge>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    {inc.vendors.map((v: any, j: number) => (
+                      <p key={j} style={{ ...mono(10), color: '#3d3834', margin: 0 }}>
+                        {v.vendor}: <strong>{v.precio}€</strong>{v.unidad ? `/${v.unidad}` : ''}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
       )}
     </div>
   )

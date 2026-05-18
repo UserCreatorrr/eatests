@@ -8,7 +8,7 @@ const fields: FieldDef[] = [
   { key: 'nif', label: 'NIF' },
   { key: 'delivery_for', label: 'Entregado para' },
   { key: 'date_delivery', label: 'Fecha Entrega' },
-  { key: 'date_sent', label: 'Fecha Envio' },
+  { key: 'date_sent', label: 'Fecha Envío' },
   { key: 'sent_by', label: 'Enviado por' },
   { key: 'received_by', label: 'Recibido por' },
   { key: 'base', label: 'Base (EUR)', type: 'number' },

@@ -7,7 +7,7 @@ const fields: FieldDef[] = [
   { key: 'code_vendor', label: 'Cod. Proveedor' },
   { key: 'nif', label: 'NIF' },
   { key: 'date_order', label: 'Fecha Pedido' },
-  { key: 'date_reception', label: 'Fecha Recepcion' },
+  { key: 'date_reception', label: 'Fecha Recepción' },
   { key: 'sent_by', label: 'Enviado por' },
   { key: 'total', label: 'Total (EUR)', type: 'number' },
 ]
@@ -23,7 +23,7 @@ const columns: ColDef[] = [
   { label: 'Cod. Prov.', render: r => r.code_vendor || '-', className: 'col-mono' },
   { label: 'NIF', render: r => r.nif || '-', className: 'col-mono' },
   { label: 'Fecha Pedido', render: r => r.date_order || '-' },
-  { label: 'Fecha Recepcion', render: r => r.date_reception || '-' },
+  { label: 'Fecha Recepción', render: r => r.date_reception || '-' },
   { label: 'Enviado por', render: r => r.sent_by || '-' },
   { label: 'Total', render: r => fmt(r.total), className: 'col-amount' },
 ]

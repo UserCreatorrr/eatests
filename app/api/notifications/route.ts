@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
   if (pendSend > 0) {
     upsertNotification(
       'pedido_pendiente',
-      `${pendSend} listas de pedidos pendientes de envio`,
+      `${pendSend} listas de pedidos pendientes de envío`,
       'Hay pedidos que aun no han sido enviados al proveedor',
       'alta',
       '/dashboard/lista-pedidos'
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
   if (facVence > 0) {
     upsertNotification(
       'factura_vence',
-      `${facVence} facturas vencen en los proximos 7 dias`,
+      `${facVence} facturas vencen en los próximos 7 días`,
       'Revisa las facturas pendientes de pago',
       'alta',
       '/dashboard/compras/facturas'
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
   if (pendReceive > 0) {
     upsertNotification(
       'recepcion_pendiente',
-      `${pendReceive} listas pendientes de recepcion`,
+      `${pendReceive} listas pendientes de recepción`,
       'Hay pedidos que aun no han sido recibidos',
       'media',
       '/dashboard/lista-pedidos'

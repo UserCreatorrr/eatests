@@ -34,7 +34,7 @@ const columns: ColDef[] = [
   { label: 'Base', render: r => fmt(r.base) },
   { label: 'IVA', render: r => fmt(r.taxes) },
   { label: 'Total', render: r => fmt(r.total), className: 'col-amount' },
-  { label: 'Pagada', render: r => r.paid ? <span className="badge badge-green">Si</span> : <span className="badge badge-red">No</span> },
+  { label: 'Pagada', render: r => r.paid ? <span className="badge badge-green">Sí</span> : <span className="badge badge-red">No</span> },
 ]
 
 export default function FacturasVentaPage() {

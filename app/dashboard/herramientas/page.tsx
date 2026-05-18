@@ -22,7 +22,7 @@ const columns: ColDef[] = [
   { label: 'Tipo', render: r => r.type || '-' },
   { label: 'Unidad', render: r => r.unit || '-' },
   { label: 'Coste', render: r => fmt(r.cost), className: 'col-amount' },
-  { label: 'Con datos', render: r => r.has_data ? <span className="badge badge-green">Si</span> : <span className="badge badge-gray">No</span> },
+  { label: 'Con datos', render: r => r.has_data ? <span className="badge badge-green">Sí</span> : <span className="badge badge-gray">No</span> },
 ]
 
 export default function HerramientasPage() {

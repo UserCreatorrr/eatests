@@ -26,6 +26,7 @@ type Props = {
   recetaNombre: string
   precioVenta: number | null
   onClose: () => void
+  embedded?: boolean
 }
 
 function eur(v: number | null | undefined) {
@@ -40,7 +41,7 @@ function foodCostBadge(pct: number) {
   return { label: 'CRITICO', bg: '#fef2f2', color: '#dc2626' }
 }
 
-export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta, onClose }: Props) {
+export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta, onClose, embedded }: Props) {
   const [lineas, setLineas] = useState<Linea[]>([])
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([])
   const [loading, setLoading] = useState(true)
@@ -121,8 +122,9 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
   const thStyle: React.CSSProperties = { padding: '6px 10px', fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'left', borderBottom: '1px solid #e8e2db' }
 
   return (
-    <div style={{ backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 20, padding: 24, marginTop: 20 }}>
-      {/* Header */}
+    <div style={{ backgroundColor: embedded ? 'transparent' : '#fff', border: embedded ? 'none' : '1px solid #e8e2db', borderRadius: embedded ? 0 : 20, padding: embedded ? '24px 0 0' : 24, marginTop: embedded ? 0 : 20 }}>
+      {/* Header — only shown when not embedded (standalone use) */}
+      {!embedded && (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: '#3d3834', margin: 0 }}>
           Food Cost: {recetaNombre}
@@ -133,6 +135,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
           </svg>
         </button>
       </div>
+      )}
 
       {loading ? (
         <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.4, padding: '24px 0', textAlign: 'center' }}>Cargando...</div>

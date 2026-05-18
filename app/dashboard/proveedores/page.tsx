@@ -32,7 +32,7 @@ const columns: ColDef[] = [
   { label: 'Contacto', render: r => r.contact || '-' },
   { label: 'Telefono', render: r => r.phone || '-' },
   { label: 'Email', render: r => r.mail || '-' },
-  { label: 'Por defecto', render: r => r.defecte ? <span className="badge badge-green">Si</span> : <span className="badge badge-gray">No</span> },
+  { label: 'Por defecto', render: r => r.defecte ? <span className="badge badge-green">Sí</span> : <span className="badge badge-gray">No</span> },
 ]
 
 export default function ProveedoresPage() {

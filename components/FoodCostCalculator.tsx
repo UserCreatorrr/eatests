@@ -41,11 +41,23 @@ function foodCostBadge(pct: number) {
   return { label: 'CRITICO', bg: '#fef2f2', color: '#dc2626' }
 }
 
+function effectiveCost(l: Linea): number | null {
+  if (l.ingrediente_id != null) return l.ing_coste ?? l.coste_unitario
+  return l.coste_unitario
+}
+
+function priceDelta(l: Linea): number | null {
+  if (l.ingrediente_id == null || l.coste_unitario == null || l.ing_coste == null) return null
+  if (Math.abs(l.ing_coste - l.coste_unitario) < 0.00005) return null
+  return Math.round(((l.ing_coste - l.coste_unitario) / l.coste_unitario) * 100)
+}
+
 export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta, onClose, embedded }: Props) {
   const [lineas, setLineas] = useState<Linea[]>([])
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [usarLibre, setUsarLibre] = useState(false)
   const [nueva, setNueva] = useState({
     ingrediente_id: '',
@@ -98,6 +110,13 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
     setSaving(false)
   }
 
+  async function syncPrecios() {
+    setSyncing(true)
+    await fetch(`/api/recetas/${recetaId}/sync-prices`, { method: 'POST' })
+    await loadLineas()
+    setSyncing(false)
+  }
+
   function onIngSelect(id: string) {
     const ing = ingredientes.find(i => i.id === parseInt(id))
     setNueva(n => ({
@@ -109,7 +128,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
   }
 
   const costeTotal = lineas.reduce((sum, l) => {
-    const cu = l.coste_unitario ?? l.ing_coste ?? 0
+    const cu = effectiveCost(l) ?? 0
     return sum + (l.cantidad * cu)
   }, 0)
 
@@ -117,6 +136,9 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
   const margen = precioVenta != null ? precioVenta - costeTotal : null
   const margenPct = precioVenta && precioVenta > 0 ? ((precioVenta - costeTotal) / precioVenta) * 100 : null
   const badge = foodCostPct != null ? foodCostBadge(foodCostPct) : null
+
+  const lineasConDelta = lineas.filter(l => priceDelta(l) !== null)
+  const hasPriceChanges = lineasConDelta.length > 0
 
   const tdStyle: React.CSSProperties = { padding: '8px 10px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', borderBottom: '1px solid #f0ebe4' }
   const thStyle: React.CSSProperties = { padding: '6px 10px', fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'left', borderBottom: '1px solid #e8e2db' }
@@ -126,15 +148,41 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
       {/* Header — only shown when not embedded (standalone use) */}
       {!embedded && (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: '#3d3834', margin: 0 }}>
-          Food Cost: {recetaNombre}
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: '#3d3834', margin: 0 }}>
+            Food Cost: {recetaNombre}
+          </h2>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 5, backgroundColor: '#f0f9ff', color: '#0369a1', letterSpacing: '0.05em' }}>
+            PRECIOS VIVOS
+          </span>
+        </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.4, display: 'flex', alignItems: 'center' }}>
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
+      )}
+
+      {/* Price-change notice */}
+      {hasPriceChanges && (
+        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#92400e', margin: '0 0 2px' }}>
+              {lineasConDelta.length} ingrediente{lineasConDelta.length > 1 ? 's' : ''} con precio actualizado
+            </p>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', opacity: 0.7, margin: 0 }}>
+              El food cost refleja los precios actuales del mercado. Sincroniza para guardarlos.
+            </p>
+          </div>
+          <button
+            onClick={syncPrecios}
+            disabled={syncing}
+            style={{ flexShrink: 0, fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '7px 14px', backgroundColor: '#f59e0b', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#fff', opacity: syncing ? 0.6 : 1, whiteSpace: 'nowrap' }}
+          >
+            {syncing ? 'Sincronizando...' : 'Sincronizar precios'}
+          </button>
+        </div>
       )}
 
       {loading ? (
@@ -146,7 +194,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Ingrediente', 'Cantidad', 'Unidad', 'Coste/ud', 'Subtotal', ''].map(h => (
+                  {['Ingrediente', 'Cantidad', 'Unidad', 'Precio/ud', 'Subtotal', ''].map(h => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -160,14 +208,28 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
                   </tr>
                 )}
                 {lineas.map(l => {
-                  const cu = l.coste_unitario ?? l.ing_coste
+                  const cu = effectiveCost(l)
                   const subtotal = cu != null ? l.cantidad * cu : null
+                  const delta = priceDelta(l)
+                  const isLive = l.ingrediente_id != null && l.ing_coste != null
                   return (
                     <tr key={l.id}>
-                      <td style={tdStyle}>{l.ingrediente_id ? (l.ing_nombre || '-') : (l.nombre_libre || '-')}</td>
+                      <td style={tdStyle}>
+                        <span>{l.ingrediente_id ? (l.ing_nombre || '-') : (l.nombre_libre || '-')}</span>
+                        {isLive && (
+                          <span style={{ marginLeft: 5, fontFamily: 'DM Mono, monospace', fontSize: 9, padding: '1px 5px', borderRadius: 4, backgroundColor: '#f0f9ff', color: '#0369a1' }}>live</span>
+                        )}
+                      </td>
                       <td style={tdStyle}>{l.cantidad}</td>
                       <td style={tdStyle}>{l.unidad || l.ing_unidad || '-'}</td>
-                      <td style={tdStyle}>{cu != null ? eur(cu) : '-'}</td>
+                      <td style={tdStyle}>
+                        <span>{cu != null ? eur(cu) : '-'}</span>
+                        {delta !== null && (
+                          <span style={{ marginLeft: 6, fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, backgroundColor: delta > 0 ? '#fef2f2' : '#f0fdf4', color: delta > 0 ? '#dc2626' : '#16a34a' }}>
+                            {delta > 0 ? '+' : ''}{delta}%
+                          </span>
+                        )}
+                      </td>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{subtotal != null ? eur(subtotal) : '-'}</td>
                       <td style={tdStyle}>
                         <button
@@ -241,10 +303,10 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
                 style={{ flex: '0 1 80px', fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '7px 10px', border: '1px solid #e8e2db', borderRadius: 8, backgroundColor: '#fff', color: '#3d3834' }}
               />
               <input
-                type="number" step="0.0001" min="0" placeholder="€/ud"
+                type="number" step="0.0001" min="0" placeholder="€/ud (auto)"
                 value={nueva.coste_unitario}
                 onChange={e => setNueva(n => ({ ...n, coste_unitario: e.target.value }))}
-                style={{ flex: '0 1 90px', fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '7px 10px', border: '1px solid #e8e2db', borderRadius: 8, backgroundColor: '#fff', color: '#3d3834' }}
+                style={{ flex: '0 1 110px', fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '7px 10px', border: '1px solid #e8e2db', borderRadius: 8, backgroundColor: '#fff', color: '#3d3834' }}
               />
               <button
                 onClick={addLinea}

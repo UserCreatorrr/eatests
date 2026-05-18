@@ -358,12 +358,175 @@ const tools: any[] = [
       },
     },
   },
+  // ── GUARDAR ALBARÁN COMPLETO ──────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'guardar_albaran_completo',
+      description: 'Guarda un albarán de compra completo: cabecero + todas las líneas de producto en una sola operación. USAR SIEMPRE al escanear un albarán con foto en vez de guardar_albaran_compra + múltiples guardar_linea_albaran por separado. Extrae TODOS los artículos de la imagen.',
+      parameters: {
+        type: 'object',
+        properties: {
+          vendor:         { type: 'string' },
+          delivery_num:   { type: 'string' },
+          date_delivery:  { type: 'string', description: 'YYYY-MM-DD' },
+          base:           { type: 'number' },
+          taxes:          { type: 'number' },
+          total:          { type: 'number' },
+          nif:            { type: 'string' },
+          lineas: {
+            type: 'array',
+            description: 'Todos los artículos del albarán',
+            items: {
+              type: 'object',
+              properties: {
+                nombre:          { type: 'string' },
+                cantidad:        { type: 'number' },
+                unidad:          { type: 'string' },
+                precio_unitario: { type: 'number' },
+                total_linea:     { type: 'number' },
+              },
+              required: ['nombre'],
+            },
+          },
+        },
+        required: ['vendor'],
+      },
+    },
+  },
+  // ── INFORME SEMANAL ───────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'informe_semanal',
+      description: 'Genera el informe de la semana pasada: gasto de compras vs semana anterior, merma, food cost de recetas, facturas pendientes y subidas de precio. Usar los lunes o cuando el usuario pida el resumen semanal.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  // ── FACTURAS PAGAR ────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'listar_facturas_para_pagar',
+      description: 'Muestra todas las facturas de compra pendientes de pago como una tarjeta interactiva donde el usuario puede marcar cada una como pagada con un clic. Usar cuando el usuario quiera ver, gestionar o pagar facturas pendientes.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'marcar_factura_pagada',
+      description: 'Marca una o varias facturas como pagadas directamente desde el chat, buscando por proveedor, número de factura o ambos. Usar cuando el usuario diga "he pagado", "marca como pagada", "ya pagué a X".',
+      parameters: {
+        type: 'object',
+        properties: {
+          vendor: { type: 'string', description: 'Nombre del proveedor (parcial)' },
+          invoice_num: { type: 'string', description: 'Número de factura exacto' },
+          todas: { type: 'boolean', description: 'Si true, marca TODAS las facturas pendientes como pagadas' },
+        },
+      },
+    },
+  },
+  // ── COMPARAR PRECIOS PROVEEDOR ────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'comparar_precios_proveedor',
+      description: 'Compara el precio de un ingrediente entre todos los proveedores que lo han suministrado, usando el último precio registrado de cada uno. Si no se indica nombre, muestra los ingredientes con mayor diferencia de precio entre proveedores. Usar cuando el usuario pregunte quién cobra más barato, comparativa de precios, ahorro potencial, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          nombre: { type: 'string', description: 'Nombre del ingrediente a comparar. Opcional — si se omite muestra los top oportunidades.' },
+          top: { type: 'number', description: 'Cuántos ingredientes mostrar cuando nombre es null. Default 8.' },
+        },
+      },
+    },
+  },
+  // ── FOOD COST ANÁLISIS ────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'analizar_food_cost_recetas',
+      description: 'Analiza el food cost actual de todas las recetas activas usando precios reales. Identifica las que están por encima del umbral y sugiere ajustes de precio de venta. Usar cuando el usuario pregunte por rentabilidad de platos, food cost alto, qué platos revisar, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          umbral_pct: { type: 'number', description: 'Umbral de food cost % para alertar. Default 33.' },
+        },
+      },
+    },
+  },
+  // ── COMPRA SEMANAL ────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'calcular_compra_semanal',
+      description: 'Calcula la lista de la compra necesaria para producir una serie de platos durante la semana, basándose en los escandallos. Escala cantidades por raciones, aplica merma y agrupa por proveedor con coste estimado. USAR cuando el usuario diga cuántas raciones va a hacer de cada plato esta semana o quiera planificar la producción.',
+      parameters: {
+        type: 'object',
+        properties: {
+          platos: {
+            type: 'array',
+            description: 'Lista de platos con sus raciones planificadas',
+            items: {
+              type: 'object',
+              properties: {
+                nombre: { type: 'string', description: 'Nombre del plato (se busca en el escandallo)' },
+                raciones: { type: 'number', description: 'Número de raciones a producir' },
+              },
+              required: ['nombre', 'raciones'],
+            },
+          },
+        },
+        required: ['platos'],
+      },
+    },
+  },
+  // ── HISTORIAL PRECIO ──────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'historial_precio_ingrediente',
+      description: 'Muestra la evolución del precio de un ingrediente a lo largo del tiempo como gráfico de línea. Usar cuando el usuario pregunta cómo ha evolucionado o subido el precio de un producto concreto.',
+      parameters: {
+        type: 'object',
+        properties: {
+          nombre: { type: 'string', description: 'Nombre del ingrediente o producto' },
+        },
+        required: ['nombre'],
+      },
+    },
+  },
   // ── SELECTOR PEDIDO ───────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'selector_pedido',
       description: 'Muestra al usuario la lista de pedidos pendientes de enviar y todos los proveedores para que elija a quién hacer el pedido y por qué canal (email o WhatsApp). Usar cuando el usuario quiere hacer un pedido sin especificar aún el proveedor.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  // ── SUGERIR ITEMS PEDIDO ──────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'sugerir_items_pedido',
+      description: 'Devuelve los ingredientes específicos (con nombre completo, cantidad sugerida y unidad) que se deberían pedir a un proveedor concreto, basándose en el histórico de albaranes y consumo. SIEMPRE usar antes de proponer_pedido_email o proponer_pedido_whatsapp para obtener items reales — nunca inventes nombres genéricos como "carne" o "pescado".',
+      parameters: {
+        type: 'object',
+        properties: {
+          proveedor_nombre: { type: 'string', description: 'Nombre del proveedor (ej. "Mercabarna Express SL")' },
+        },
+        required: ['proveedor_nombre'],
+      },
+    },
+  },
+  // ── ANALIZAR NECESIDADES PEDIDO ────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'analizar_necesidades_pedido',
+      description: 'Analiza qué ingredientes hace falta reponer (basándose en cuánto tiempo hace que no se piden y el patrón histórico) y los agrupa por proveedor. USAR SIEMPRE cuando el usuario diga "quiero hacer un pedido", "qué tengo que pedir", "haz un pedido", etc. — sin preguntar a qué proveedor. Devuelve la lista de proveedores y los items específicos que necesitan reposición.',
       parameters: { type: 'object', properties: {} },
     },
   },
@@ -427,6 +590,47 @@ const tools: any[] = [
   },
 ]
 
+function checkFoodCostImpact(userId: string, ingredienteName: string): string {
+  const afectadas = db.prepare(`
+    SELECT r.nombre, r.precio_venta,
+           ROUND(SUM(
+             CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
+                  WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
+                  ELSE 0 END
+           ), 4) AS coste_total
+    FROM escandallo_receta r
+    JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
+    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+    WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
+      AND r.id IN (
+        SELECT DISTINCT l2.receta_id FROM escandallo_lineas l2
+        JOIN ingredientes i2 ON i2.id = l2.ingrediente_id
+        WHERE l2.user_id = ? AND i2.descr LIKE ?
+      )
+    GROUP BY r.id
+    HAVING coste_total > 0
+    ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
+  `).all(userId, userId, '%' + ingredienteName + '%') as any[]
+
+  if (!afectadas.length) return ''
+
+  const criticas = afectadas.filter(r => (r.coste_total / r.precio_venta) > 0.35)
+  const warnings = afectadas.filter(r => {
+    const pct = r.coste_total / r.precio_venta
+    return pct > 0.30 && pct <= 0.35
+  })
+
+  if (!criticas.length && !warnings.length) return ''
+
+  const lines: string[] = ['\n\nIMPACTO EN FOOD COST:']
+  for (const r of [...criticas, ...warnings]) {
+    const pct = Math.round((r.coste_total / r.precio_venta) * 100)
+    const nivel = pct > 35 ? 'CRITICO' : 'REVISAR'
+    lines.push(`• ${r.nombre}: ${pct}% food cost [${nivel}]`)
+  }
+  return lines.join('\n')
+}
+
 async function executeTool(name: string, args: any, userId: string): Promise<string> {
   // ── INSERT helpers ─────────────────────────────────────
   const insertMap: Record<string, string> = {
@@ -481,7 +685,14 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const orden = args.orden === 'mas_barato' ? 'ASC' : 'DESC'
     const rows = db.prepare(`SELECT descr, unit, cost FROM ingredientes WHERE user_id=? AND cost>0 ORDER BY cost ${orden} LIMIT ?`).all(userId, n) as any[]
     if (!rows.length) return 'No hay ingredientes con coste registrado.'
-    return rows.map((r, i) => `${i + 1}. ${r.descr} — ${r.cost}€/${r.unit || 'ud'}`).join('\n')
+    const text = rows.map((r: any, i: number) => `${i + 1}. ${r.descr} — ${r.cost}€/${r.unit || 'ud'}`).join('\n')
+    const chart = {
+      tipo: 'bar',
+      titulo: args.orden === 'mas_caro' ? 'Ingredientes más caros' : 'Ingredientes más baratos',
+      datos: rows.slice(0, 8).map((r: any) => ({ label: r.descr, value: r.cost })),
+      unidad: '€',
+    }
+    return `__CHART__${JSON.stringify({ chart, text })}`
   }
 
   // ── BUSCAR PROVEEDOR ───────────────────────────────────
@@ -567,7 +778,15 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       `SELECT vendor, COUNT(*) as pedidos, ROUND(SUM(total),2) as total FROM pedidos_compra WHERE user_id=? ${f} AND vendor IS NOT NULL GROUP BY vendor ORDER BY total DESC LIMIT ?`
     ).all(userId, top) as any[]
     if (!rows.length) return 'No hay datos de pedidos.'
-    return rows.map((r, i) => `${i + 1}. ${r.vendor} — ${r.total || 0}€ (${r.pedidos} pedidos)`).join('\n')
+    const text = rows.map((r: any, i: number) => `${i + 1}. ${r.vendor} — ${r.total || 0}€ (${r.pedidos} pedidos)`).join('\n')
+    const periodoLabel = args.periodo ? args.periodo.replace(/_/g, ' ') : 'histórico'
+    const chart = {
+      tipo: 'bar',
+      titulo: `Gasto por proveedor · ${periodoLabel}`,
+      datos: rows.slice(0, 8).map((r: any) => ({ label: r.vendor, value: r.total || 0 })),
+      unidad: '€',
+    }
+    return `__CHART__${JSON.stringify({ chart, text })}`
   }
 
   // ── INFORME DIARIO ─────────────────────────────────────
@@ -738,8 +957,353 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const rows = db.prepare(q + ' ORDER BY fecha DESC LIMIT 20').all(...params) as any[]
     const total = (db.prepare(`SELECT ROUND(SUM(coste_estimado),2) as t FROM merma_registro WHERE user_id=? AND ${f}`).get(userId) as any).t
     if (!rows.length) return `No hay merma registrada para ${args.periodo || 'este mes'}.`
-    return `Merma ${args.periodo || 'este mes'} — Total: ${total || 0}€\n` +
-      rows.map(r => `• ${r.nombre} | ${r.cantidad || '?'} ${r.unidad || ''} | ${r.motivo} | ${r.coste_estimado ? r.coste_estimado + '€' : '-'} | ${r.fecha}`).join('\n')
+    const text = `Merma ${args.periodo || 'este mes'} — Total: ${total || 0}€\n` +
+      rows.map((r: any) => `• ${r.nombre} | ${r.cantidad || '?'} ${r.unidad || ''} | ${r.motivo} | ${r.coste_estimado ? r.coste_estimado + '€' : '-'} | ${r.fecha}`).join('\n')
+    // Chart: top products by cost
+    const byProduct: Record<string, number> = {}
+    for (const r of rows as any[]) {
+      byProduct[r.nombre] = (byProduct[r.nombre] || 0) + (r.coste_estimado || 0)
+    }
+    const chartDatos = Object.entries(byProduct)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([label, value]) => ({ label, value: Math.round(value * 100) / 100 }))
+    if (chartDatos.length > 1) {
+      const chart = {
+        tipo: 'bar',
+        titulo: `Merma por producto · ${args.periodo || 'este mes'}`,
+        datos: chartDatos,
+        unidad: '€',
+      }
+      return `__CHART__${JSON.stringify({ chart, text })}`
+    }
+    return text
+  }
+
+  // ── GUARDAR ALBARÁN COMPLETO ──────────────────────────────
+  if (name === 'guardar_albaran_completo') {
+    try {
+      const { vendor, delivery_num, date_delivery, base, taxes, total, nif, lineas = [] } = args
+      const fecha = date_delivery ?? new Date().toISOString().split('T')[0]
+
+      const albaran = db.prepare(
+        `INSERT INTO albaranes_compra (user_id, vendor, delivery_num, date_delivery, base, taxes, total, nif) VALUES (?,?,?,?,?,?,?,?)`
+      ).run(userId, vendor ?? null, delivery_num ?? null, fecha, base ?? null, taxes ?? null, total ?? null, nif ?? null)
+
+      const priceChanges: { nombre: string; precio_anterior: number | null; precio_nuevo: number; diff_pct: number | null; recetas_afectadas: string[] }[] = []
+
+      const tx = db.transaction(() => {
+        for (const l of lineas as any[]) {
+          const { nombre, cantidad, unidad, precio_unitario, total_linea } = l
+          if (!nombre) continue
+          db.prepare(`INSERT INTO lineas_albaran_compra (user_id, vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha) VALUES (?,?,?,?,?,?,?,?)`)
+            .run(userId, vendor ?? null, nombre, cantidad ?? null, unidad ?? null, precio_unitario ?? null, total_linea ?? null, fecha)
+          if (precio_unitario != null) {
+            const prev = db.prepare(`SELECT precio FROM precio_historial WHERE user_id=? AND nombre LIKE ? ORDER BY id DESC LIMIT 1`).get(userId, '%' + nombre + '%') as any
+            db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente) VALUES (?,?,?,?,?,?)`).run(userId, nombre, vendor ?? null, precio_unitario, unidad ?? null, 'albaran')
+            const ing = db.prepare(`SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1`).get(userId, '%' + nombre + '%') as any
+            if (ing) db.prepare(`UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?`).run(precio_unitario, ing.id, userId)
+            const prevPrice = prev?.precio ?? null
+            const diffPct = prevPrice && prevPrice > 0 ? Math.round(((precio_unitario - prevPrice) / prevPrice) * 100) : null
+            // Find affected recipes
+            const recetas = ing ? db.prepare(`SELECT r.nombre FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id WHERE l.ingrediente_id=? AND r.user_id=? AND r.activo=1`).all(ing.id, userId) as any[] : []
+            priceChanges.push({ nombre, precio_anterior: prevPrice, precio_nuevo: precio_unitario, diff_pct: diffPct, recetas_afectadas: recetas.map(r => r.nombre) })
+          }
+        }
+      })
+      tx()
+
+      const foodCostImpact = checkFoodCostImpact(userId, (lineas as any[]).map((l: any) => l.nombre).join(','))
+
+      return `__ALBARAN_GUARDADO__${JSON.stringify({
+        albaran_id: albaran.lastInsertRowid,
+        vendor, delivery_num, date_delivery: fecha, base, taxes, total,
+        lineas: args.lineas || [],
+        price_changes: priceChanges,
+        food_cost_impact: foodCostImpact.trim(),
+      })}`
+    } catch (e: any) { return `Error: ${e.message}` }
+  }
+
+  // ── INFORME SEMANAL ───────────────────────────────────────
+  if (name === 'informe_semanal') {
+    const gastoSemana = (db.prepare(`SELECT ROUND(SUM(total),2) as t, COUNT(*) as c FROM pedidos_compra WHERE user_id=? AND date(date_order)>=date('now','-7 days')`).get(userId) as any)
+    const gastoSemAnt = (db.prepare(`SELECT ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND date(date_order) BETWEEN date('now','-14 days') AND date('now','-8 days')`).get(userId) as any)
+    const variacion = gastoSemAnt.t > 0 ? Math.round(((gastoSemana.t - gastoSemAnt.t) / gastoSemAnt.t) * 100) : null
+
+    const topProv = db.prepare(`SELECT vendor, ROUND(SUM(total),2) as t FROM pedidos_compra WHERE user_id=? AND date(date_order)>=date('now','-7 days') GROUP BY vendor ORDER BY t DESC LIMIT 3`).all(userId) as any[]
+
+    const merma = (db.prepare(`SELECT ROUND(SUM(coste_estimado),2) as t, COUNT(*) as n FROM merma_registro WHERE user_id=? AND date(fecha)>=date('now','-7 days')`).get(userId) as any)
+    const topMerma = db.prepare(`SELECT nombre, ROUND(SUM(coste_estimado),2) as t FROM merma_registro WHERE user_id=? AND date(fecha)>=date('now','-7 days') GROUP BY nombre ORDER BY t DESC LIMIT 3`).all(userId) as any[]
+
+    const facVenc = (db.prepare(`SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL) AND date_due<date('now')`).get(userId) as any)
+    const facPend = (db.prepare(`SELECT COUNT(*) as c, ROUND(SUM(total),2) as t FROM facturas_compra WHERE user_id=? AND (paid=0 OR paid IS NULL)`).get(userId) as any)
+
+    const preciosSemana = db.prepare(`SELECT nombre, precio, vendor FROM precio_historial WHERE user_id=? AND date(fecha)>=date('now','-7 days') ORDER BY nombre, id ASC`).all(userId) as any[]
+    const precMap: Record<string, { first: number; last: number; vendor: string }> = {}
+    for (const p of preciosSemana) {
+      if (!precMap[p.nombre]) precMap[p.nombre] = { first: p.precio, last: p.precio, vendor: p.vendor }
+      precMap[p.nombre].last = p.precio
+    }
+    const subidas = Object.entries(precMap).filter(([, v]) => v.first > 0 && ((v.last - v.first) / v.first) > 0.05).sort((a, b) => ((b[1].last - b[1].first) / b[1].first) - ((a[1].last - a[1].first) / a[1].first)).slice(0, 4)
+
+    const recetasCrit = db.prepare(`SELECT r.nombre, r.precio_venta, ROUND(SUM(CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad*i.cost WHEN l.coste_unitario IS NOT NULL THEN l.cantidad*l.coste_unitario ELSE 0 END),4) AS coste FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id AND l.user_id=r.user_id LEFT JOIN ingredientes i ON i.id=l.ingrediente_id WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0 GROUP BY r.id HAVING CAST(coste AS REAL)/r.precio_venta>0.35 ORDER BY CAST(coste AS REAL)/r.precio_venta DESC LIMIT 4`).all(userId) as any[]
+
+    const semana = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+    return `__INFORME_SEMANAL__${JSON.stringify({
+      fecha: semana,
+      gasto: { total: gastoSemana.t || 0, pedidos: gastoSemana.c || 0, variacion, top: topProv },
+      merma: { total: merma.t || 0, eventos: merma.n || 0, top: topMerma },
+      facturas: { vencidas_c: facVenc.c, vencidas_t: facVenc.t || 0, pendientes_c: facPend.c, pendientes_t: facPend.t || 0 },
+      precios_subida: subidas.map(([n, v]) => ({ nombre: n, diff_pct: Math.round(((v.last - v.first) / v.first) * 100), precio: v.last, vendor: v.vendor })),
+      food_cost_critico: recetasCrit.map(r => ({ nombre: r.nombre, pct: Math.round((r.coste / r.precio_venta) * 100) })),
+    })}`
+  }
+
+  // ── FACTURAS PAGAR ────────────────────────────────────────
+  if (name === 'listar_facturas_para_pagar') {
+    const facturas = db.prepare(`
+      SELECT id, invoice_num, vendor, total, date_due, date_invoice, base, taxes, comment
+      FROM facturas_compra
+      WHERE user_id = ? AND (paid = 0 OR paid IS NULL)
+      ORDER BY date_due ASC NULLS LAST
+      LIMIT 40
+    `).all(userId) as any[]
+    if (!facturas.length) return '__FACTURAS_PAGAR__' + JSON.stringify({ facturas: [] })
+    const today = new Date().toISOString().split('T')[0]
+    const enriched = facturas.map((f: any) => ({
+      ...f,
+      vencida: f.date_due && f.date_due < today,
+      dias_vencida: f.date_due ? Math.floor((Date.now() - new Date(f.date_due).getTime()) / 86400000) : null,
+    }))
+    return '__FACTURAS_PAGAR__' + JSON.stringify({ facturas: enriched })
+  }
+
+  if (name === 'marcar_factura_pagada') {
+    let q = 'UPDATE facturas_compra SET paid=1 WHERE user_id=? AND (paid=0 OR paid IS NULL)'
+    const params: any[] = [userId]
+    if (args.todas) { /* no extra filter */ }
+    else if (args.vendor && args.invoice_num) { q += ' AND vendor LIKE ? AND invoice_num=?'; params.push('%' + args.vendor + '%', args.invoice_num) }
+    else if (args.vendor) { q += ' AND vendor LIKE ?'; params.push('%' + args.vendor + '%') }
+    else if (args.invoice_num) { q += ' AND invoice_num=?'; params.push(args.invoice_num) }
+    else return 'Necesito al menos el proveedor o el número de factura.'
+    const r = db.prepare(q).run(...params)
+    return r.changes > 0
+      ? `${r.changes} factura${r.changes > 1 ? 's' : ''} marcada${r.changes > 1 ? 's' : ''} como pagada${r.changes > 1 ? 's' : ''}.`
+      : 'No encontré facturas pendientes con esos criterios.'
+  }
+
+  // ── COMPARAR PRECIOS PROVEEDOR ────────────────────────────
+  if (name === 'comparar_precios_proveedor') {
+    // Latest price per ingredient + vendor
+    const rows = db.prepare(`
+      SELECT ph.nombre, ph.vendor, ph.precio, ph.unidad, ph.fecha
+      FROM precio_historial ph
+      WHERE ph.user_id = ?
+        AND ph.vendor IS NOT NULL
+        AND ph.id = (
+          SELECT MAX(ph2.id) FROM precio_historial ph2
+          WHERE ph2.user_id = ph.user_id AND ph2.nombre = ph.nombre AND ph2.vendor = ph.vendor
+        )
+      ${args.nombre ? 'AND ph.nombre LIKE ?' : ''}
+      ORDER BY ph.nombre, ph.precio ASC
+    `).all(...(args.nombre ? [userId, '%' + args.nombre + '%'] : [userId])) as any[]
+
+    if (!rows.length) return args.nombre
+      ? `No hay historial de precios para "${args.nombre}" con proveedor registrado.`
+      : 'No hay historial de precios con proveedor registrado aún.'
+
+    // Group by ingredient
+    const byIng: Record<string, { vendor: string; precio: number; unidad: string | null; fecha: string }[]> = {}
+    for (const r of rows) {
+      if (!byIng[r.nombre]) byIng[r.nombre] = []
+      byIng[r.nombre].push({ vendor: r.vendor, precio: r.precio, unidad: r.unidad, fecha: r.fecha })
+    }
+
+    // Only keep ingredients with 2+ vendors
+    const comparables = Object.entries(byIng)
+      .filter(([, vs]) => vs.length >= 2)
+      .map(([nombre, vs]) => {
+        const sorted = [...vs].sort((a, b) => a.precio - b.precio)
+        const min = sorted[0]
+        const max = sorted[sorted.length - 1]
+        const diffPct = Math.round(((max.precio - min.precio) / min.precio) * 100)
+        return { nombre, vendors: sorted, min, max, diffPct }
+      })
+      .sort((a, b) => b.diffPct - a.diffPct)
+
+    if (!comparables.length) {
+      if (args.nombre) return `Solo hay un proveedor con precio registrado para "${args.nombre}". Necesitas comprar a dos o más para comparar.`
+      return 'No hay ingredientes comprados a dos o más proveedores distintos aún.'
+    }
+
+    // Single ingredient → return bar chart
+    if (args.nombre && comparables.length === 1) {
+      const ing = comparables[0]
+      const text = `Comparativa de precio para ${ing.nombre}:\n` +
+        ing.vendors.map((v, i) => `${i + 1}. ${v.vendor}: ${v.precio}€/${v.unidad || 'ud'} (${v.fecha})`).join('\n') +
+        `\n\nMás barato: ${ing.min.vendor} (${ing.min.precio}€)\nMás caro: ${ing.max.vendor} (${ing.max.precio}€)\nDiferencia: ${ing.diffPct}%`
+      const chart = {
+        tipo: 'bar',
+        titulo: `Precio de ${ing.nombre} por proveedor`,
+        datos: ing.vendors.map(v => ({ label: v.vendor, value: v.precio })),
+        unidad: `€/${ing.vendors[0].unidad || 'ud'}`,
+      }
+      return `__CHART__${JSON.stringify({ chart, text })}`
+    }
+
+    // Multiple ingredients → text table of top opportunities
+    const top = args.top || 8
+    const lista = comparables.slice(0, top)
+    const text = `Top oportunidades de ahorro por proveedor:\n\n` +
+      lista.map(ing => {
+        const vendors = ing.vendors.map(v => `${v.vendor} ${v.precio}€`).join(' · ')
+        return `• ${ing.nombre}: ${vendors} → ${ing.min.vendor} es ${ing.diffPct}% más barato`
+      }).join('\n')
+    return text
+  }
+
+  // ── ANALIZAR FOOD COST RECETAS ────────────────────────────
+  if (name === 'analizar_food_cost_recetas') {
+    const umbral = (args.umbral_pct || 33) / 100
+    const recetas = db.prepare(`
+      SELECT r.nombre, r.precio_venta, r.raciones,
+             ROUND(SUM(
+               CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
+                    WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
+                    ELSE 0 END
+             ), 4) AS coste_total
+      FROM escandallo_receta r
+      JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
+      LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+      WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
+      GROUP BY r.id
+      ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
+    `).all(userId) as any[]
+
+    if (!recetas.length) return 'No hay recetas con precio de venta definido.'
+
+    const result = recetas.map(r => {
+      const pct = Math.round((r.coste_total / r.precio_venta) * 100)
+      const nivel = pct > 40 ? 'CRITICO' : pct > 33 ? 'REVISAR' : pct > 28 ? 'ACEPTABLE' : 'EXCELENTE'
+      const pvSugerido = r.coste_total > 0 ? Math.ceil(r.coste_total / 0.30 * 100) / 100 : null
+      return `• ${r.nombre}: coste ${r.coste_total}€ / PVP ${r.precio_venta}€ → ${pct}% [${nivel}]${nivel !== 'EXCELENTE' && nivel !== 'ACEPTABLE' && pvSugerido ? ` — PVP sugerido: ${pvSugerido}€` : ''}`
+    })
+
+    const criticas = recetas.filter(r => (r.coste_total / r.precio_venta) > umbral)
+    const header = `Food cost por receta (precios actuales):\n`
+    const footer = criticas.length > 0
+      ? `\n\n${criticas.length} receta${criticas.length > 1 ? 's' : ''} por encima del ${Math.round(umbral * 100)}%.`
+      : `\n\nTodas las recetas están dentro del umbral del ${Math.round(umbral * 100)}%.`
+
+    return header + result.join('\n') + footer
+  }
+
+  // ── CALCULAR COMPRA SEMANAL ───────────────────────────────
+  if (name === 'calcular_compra_semanal') {
+    const platos = (args.platos || []) as { nombre: string; raciones: number }[]
+    const resultado: any[] = []
+
+    for (const plato of platos) {
+      const receta = db.prepare(
+        `SELECT id, nombre, raciones, merma_pct FROM escandallo_receta WHERE user_id=? AND nombre LIKE ? AND activo=1 LIMIT 1`
+      ).get(userId, '%' + plato.nombre + '%') as any
+
+      if (!receta) { resultado.push({ nombre: plato.nombre, raciones: plato.raciones, encontrada: false, lineas: [] }); continue }
+
+      const lineas = db.prepare(`
+        SELECT l.nombre_libre, l.cantidad, l.unidad, l.coste_unitario,
+               i.descr AS ing_nombre, i.cost AS ing_coste, i.unit AS ing_unidad,
+               p.descr AS proveedor_nombre, p.mail AS proveedor_email, p.phone AS proveedor_phone
+        FROM escandallo_lineas l
+        LEFT JOIN ingredientes i ON l.ingrediente_id = i.id
+        LEFT JOIN proveedores p ON p.id = i.proveedor_id
+        WHERE l.receta_id=? AND l.user_id=?
+      `).all(receta.id, userId) as any[]
+
+      const mermaFactor = 1 + ((receta.merma_pct || 0) / 100)
+      const ratio = plato.raciones / (receta.raciones || 1)
+
+      resultado.push({
+        nombre: receta.nombre,
+        raciones: plato.raciones,
+        encontrada: true,
+        lineas: lineas.map((l: any) => ({
+          nombre: l.ing_nombre || l.nombre_libre || 'Ingrediente',
+          cantidad: Math.round(l.cantidad * ratio * mermaFactor * 1000) / 1000,
+          unidad: l.unidad || l.ing_unidad || null,
+          coste_unitario: l.ing_coste ?? l.coste_unitario ?? null,
+          proveedor: l.proveedor_nombre || null,
+          proveedor_email: l.proveedor_email || null,
+          proveedor_phone: l.proveedor_phone || null,
+          receta: receta.nombre,
+        })),
+      })
+    }
+
+    const platosEncontrados = resultado.filter(p => p.encontrada)
+    if (!platosEncontrados.length) {
+      const nombres = platos.map(p => p.nombre).join(', ')
+      return `No encontré ninguna de las recetas: ${nombres}. Comprueba que están en el escandallo.`
+    }
+
+    // Agrupar por proveedor, sumando cantidades del mismo ingrediente
+    const grupos: Record<string, { proveedor: any; itemsMap: Record<string, any> }> = {}
+    const sinProveedorMap: Record<string, any> = {}
+
+    for (const plato of platosEncontrados) {
+      for (const linea of plato.lineas) {
+        const key = linea.nombre.toLowerCase()
+        if (!linea.proveedor) {
+          if (!sinProveedorMap[key]) sinProveedorMap[key] = { ...linea, recetas: [] }
+          sinProveedorMap[key].cantidad = Math.round((sinProveedorMap[key].cantidad + linea.cantidad) * 1000) / 1000
+          if (!sinProveedorMap[key].recetas.includes(linea.receta)) sinProveedorMap[key].recetas.push(linea.receta)
+        } else {
+          if (!grupos[linea.proveedor]) grupos[linea.proveedor] = { proveedor: { nombre: linea.proveedor, email: linea.proveedor_email, phone: linea.proveedor_phone }, itemsMap: {} }
+          if (!grupos[linea.proveedor].itemsMap[key]) grupos[linea.proveedor].itemsMap[key] = { ...linea, recetas: [] }
+          grupos[linea.proveedor].itemsMap[key].cantidad = Math.round((grupos[linea.proveedor].itemsMap[key].cantidad + linea.cantidad) * 1000) / 1000
+          if (!grupos[linea.proveedor].itemsMap[key].recetas.includes(linea.receta)) grupos[linea.proveedor].itemsMap[key].recetas.push(linea.receta)
+        }
+      }
+    }
+
+    const gruposArr = Object.values(grupos).map(g => {
+      const items = Object.values(g.itemsMap).map((item: any) => ({
+        ...item,
+        subtotal: item.coste_unitario ? Math.round(item.cantidad * item.coste_unitario * 100) / 100 : null,
+      }))
+      const coste_total = items.reduce((s: number, i: any) => s + (i.subtotal ?? 0), 0)
+      return { proveedor: g.proveedor, items, coste_total: Math.round(coste_total * 100) / 100 }
+    })
+
+    const sinProveedor = Object.values(sinProveedorMap)
+    const coste_total_estimado = gruposArr.reduce((s, g) => s + g.coste_total, 0)
+
+    return `__COMPRA_SEMANAL__${JSON.stringify({
+      platos: resultado,
+      grupos: gruposArr,
+      sinProveedor,
+      coste_total_estimado: Math.round(coste_total_estimado * 100) / 100,
+    })}`
+  }
+
+  // ── HISTORIAL PRECIO INGREDIENTE ─────────────────────────
+  if (name === 'historial_precio_ingrediente') {
+    const rows = db.prepare(
+      `SELECT precio, fecha, vendor FROM precio_historial WHERE user_id=? AND nombre LIKE ? ORDER BY fecha ASC LIMIT 30`
+    ).all(userId, '%' + args.nombre + '%') as any[]
+    if (rows.length < 2) return `No hay suficiente historial de precios para "${args.nombre}".`
+    const first = rows[0]
+    const last = rows[rows.length - 1]
+    const cambio = first.precio > 0 ? Math.round(((last.precio - first.precio) / first.precio) * 100) : 0
+    const text = `Historial de precio: ${args.nombre}\nPrimero: ${first.precio}€ (${first.fecha}) → Último: ${last.precio}€ (${last.fecha})\nVariación: ${cambio > 0 ? '+' : ''}${cambio}%`
+    const chart = {
+      tipo: 'line',
+      titulo: `Evolución precio · ${args.nombre}`,
+      datos: rows.map((r: any) => ({ label: r.fecha, value: r.precio })),
+      unidad: '€',
+    }
+    return `__CHART__${JSON.stringify({ chart, text })}`
   }
 
   // ── REGISTRAR PRECIO HISTORIAL ────────────────────────────
@@ -751,7 +1315,8 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       // Also update ingredientes cost if match found
       const ing = db.prepare('SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
       if (ing) db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(precio, ing.id, userId)
-      return `Precio registrado: ${nombre} → ${precio}€${unidad ? '/' + unidad : ''}${vendor ? ' (' + vendor + ')' : ''}`
+      const impacto = checkFoodCostImpact(userId, nombre)
+      return `Precio registrado: ${nombre} → ${precio}€${unidad ? '/' + unidad : ''}${vendor ? ' (' + vendor + ')' : ''}${impacto}`
     } catch (e: any) { return `Error: ${e.message}` }
   }
 
@@ -768,7 +1333,8 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
         const ing = db.prepare('SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
         if (ing) db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(precio_unitario, ing.id, userId)
       }
-      return `Línea guardada: ${nombre} × ${cantidad || '?'} ${unidad || ''} a ${precio_unitario || '?'}€`
+      const impacto = precio_unitario ? checkFoodCostImpact(userId, nombre) : ''
+      return `Línea guardada: ${nombre} × ${cantidad || '?'} ${unidad || ''} a ${precio_unitario || '?'}€${impacto}`
     } catch (e: any) { return `Error: ${e.message}` }
   }
 
@@ -822,6 +1388,114 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     ).all(userId) as any[])
 
     return `__PEDIDO_SELECTOR__${JSON.stringify({ pedidosPorProveedor, pendientes, proveedores })}`
+  }
+
+  // ── SUGERIR ITEMS PEDIDO ──────────────────────────────────
+  if (name === 'sugerir_items_pedido') {
+    const provNombre = (args.proveedor_nombre || '').trim()
+    if (!provNombre) return 'Necesito el nombre del proveedor.'
+
+    // Average quantity from last 6 months of albaran lines for this vendor
+    const lineas = db.prepare(`
+      SELECT nombre, unidad,
+             ROUND(AVG(cantidad), 2) AS avg_cant,
+             COUNT(*) AS veces,
+             MAX(fecha) AS ultima
+      FROM lineas_albaran_compra
+      WHERE user_id=? AND vendor LIKE ?
+      GROUP BY nombre, unidad
+      ORDER BY veces DESC, ultima DESC
+      LIMIT 15
+    `).all(userId, '%' + provNombre + '%') as any[]
+
+    // Fallback: ingredients assigned to this provider (no history yet)
+    const asignados = db.prepare(`
+      SELECT i.descr AS nombre, i.unit AS unidad, i.cost
+      FROM ingredientes i
+      JOIN proveedores p ON p.id = i.proveedor_id
+      WHERE i.user_id=? AND p.descr LIKE ?
+      ORDER BY i.descr
+      LIMIT 20
+    `).all(userId, '%' + provNombre + '%') as any[]
+
+    if (!lineas.length && !asignados.length) {
+      return `No tengo datos de pedidos previos ni ingredientes asignados a "${provNombre}". Pregunta al usuario qué quiere pedir.`
+    }
+
+    // Merge: history first (with avg quantities), then assigned ingredients not yet in history
+    const seen = new Set(lineas.map(l => l.nombre.toLowerCase()))
+    const sugerencias = [
+      ...lineas.map(l => ({ nombre: l.nombre, cantidad: l.avg_cant, unidad: l.unidad, fuente: `histórico (${l.veces}x, última ${l.ultima})` })),
+      ...asignados.filter(a => !seen.has(a.nombre.toLowerCase())).map(a => ({ nombre: a.nombre, cantidad: null, unidad: a.unidad, fuente: 'asignado (sin histórico)' })),
+    ]
+
+    return `Items sugeridos para ${provNombre} (basado en histórico real):\n` +
+      sugerencias.map(s => `• ${s.nombre} — ${s.cantidad ?? '?'} ${s.unidad || 'ud'} [${s.fuente}]`).join('\n') +
+      `\n\nUSA ESTOS NOMBRES EXACTOS al proponer el pedido. Ajusta cantidades si el usuario lo indica.`
+  }
+
+  // ── ANALIZAR NECESIDADES PEDIDO ────────────────────────────
+  if (name === 'analizar_necesidades_pedido') {
+    // For each ingredient with vendor, find last delivery date and average qty
+    const items = db.prepare(`
+      SELECT
+        i.descr        AS nombre,
+        i.unit         AS unidad,
+        i.type         AS tipo,
+        p.descr        AS proveedor,
+        p.mail         AS proveedor_email,
+        p.phone        AS proveedor_phone,
+        (SELECT MAX(l.fecha) FROM lineas_albaran_compra l
+           WHERE l.user_id=i.user_id AND l.nombre = i.descr)        AS ultima_fecha,
+        (SELECT ROUND(AVG(l.cantidad), 2) FROM lineas_albaran_compra l
+           WHERE l.user_id=i.user_id AND l.nombre = i.descr)        AS cant_media
+      FROM ingredientes i
+      JOIN proveedores p ON p.id = i.proveedor_id
+      WHERE i.user_id=?
+      ORDER BY p.descr, i.descr
+    `).all(userId) as any[]
+
+    const today = new Date()
+    // Reorder thresholds (days since last delivery)
+    const freshTypes = new Set(['Pescado','Marisco','Carne','Verdura','Hongo','Lácteo','Fruta','Hierba','Charcutería','Panadería'])
+    const dryThreshold = 30
+    const freshThreshold = 7
+
+    const needsReorder: Record<string, { proveedor: any; items: any[] }> = {}
+
+    for (const it of items) {
+      const isFresh = freshTypes.has(it.tipo)
+      const threshold = isFresh ? freshThreshold : dryThreshold
+      let daysSince = 999
+      if (it.ultima_fecha) {
+        const last = new Date(it.ultima_fecha)
+        daysSince = Math.floor((today.getTime() - last.getTime()) / 86400000)
+      }
+      if (daysSince < threshold) continue // No hace falta reponer aún
+
+      // Suggested qty = historical avg or 1 unit fallback
+      const cant = it.cant_media || 1
+
+      if (!needsReorder[it.proveedor]) {
+        needsReorder[it.proveedor] = {
+          proveedor: { nombre: it.proveedor, email: it.proveedor_email, phone: it.proveedor_phone },
+          items: [],
+        }
+      }
+      needsReorder[it.proveedor].items.push({
+        nombre: it.nombre,
+        cantidad: cant,
+        unidad: it.unidad,
+        dias_sin_pedir: daysSince === 999 ? 'nunca' : daysSince,
+      })
+    }
+
+    const grupos = Object.values(needsReorder)
+    if (!grupos.length) {
+      return 'Todos los ingredientes están dentro de su ciclo de pedido habitual. No hace falta reponer nada urgente.'
+    }
+
+    return `__NECESIDADES_PEDIDO__${JSON.stringify({ grupos })}`
   }
 
   // ── PROPONER PEDIDO WHATSAPP ──────────────────────────────
@@ -899,13 +1573,27 @@ Ingredientes: ${ctx.counts.ingredientes} (${ctx.counts.ing_sin_proveedor} sin pr
 REGLAS:
 - Responde en español, directo y conciso. Listas markdown, nunca párrafos.
 - Precios en euros. USA LAS HERRAMIENTAS para consultar datos — no inventes ni adivines.
-- FOTO albarán/factura → extrae todo en tabla markdown, pregunta si guardar. Si confirma → guardar_albaran_compra / guardar_factura_compra.
+- FOTO albarán → usa guardar_albaran_completo con TODAS las líneas en una sola llamada (vendor, delivery_num, fecha, líneas con nombre/cantidad/unidad/precio_unitario/total_linea). NUNCA uses guardar_albaran_compra + guardar_linea_albaran por separado al escanear.
+- FOTO factura → extrae todo en tabla markdown, pregunta si guardar. Si confirma → guardar_factura_compra.
+- "informe semanal/resumen de la semana/qué tal la semana/balance semanal" (especialmente los lunes) → informe_semanal
 - "resumen/informe/cómo estamos/brief" → informe_diario
-- "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor
+- "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor (genera gráfico automáticamente)
+- "ingredientes más caros/baratos" → top_ingredientes_coste (genera gráfico)
+- "food cost/rentabilidad/qué platos revisar/margen de platos" → analizar_food_cost_recetas
+- "quién cobra más barato/comparativa precios/ahorro proveedor/precio X entre proveedores" → comparar_precios_proveedor
+- "facturas pendientes/qué debo pagar/pagar facturas" → listar_facturas_para_pagar
+- "he pagado/marca como pagada/ya pagué a X" → marcar_factura_pagada
+- "merma/pérdidas" → ver_merma (genera gráfico si hay datos suficientes)
+- "evolución/precio/ha subido X" → historial_precio_ingrediente (genera gráfico de línea)
 - "busca/qué ingredientes/cuáles" → buscar_ingrediente
-- PEDIDOS — OBLIGATORIO: cualquier intención de pedir (carnes, verduras, compras, hacer un pedido...) → selector_pedido SIEMPRE. Jamás respondas con texto listando proveedores.
-- Email a proveedor concreto → proponer_pedido_email con sus productos asignados
-- WhatsApp → proponer_pedido_whatsapp. INTEGRADO — SÍ PUEDES. Jamás digas que no puedes.`
+- "esta semana hago/voy a hacer/planificar producción/cuánto tengo que pedir para X raciones" → calcular_compra_semanal con los platos y raciones mencionados
+- PEDIDOS — flujo obligatorio cuando el usuario diga "quiero pedir/hacer un pedido/qué tengo que pedir/repón":
+  1. JAMÁS preguntes "qué proveedor". Llama YA a analizar_necesidades_pedido — genera una tarjeta interactiva con botones por proveedor.
+  2. El usuario verá los artículos por proveedor y podrá elegir Email, WhatsApp, Más tarde o Eliminar directamente en la tarjeta. NO hace falta preguntar por el canal.
+- Si el usuario YA especifica un proveedor concreto: salta a sugerir_items_pedido({proveedor_nombre}) y luego al proponer_pedido_*.
+- selector_pedido SOLO si el usuario pide explícitamente "muéstrame los proveedores" o "quiero elegir manualmente".
+- PROHIBIDO usar nombres genéricos ("carne", "pescado", "verduras", "fruta") en items de pedido. SIEMPRE nombres específicos del catálogo: "Salmón fresco (lomo)", "Solomillo de ternera", "Tomate rama madurado", etc.
+- WhatsApp INTEGRADO — SÍ PUEDES. Jamás digas que no puedes.`
 
   const chatMessages: any[] = messages.map((m: any) => ({ role: m.role, content: m.content }))
 
@@ -949,6 +1637,12 @@ REGLAS:
   let whatsappProposal: any = null
   let briefCards: any = null
   let pedidoSelector: any = null
+  let necesidadesPedido: any = null
+  let compraSemanal: any = null
+  let facturasPagar: any = null
+  let chartData: any = null
+  let albaranGuardado: any = null
+  let informeSemanal: any = null
 
   for (const tc of toolCalls) {
     const args = JSON.parse(tc.function.arguments)
@@ -965,15 +1659,39 @@ REGLAS:
     } else if (result.startsWith('__PEDIDO_SELECTOR__')) {
       pedidoSelector = JSON.parse(result.slice('__PEDIDO_SELECTOR__'.length))
       results.push('Selector de pedido generado.')
+    } else if (result.startsWith('__NECESIDADES_PEDIDO__')) {
+      necesidadesPedido = JSON.parse(result.slice('__NECESIDADES_PEDIDO__'.length))
+      results.push('Análisis de necesidades generado.')
+    } else if (result.startsWith('__FACTURAS_PAGAR__')) {
+      facturasPagar = JSON.parse(result.slice('__FACTURAS_PAGAR__'.length))
+      results.push('Lista de facturas pendientes generada.')
+    } else if (result.startsWith('__COMPRA_SEMANAL__')) {
+      compraSemanal = JSON.parse(result.slice('__COMPRA_SEMANAL__'.length))
+      results.push('Lista de la compra semanal generada.')
+    } else if (result.startsWith('__ALBARAN_GUARDADO__')) {
+      albaranGuardado = JSON.parse(result.slice('__ALBARAN_GUARDADO__'.length))
+      results.push('Albarán guardado.')
+    } else if (result.startsWith('__INFORME_SEMANAL__')) {
+      informeSemanal = JSON.parse(result.slice('__INFORME_SEMANAL__'.length))
+      results.push('Informe semanal generado.')
+    } else if (result.startsWith('__CHART__')) {
+      const parsed = JSON.parse(result.slice('__CHART__'.length))
+      chartData = parsed.chart
+      results.push(parsed.text)
     } else {
       results.push(result)
     }
   }
 
   // Visual cards → return immediately, no follow-up needed
-  if (briefCards)     return NextResponse.json({ reply: '', action: toolNames, briefCards })
-  if (pedidoSelector) return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
-  if (whatsappProposal) return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
+  if (briefCards)          return NextResponse.json({ reply: '', action: toolNames, briefCards })
+  if (pedidoSelector)      return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
+  if (necesidadesPedido)   return NextResponse.json({ reply: '', action: toolNames, necesidadesPedido })
+  if (compraSemanal)       return NextResponse.json({ reply: '', action: toolNames, compraSemanal })
+  if (facturasPagar)       return NextResponse.json({ reply: '', action: toolNames, facturasPagar })
+  if (albaranGuardado)     return NextResponse.json({ reply: '', action: toolNames, albaranGuardado })
+  if (informeSemanal)      return NextResponse.json({ reply: '', action: toolNames, informeSemanal })
+  if (whatsappProposal)    return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
 
   // Simple CRUD tools → return result directly, no follow-up LLM call
   const allSimple = toolCalls.every((tc: any) => SIMPLE_TOOLS.has(tc.function.name))
@@ -1000,5 +1718,5 @@ REGLAS:
   })
 
   const reply = followUp.choices[0]?.message?.content || results.join('\n')
-  return NextResponse.json({ reply, action: toolNames, emailProposal })
+  return NextResponse.json({ reply, action: toolNames, emailProposal, chartData: chartData || undefined })
 }

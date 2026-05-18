@@ -65,14 +65,40 @@ interface PedidoSelectorData {
   proveedores: ProveedorSelectorItem[]
 }
 
+interface NecesidadItem {
+  nombre: string
+  cantidad: number | null
+  unidad: string | null
+  dias_sin_pedir: number | 'nunca'
+}
+
+interface NecesidadGrupo {
+  proveedor: {
+    nombre: string
+    email: string | null
+    phone: string | null
+  }
+  items: NecesidadItem[]
+}
+
+interface NecesidadesPedidoData {
+  grupos: NecesidadGrupo[]
+}
+
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector'
+  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar' | 'albaran_guardado' | 'informe_semanal'
   content: string
   image?: string
   emailProposal?: EmailProposal
   whatsappProposal?: WhatsAppProposal
   briefCards?: BriefData
   pedidoSelector?: PedidoSelectorData
+  necesidadesPedido?: NecesidadesPedidoData
+  compraSemanal?: CompraSemanalData
+  facturasPagar?: FacturasPagarData
+  albaranGuardado?: AlbaranGuardadoData
+  informeSemanal?: InformeSemanalData
+  chartData?: ChartData
 }
 
 const CARD_ICONS: Record<string, JSX.Element> = {
@@ -641,6 +667,500 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
   )
 }
 
+function FacturasCard({ data }: { data: FacturasPagarData }) {
+  const [pendientes, setPendientes] = useState<FacturaPendiente[]>(data.facturas)
+  const [paying, setPaying] = useState<Record<number, boolean>>({})
+  const [payingAll, setPayingAll] = useState(false)
+
+  if (pendientes.length === 0) {
+    return (
+      <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: 16, padding: '16px 20px', maxWidth: 520 }}>
+        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#16a34a', margin: 0 }}>Todas las facturas están pagadas</p>
+      </div>
+    )
+  }
+
+  const total = pendientes.reduce((s, f) => s + (f.total || 0), 0)
+  const vencidas = pendientes.filter(f => f.vencida)
+
+  async function pagarUna(id: number) {
+    setPaying(prev => ({ ...prev, [id]: true }))
+    await fetch(`/api/facturas/${id}/pay`, { method: 'PATCH' })
+    setPendientes(prev => prev.filter(f => f.id !== id))
+    setPaying(prev => { const n = { ...prev }; delete n[id]; return n })
+  }
+
+  async function pagarTodas() {
+    setPayingAll(true)
+    await Promise.all(pendientes.map(f => fetch(`/api/facturas/${f.id}/pay`, { method: 'PATCH' })))
+    setPendientes([])
+    setPayingAll(false)
+  }
+
+  const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid #f0ebe4' }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      {/* Header */}
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#dfd5c9', margin: '0 0 2px' }}>Facturas pendientes de pago</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
+            {pendientes.length} factura{pendientes.length > 1 ? 's' : ''}{vencidas.length > 0 ? ` · ${vencidas.length} vencida${vencidas.length > 1 ? 's' : ''}` : ''}
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#dfd5c9', opacity: 0.45, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total pendiente</p>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: vencidas.length > 0 ? '#fca5a5' : '#19f973', margin: 0 }}>{total.toFixed(2)}€</p>
+        </div>
+      </div>
+
+      {/* Lista */}
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', padding: '4px 20px 0', backgroundColor: '#fff' }}>
+        {pendientes.map(f => {
+          const overdue = f.vencida
+          const soon = !overdue && f.date_due && (new Date(f.date_due).getTime() - Date.now()) < 5 * 86400000
+          const dueBadgeColor = overdue ? '#fef2f2' : soon ? '#fffbeb' : '#f0f9ff'
+          const dueBadgeText = overdue ? '#dc2626' : soon ? '#92400e' : '#0369a1'
+          const dueBorderColor = overdue ? '#fca5a5' : soon ? '#fcd34d' : '#bae6fd'
+          return (
+            <div key={f.id} style={rowStyle}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#3d3834', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {f.vendor || 'Sin proveedor'}
+                </p>
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: 0 }}>
+                  {f.invoice_num || 'S/N'}{f.date_invoice ? ` · ${f.date_invoice}` : ''}
+                </p>
+              </div>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: '#3d3834', flexShrink: 0 }}>
+                {f.total != null ? `${f.total}€` : '-'}
+              </span>
+              {f.date_due && (
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, padding: '2px 6px', borderRadius: 5, backgroundColor: dueBadgeColor, color: dueBadgeText, border: `1px solid ${dueBorderColor}`, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  {overdue ? `${Math.abs(f.dias_vencida ?? 0)}d vencida` : f.date_due}
+                </span>
+              )}
+              <button
+                onClick={() => pagarUna(f.id)}
+                disabled={paying[f.id]}
+                style={{ flexShrink: 0, padding: '5px 12px', backgroundColor: paying[f.id] ? '#f0fdf4' : '#19f973', border: 'none', borderRadius: 8, cursor: paying[f.id] ? 'default' : 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#2a2522', opacity: paying[f.id] ? 0.6 : 1 }}
+              >
+                {paying[f.id] ? '...' : 'Pagada'}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer */}
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '12px 20px', backgroundColor: '#faf9f7', display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          onClick={pagarTodas}
+          disabled={payingAll}
+          style={{ padding: '8px 18px', backgroundColor: '#3d3834', border: 'none', borderRadius: 10, cursor: payingAll ? 'default' : 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#dfd5c9', opacity: payingAll ? 0.6 : 1 }}
+        >
+          {payingAll ? 'Procesando...' : 'Marcar todas como pagadas'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CompraSemanalCard({ data, onInsertMessage }: { data: CompraSemanalData; onInsertMessage: (m: Message) => void }) {
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({})
+
+  const platosOk = data.platos.filter(p => p.encontrada)
+  const platosNok = data.platos.filter(p => !p.encontrada)
+
+  function toggle(i: number) {
+    setExpanded(prev => ({ ...prev, [i]: !prev[i] }))
+  }
+
+  function pedirEmail(grupo: CompraSemanalGrupo) {
+    const items = grupo.items.map(i => `  - ${i.nombre}: ${i.cantidad} ${i.unidad || 'ud'}`).join('\n')
+    const body = `Estimado equipo de ${grupo.proveedor.nombre},\n\nNecesitamos el siguiente pedido para esta semana:\n\n${items}\n\nPor favor, confirmen disponibilidad y fecha de entrega.\n\nMuchas gracias,\nEquipo MarginBites`
+    const mailtoItems = grupo.items.map(i => `• ${i.nombre}: ${i.cantidad} ${i.unidad || 'ud'}`).join('%0A')
+    const subject = encodeURIComponent(`Pedido semanal - MarginBites`)
+    const bodyEncoded = encodeURIComponent(body)
+    const to = grupo.proveedor.email || ''
+    window.open(`mailto:${to}?subject=${subject}&body=${bodyEncoded}`)
+  }
+
+  function pedirWhatsApp(grupo: CompraSemanalGrupo) {
+    const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const lines = grupo.items.map(i => `• ${i.nombre}: ${i.cantidad} ${i.unidad || 'ud'}`).join('\n')
+    const msg = encodeURIComponent(`Hola, pedido para la semana (${today}):\n\n${lines}\n\nMuchas gracias`)
+    const phone = (grupo.proveedor.phone || '').replace(/\s+/g, '')
+    window.open(`https://wa.me/${phone}?text=${msg}`)
+  }
+
+  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid #f0ebe4' }
+  const labelStyle: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834' }
+  const dimStyle: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45 }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      {/* Header */}
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#dfd5c9', margin: '0 0 3px' }}>Lista de la compra semanal</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
+            {platosOk.map(p => `${p.nombre} ×${p.raciones}`).join(' · ')}
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#dfd5c9', opacity: 0.45, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coste estimado</p>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: '#19f973', margin: 0 }}>{data.coste_total_estimado}€</p>
+        </div>
+      </div>
+
+      {/* Platos no encontrados */}
+      {platosNok.length > 0 && (
+        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderTop: 'none', padding: '8px 18px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', margin: 0 }}>
+            Sin escandallo: {platosNok.map(p => p.nombre).join(', ')}
+          </p>
+        </div>
+      )}
+
+      {/* Grupos por proveedor */}
+      {data.grupos.map((grupo, gi) => (
+        <div key={gi} style={{ border: '1px solid #e8e2db', borderTop: gi === 0 && platosNok.length === 0 ? '1px solid #e8e2db' : 'none' }}>
+          {/* Supplier header */}
+          <div
+            onClick={() => toggle(gi)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 18px', cursor: 'pointer', backgroundColor: expanded[gi] ? '#faf9f7' : '#fff' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#19f973', flexShrink: 0 }} />
+              <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#3d3834' }}>{grupo.proveedor.nombre}</span>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4 }}>{grupo.items.length} art.</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {grupo.coste_total > 0 && (
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', fontWeight: 700 }}>{grupo.coste_total}€</span>
+              )}
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#3d3834" strokeWidth={2} style={{ opacity: 0.4, transform: expanded[gi] ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Items */}
+          {expanded[gi] && (
+            <div style={{ padding: '0 18px 12px', backgroundColor: '#faf9f7' }}>
+              <div style={{ marginBottom: 10 }}>
+                {grupo.items.map((item, ii) => (
+                  <div key={ii} style={rowStyle}>
+                    <div>
+                      <span style={labelStyle}>{item.nombre}</span>
+                      {item.recetas.length > 1 && (
+                        <span style={{ ...dimStyle, marginLeft: 6 }}>{item.recetas.join(', ')}</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', fontWeight: 700 }}>
+                        {item.cantidad} {item.unidad || 'ud'}
+                      </span>
+                      {item.subtotal != null && (
+                        <span style={dimStyle}>{item.subtotal}€</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
+                {grupo.proveedor.email && (
+                  <button
+                    onClick={() => pedirEmail(grupo)}
+                    style={{ flex: 1, padding: '7px 0', backgroundColor: '#3d3834', border: 'none', borderRadius: 9, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#dfd5c9' }}
+                  >
+                    Email
+                  </button>
+                )}
+                {grupo.proveedor.phone && (
+                  <button
+                    onClick={() => pedirWhatsApp(grupo)}
+                    style={{ flex: 1, padding: '7px 0', backgroundColor: '#25d366', border: 'none', borderRadius: 9, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#fff' }}
+                  >
+                    WhatsApp
+                  </button>
+                )}
+                {!grupo.proveedor.email && !grupo.proveedor.phone && (
+                  <span style={{ ...dimStyle, padding: '7px 0' }}>Sin contacto registrado</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Sin proveedor */}
+      {data.sinProveedor.length > 0 && (
+        <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '11px 18px', backgroundColor: '#faf9f7' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>Sin proveedor asignado</p>
+          {data.sinProveedor.map((item, i) => (
+            <div key={i} style={rowStyle}>
+              <span style={labelStyle}>{item.nombre}</span>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', fontWeight: 700 }}>{item.cantidad} {item.unidad || 'ud'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.grupos.length > 0 && data.sinProveedor.length === 0 && (
+        <div style={{ height: 16, borderRadius: '0 0 16px 16px', border: '1px solid #e8e2db', borderTop: 'none', backgroundColor: '#fff' }} />
+      )}
+    </div>
+  )
+}
+
+function MiniBarChart({ data }: { data: ChartData }) {
+  const max = Math.max(...data.datos.map(d => d.value), 1)
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 8px' }}>
+        {data.titulo}
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {data.datos.map((d, i) => {
+          const pct = Math.round((d.value / max) * 100)
+          const label = d.label.length > 18 ? d.label.slice(0, 16) + '…' : d.label
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.6, width: 96, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {label}
+              </span>
+              <div style={{ flex: 1, height: 13, backgroundColor: '#f0ece8', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#d97706', borderRadius: 3 }} />
+              </div>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', width: 50, flexShrink: 0, textAlign: 'right' }}>
+                {d.value}{data.unidad}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function MiniLineChart({ data }: { data: ChartData }) {
+  const W = 280
+  const H = 88
+  const PL = 34, PR = 8, PT = 8, PB = 22
+  const cW = W - PL - PR
+  const cH = H - PT - PB
+  const vals = data.datos.map(d => d.value)
+  const minV = Math.min(...vals)
+  const maxV = Math.max(...vals)
+  const range = maxV - minV || 1
+  const n = data.datos.length
+  const pts = data.datos.map((d, i) => ({
+    x: PL + (n < 2 ? cW / 2 : (i / (n - 1)) * cW),
+    y: PT + (1 - (d.value - minV) / range) * cH,
+    label: d.label,
+    value: d.value,
+  }))
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>
+        {data.titulo}
+      </p>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', overflow: 'visible' }}>
+        {[0, 0.5, 1].map((t, i) => (
+          <line key={i} x1={PL} y1={PT + t * cH} x2={W - PR} y2={PT + t * cH} stroke="#e8e2db" strokeWidth={0.5} />
+        ))}
+        {[0, 1].map((t, i) => (
+          <text key={i} x={PL - 3} y={PT + t * cH + 3} textAnchor="end" fontFamily="DM Mono, monospace" fontSize={8} fill="#3d3834" fillOpacity={0.45}>
+            {Math.round(t === 0 ? maxV : minV)}{data.unidad}
+          </text>
+        ))}
+        <path d={pathD} fill="none" stroke="#d97706" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        {pts.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="#d97706" />
+        ))}
+        {[pts[0], pts[pts.length - 1]].filter(Boolean).map((p, i) => (
+          <text key={i} x={p.x} y={H - 4} textAnchor={i === 0 ? 'start' : 'end'} fontFamily="DM Mono, monospace" fontSize={8} fill="#3d3834" fillOpacity={0.5}>
+            {p.label.slice(0, 7)}
+          </text>
+        ))}
+      </svg>
+    </div>
+  )
+}
+
+function MiniChart({ data }: { data: ChartData }) {
+  return (
+    <div style={{ backgroundColor: '#faf9f7', border: '1px solid #e8e2db', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
+      {data.tipo === 'bar' ? <MiniBarChart data={data} /> : <MiniLineChart data={data} />}
+    </div>
+  )
+}
+
+function NecesidadesPedidoCard({
+  data,
+  onInsertMessage,
+}: {
+  data: NecesidadesPedidoData
+  onInsertMessage: (msg: Message) => void
+}) {
+  const [dismissed, setDismissed] = useState<Record<number, boolean>>({})
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true })
+
+  const iconEmail = (
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  )
+  const iconWA = (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.854L0 24l6.303-1.654A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.214-3.733.979 1.001-3.64-.234-.374A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+    </svg>
+  )
+
+  function toggleExpand(i: number) {
+    setExpanded(prev => ({ ...prev, [i]: !prev[i] }))
+  }
+
+  function handleEmail(grupo: NecesidadGrupo) {
+    const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const itemLines = grupo.items.map(it => `  - ${it.nombre}: ${it.cantidad ?? '?'}${it.unidad ? ' ' + it.unidad : ''}`).join('\n')
+    const subject = `Pedido ${today} - MarginBites`
+    const body = `Estimado equipo de ${grupo.proveedor.nombre},\n\nNecesitamos realizar el siguiente pedido para la próxima entrega:\n\n${itemLines}\n\nPor favor, confirmen disponibilidad y fecha estimada de entrega.\n\nMuchas gracias,\nEquipo MarginBites`
+    onInsertMessage({
+      role: 'email_proposal',
+      content: '',
+      emailProposal: {
+        proveedor: grupo.proveedor.nombre,
+        to: grupo.proveedor.email || '',
+        subject,
+        body,
+        items: grupo.items.map(it => ({ nombre: it.nombre, cantidad: it.cantidad ?? undefined, unidad: it.unidad ?? undefined })),
+      },
+    })
+  }
+
+  function handleWhatsApp(grupo: NecesidadGrupo) {
+    const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const itemLines = grupo.items.map(it => `• ${it.nombre}${it.cantidad ? ': ' + it.cantidad + (it.unidad ? ' ' + it.unidad : '') : ''}`).join('\n')
+    const message = `Hola, soy MarginBites 👋\n\nPedido para el ${today}:\n\n${itemLines}\n\nMuchas gracias 🙏`
+    onInsertMessage({
+      role: 'whatsapp_proposal',
+      content: '',
+      whatsappProposal: {
+        proveedor: grupo.proveedor.nombre,
+        phone: grupo.proveedor.phone || '',
+        message,
+        items: grupo.items.map(it => ({ nombre: it.nombre, cantidad: it.cantidad ?? undefined, unidad: it.unidad ?? undefined })),
+      },
+    })
+  }
+
+  const active = data.grupos.filter((_, i) => !dismissed[i])
+
+  if (active.length === 0) {
+    return (
+      <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 14, padding: '14px 18px', maxWidth: 580 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#166534' }}>Todos los pedidos gestionados</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 580 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+        </div>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#3d3834', margin: 0 }}>Pedidos pendientes</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45, margin: 0 }}>{active.length} proveedor{active.length !== 1 ? 'es' : ''} con reposición pendiente</p>
+        </div>
+      </div>
+
+      {/* Supplier cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {data.grupos.map((grupo, i) => {
+          if (dismissed[i]) return null
+          const isExp = expanded[i]
+          return (
+            <div key={i} style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 14, overflow: 'hidden' }}>
+              {/* Supplier header row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', cursor: 'pointer' }} onClick={() => toggleExpand(i)}>
+                <span style={{ fontSize: 10, color: '#3d3834', opacity: 0.35, flexShrink: 0, transform: isExp ? 'rotate(90deg)' : 'none', display: 'inline-block', transition: 'transform 0.15s' }}>▶</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{grupo.proveedor.nombre}</p>
+                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: 0 }}>{grupo.items.length} artículo{grupo.items.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+
+              {/* Expanded items list */}
+              {isExp && (
+                <div style={{ borderTop: '1px solid #f0ece8', padding: '8px 14px 10px' }}>
+                  {grupo.items.map((item, j) => (
+                    <div key={j} style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '4px 0', borderBottom: j < grupo.items.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1 }}>
+                        {item.nombre}
+                      </span>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.7, flexShrink: 0 }}>
+                        {item.cantidad ?? '?'} {item.unidad || 'ud'}
+                      </span>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.35, flexShrink: 0 }}>
+                        {item.dias_sin_pedir === 'nunca' ? 'nunca pedido' : `${item.dias_sin_pedir}d`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ borderTop: '1px solid #f0ece8', padding: '10px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', backgroundColor: '#fafaf9' }}>
+                <button
+                  onClick={() => handleEmail(grupo)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#1a3a2a', fontWeight: 600 }}
+                >
+                  {iconEmail} Email
+                </button>
+                <button
+                  onClick={() => handleWhatsApp(grupo)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', fontWeight: 600 }}
+                >
+                  {iconWA} WhatsApp
+                </button>
+                <div style={{ flex: 1 }} />
+                <button
+                  onClick={() => setDismissed(prev => ({ ...prev, [i]: true }))}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.6 }}
+                >
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Más tarde
+                </button>
+                <button
+                  onClick={() => setDismissed(prev => ({ ...prev, [i]: true }))}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#dc2626', opacity: 0.8 }}
+                >
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard: () => void }) {
   const [subject, setSubject] = useState(proposal.subject)
   const [body, setBody] = useState(proposal.body)
@@ -733,17 +1253,394 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
   )
 }
 
+function AlbaranGuardadoCard({ data }: { data: AlbaranGuardadoData }) {
+  const priceMap: Record<string, AlbaranGuardadoPriceChange> = {}
+  for (const pc of data.price_changes) priceMap[pc.nombre] = pc
+
+  const hasFoodCostWarning = data.food_cost_impact && data.food_cost_impact.trim().length > 0
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      {/* Header */}
+      <div style={{ backgroundColor: '#1a3a2a', borderRadius: '16px 16px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#19f973" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#dfd5c9', margin: 0 }}>Albarán guardado</p>
+          </div>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: '3px 0 0' }}>
+            {data.vendor || 'Proveedor'}{data.delivery_num ? ` · #${data.delivery_num}` : ''} · {data.date_delivery}
+          </p>
+        </div>
+        {data.total != null && (
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#dfd5c9', opacity: 0.45, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total</p>
+            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: '#19f973', margin: 0 }}>{data.total}€</p>
+          </div>
+        )}
+      </div>
+
+      {/* Lines */}
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', backgroundColor: '#fff' }}>
+        {data.lineas.map((l, i) => {
+          const pc = priceMap[l.nombre]
+          const hasDelta = pc && pc.diff_pct !== null
+          const isUp = hasDelta && pc.diff_pct! > 0
+          const isDown = hasDelta && pc.diff_pct! < 0
+          const deltaBg = isUp ? '#fff1f2' : '#f0fdf4'
+          const deltaColor = isUp ? '#dc2626' : '#16a34a'
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 20px', borderBottom: i < data.lineas.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.nombre}</span>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, flexShrink: 0 }}>{l.cantidad != null ? `${l.cantidad}${l.unidad ? ' ' + l.unidad : ''}` : ''}</span>
+              {l.precio_unitario != null && (
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', flexShrink: 0 }}>{l.precio_unitario}€</span>
+              )}
+              {hasDelta && (
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, padding: '2px 5px', borderRadius: 4, backgroundColor: deltaBg, color: deltaColor, fontWeight: 700, flexShrink: 0 }}>
+                  {isUp ? '+' : ''}{pc.diff_pct}%
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Price change alerts */}
+      {data.price_changes.filter(pc => pc.diff_pct !== null && Math.abs(pc.diff_pct) >= 5).length > 0 && (
+        <div style={{ border: '1px solid #fcd34d', borderTop: 'none', backgroundColor: '#fffbeb', padding: '10px 20px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Variaciones de precio</p>
+          {data.price_changes.filter(pc => pc.diff_pct !== null && Math.abs(pc.diff_pct) >= 5).map((pc, i) => (
+            <p key={i} style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', margin: '2px 0' }}>
+              {pc.nombre}: {pc.precio_anterior != null ? `${pc.precio_anterior}€ → ` : ''}{pc.precio_nuevo}€
+              {' '}
+              <span style={{ fontWeight: 700, color: pc.diff_pct! > 0 ? '#dc2626' : '#16a34a' }}>
+                ({pc.diff_pct! > 0 ? '+' : ''}{pc.diff_pct}%)
+              </span>
+              {pc.recetas_afectadas.length > 0 && (
+                <span style={{ opacity: 0.6 }}> · afecta a: {pc.recetas_afectadas.join(', ')}</span>
+              )}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Food cost warning */}
+      {hasFoodCostWarning && (
+        <div style={{ border: '1px solid #fca5a5', borderTop: 'none', backgroundColor: '#fff1f2', padding: '10px 20px', borderRadius: '0 0 16px 16px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#991b1b', margin: 0, whiteSpace: 'pre-line' }}>
+            {data.food_cost_impact.replace(/^[\n]+/, '')}
+          </p>
+        </div>
+      )}
+
+      {!hasFoodCostWarning && (
+        <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '10px 20px', backgroundColor: '#faf9f7' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: 0 }}>
+            {data.lineas.length} línea{data.lineas.length !== 1 ? 's' : ''} · precios actualizados en ingredientes
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
+  const variacionColor = data.gasto.variacion === null ? '#3d3834' : data.gasto.variacion > 0 ? '#dc2626' : '#16a34a'
+  const variacionLabel = data.gasto.variacion === null ? '—' : `${data.gasto.variacion > 0 ? '+' : ''}${data.gasto.variacion}%`
+
+  function compartirWhatsApp() {
+    const lines: string[] = [
+      `📊 *Informe semanal MarginBites*`,
+      `${data.fecha}`,
+      '',
+      `💰 Gasto compras: ${data.gasto.total}€ (${data.gasto.pedidos} pedidos)${data.gasto.variacion !== null ? ` ${variacionLabel} vs semana anterior` : ''}`,
+      data.merma.total > 0 ? `🗑 Merma: ${data.merma.total}€ (${data.merma.eventos} registros)` : '',
+      data.facturas.vencidas_c > 0 ? `⚠️ Facturas vencidas: ${data.facturas.vencidas_c} (${data.facturas.vencidas_t}€)` : '',
+      data.facturas.pendientes_c > 0 ? `📄 Facturas pendientes: ${data.facturas.pendientes_c} (${data.facturas.pendientes_t}€)` : '',
+      data.precios_subida.length > 0 ? `📈 Subidas precio: ${data.precios_subida.map(p => `${p.nombre} +${p.diff_pct}%`).join(', ')}` : '',
+      data.food_cost_critico.length > 0 ? `🔴 Food cost crítico: ${data.food_cost_critico.map(r => `${r.nombre} ${r.pct}%`).join(', ')}` : '',
+    ].filter(Boolean)
+    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`)
+  }
+
+  const metricStyle: React.CSSProperties = { backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 12, padding: '12px 14px' }
+  const metricLabel: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#3d3834', opacity: 0.45, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }
+  const metricValue: React.CSSProperties = { fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 20, color: '#3d3834', margin: 0 }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      {/* Header */}
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#dfd5c9', margin: '0 0 2px' }}>Informe semanal</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>{data.fecha}</p>
+        </div>
+        <button
+          onClick={compartirWhatsApp}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#1a3a2a' }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.854L0 24l6.303-1.654A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.214-3.733.979 1.001-3.64-.234-.374A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/></svg>
+          Compartir
+        </button>
+      </div>
+
+      {/* Metrics grid */}
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', backgroundColor: '#faf9f7', padding: '14px 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          {/* Gasto */}
+          <div style={metricStyle}>
+            <p style={metricLabel}>Gasto semana</p>
+            <p style={metricValue}>{data.gasto.total}€</p>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: variacionColor, margin: '3px 0 0' }}>
+              {variacionLabel} vs anterior
+            </p>
+          </div>
+          {/* Merma */}
+          <div style={metricStyle}>
+            <p style={metricLabel}>Merma</p>
+            <p style={{ ...metricValue, color: data.merma.total > 0 ? '#b45309' : '#16a34a' }}>{data.merma.total}€</p>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: '3px 0 0' }}>
+              {data.merma.eventos} registro{data.merma.eventos !== 1 ? 's' : ''}
+            </p>
+          </div>
+          {/* Facturas vencidas */}
+          <div style={{ ...metricStyle, backgroundColor: data.facturas.vencidas_c > 0 ? '#fff1f2' : '#fff', borderColor: data.facturas.vencidas_c > 0 ? '#fca5a5' : '#e8e2db' }}>
+            <p style={metricLabel}>Facturas vencidas</p>
+            <p style={{ ...metricValue, color: data.facturas.vencidas_c > 0 ? '#dc2626' : '#16a34a' }}>
+              {data.facturas.vencidas_c > 0 ? `${data.facturas.vencidas_c} (${data.facturas.vencidas_t}€)` : 'Ninguna'}
+            </p>
+          </div>
+          {/* Facturas pendientes */}
+          <div style={metricStyle}>
+            <p style={metricLabel}>Pendientes pago</p>
+            <p style={metricValue}>{data.facturas.pendientes_c}</p>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: '3px 0 0' }}>
+              {data.facturas.pendientes_t}€ total
+            </p>
+          </div>
+        </div>
+
+        {/* Top proveedores */}
+        {data.gasto.top.length > 0 && (
+          <div style={{ backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
+            <p style={metricLabel}>Top proveedores</p>
+            {data.gasto.top.map((v, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834' }}>{v.vendor}</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', fontWeight: 700 }}>{v.t}€</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Subidas de precio */}
+        {data.precios_subida.length > 0 && (
+          <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
+            <p style={{ ...metricLabel, color: '#92400e' }}>Subidas de precio esta semana</p>
+            {data.precios_subida.map((p, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e' }}>{p.nombre}</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#dc2626', backgroundColor: '#fff1f2', padding: '2px 6px', borderRadius: 4 }}>+{p.diff_pct}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Food cost crítico */}
+        {data.food_cost_critico.length > 0 && (
+          <div style={{ backgroundColor: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px' }}>
+            <p style={{ ...metricLabel, color: '#991b1b' }}>Food cost crítico (&gt;35%)</p>
+            {data.food_cost_critico.map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#991b1b' }}>{r.nombre}</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#991b1b', backgroundColor: '#fca5a5', padding: '2px 6px', borderRadius: 4 }}>{r.pct}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '10px 20px', backgroundColor: '#faf9f7' }}>
+        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.35, margin: 0, textAlign: 'center' }}>
+          Datos del periodo: últimos 7 días
+        </p>
+      </div>
+    </div>
+  )
+}
+
 interface StoredConvo {
   messages: Message[]
   lastUsed: number  // timestamp ms
 }
 
-const SUGGESTIONS = [
-  'Ingredientes sin coste registrado',
-  'Ultimos pedidos de compra',
-  'Proveedores principales',
-  'Resumen de costes',
-]
+interface Sugerencia {
+  label: string
+  sub: string
+  chat: string
+  scan?: boolean
+}
+
+interface ChartPoint {
+  label: string
+  value: number
+}
+
+interface ChartData {
+  tipo: 'bar' | 'line'
+  titulo: string
+  datos: ChartPoint[]
+  unidad: string
+}
+
+interface FacturaPendiente {
+  id: number
+  invoice_num: string | null
+  vendor: string | null
+  total: number | null
+  date_due: string | null
+  date_invoice: string | null
+  vencida: boolean
+  dias_vencida: number | null
+}
+
+interface FacturasPagarData {
+  facturas: FacturaPendiente[]
+}
+
+interface CompraSemanalItem {
+  nombre: string
+  cantidad: number
+  unidad: string | null
+  coste_unitario: number | null
+  subtotal: number | null
+  recetas: string[]
+}
+
+interface CompraSemanalGrupo {
+  proveedor: { nombre: string; email: string | null; phone: string | null }
+  items: CompraSemanalItem[]
+  coste_total: number
+}
+
+interface CompraSemanalPlato {
+  nombre: string
+  raciones: number
+  encontrada: boolean
+}
+
+interface CompraSemanalData {
+  platos: CompraSemanalPlato[]
+  grupos: CompraSemanalGrupo[]
+  sinProveedor: (CompraSemanalItem & { proveedor: null })[]
+  coste_total_estimado: number
+}
+
+interface AlertItem {
+  id: string
+  tipo: 'danger' | 'warning' | 'info'
+  titulo: string
+  detalle: string
+  chat?: string
+  href?: string
+}
+
+interface AlbaranGuardadoLinea {
+  nombre: string
+  cantidad: number | null
+  unidad: string | null
+  precio_unitario: number | null
+  total_linea: number | null
+}
+
+interface AlbaranGuardadoPriceChange {
+  nombre: string
+  precio_anterior: number | null
+  precio_nuevo: number
+  diff_pct: number | null
+  recetas_afectadas: string[]
+}
+
+interface AlbaranGuardadoData {
+  albaran_id: number
+  vendor: string | null
+  delivery_num: string | null
+  date_delivery: string
+  base: number | null
+  taxes: number | null
+  total: number | null
+  lineas: AlbaranGuardadoLinea[]
+  price_changes: AlbaranGuardadoPriceChange[]
+  food_cost_impact: string
+}
+
+interface InformeSemanalData {
+  fecha: string
+  gasto: { total: number; pedidos: number; variacion: number | null; top: { vendor: string; t: number }[] }
+  merma: { total: number; eventos: number; top: { nombre: string; t: number }[] }
+  facturas: { vencidas_c: number; vencidas_t: number; pendientes_c: number; pendientes_t: number }
+  precios_subida: { nombre: string; diff_pct: number; precio: number; vendor: string }[]
+  food_cost_critico: { nombre: string; pct: number }[]
+}
+
+interface MomentoData {
+  momento: string
+  sugerencias: Sugerencia[]
+}
+
+function getMomento(hour: number): MomentoData {
+  if (hour >= 6 && hour < 11) {
+    const isMonday = new Date().getDay() === 1
+    return {
+      momento: isMonday ? 'Lunes · Apertura' : 'Apertura',
+      sugerencias: isMonday
+        ? [
+            { label: 'Informe semanal', sub: 'Resumen de la semana pasada', chat: 'Dame el informe de la semana pasada' },
+            { label: '¿Qué tengo que pedir?', sub: 'Análisis de reposición', chat: 'Quiero hacer un pedido' },
+            { label: 'Facturas urgentes', sub: 'Vencen esta semana', chat: '¿Qué facturas vencen esta semana?' },
+            { label: 'Gasto del mes', sub: 'Vs mes anterior', chat: 'Dame el resumen de gasto de este mes comparado con el anterior' },
+          ]
+        : [
+            { label: '¿Qué tengo que pedir?', sub: 'Análisis de reposición', chat: 'Quiero hacer un pedido' },
+            { label: 'Entregas de hoy', sub: 'Albaranes esperados', chat: '¿Qué entregas tengo previstas para hoy?' },
+            { label: 'Facturas urgentes', sub: 'Vencen esta semana', chat: '¿Qué facturas vencen esta semana?' },
+            { label: 'Gasto del mes', sub: 'Vs mes anterior', chat: 'Dame el resumen de gasto de este mes comparado con el anterior' },
+          ],
+    }
+  }
+  if (hour >= 11 && hour < 16) {
+    return {
+      momento: 'Servicio',
+      sugerencias: [
+        { label: 'Registrar producción', sub: 'Raciones del servicio', chat: 'Quiero registrar la producción del servicio de hoy' },
+        { label: 'Escanear albarán', sub: 'Entrega recibida', chat: '', scan: true },
+        { label: 'Registrar merma', sub: 'Producto no aprovechado', chat: 'Quiero registrar una merma' },
+        { label: '¿Cómo vamos hoy?', sub: 'Gastos y pedidos', chat: 'Dame un resumen rápido de cómo vamos hoy' },
+      ],
+    }
+  }
+  if (hour >= 16 && hour < 20) {
+    return {
+      momento: 'Entre servicios',
+      sugerencias: [
+        { label: 'Pedir para mañana', sub: 'Reposición urgente', chat: 'Quiero hacer un pedido para mañana' },
+        { label: 'Merma del día', sub: 'Registrar pérdidas', chat: 'Quiero registrar la merma del servicio de hoy' },
+        { label: 'Facturas pendientes', sub: 'Control de pagos', chat: '¿Qué facturas tengo pendientes de pagar?' },
+        { label: 'Precios que subieron', sub: 'Alertas de coste', chat: '¿Qué ingredientes han subido de precio recientemente?' },
+      ],
+    }
+  }
+  return {
+    momento: 'Cierre',
+    sugerencias: [
+      { label: 'Resumen del día', sub: 'Gastos, pedidos y merma', chat: 'Dame el resumen completo del día de hoy' },
+      { label: 'Merma de cierre', sub: 'Registrar sobras', chat: 'Quiero registrar la merma de cierre' },
+      { label: 'Pedidos sin recibir', sub: 'Entregas pendientes', chat: '¿Qué pedidos tengo pendientes de recibir?' },
+      { label: 'Balance del mes', sub: 'Cómo vamos de costes', chat: '¿Cómo vamos de gasto este mes?' },
+    ],
+  }
+}
 
 const STORAGE_KEY = 'mb_chat_history'
 const CURRENT_KEY = 'mb_chat_current'
@@ -775,12 +1672,15 @@ function loadCurrent(): Message[] {
 
 function saveCurrent(messages: Message[]) {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal')))
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && m.role !== 'necesidades_pedido' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal')))
   } catch {}
 }
 
 export default function KitchenChat() {
   const [greeting, setGreeting] = useState('')
+  const [momento, setMomento] = useState<MomentoData | null>(null)
+  const [alerts, setAlerts] = useState<AlertItem[]>([])
+  const [dismissedAlerts, setDismissedAlerts] = useState<Record<string, boolean>>({})
   const [messages, setMessages] = useState<Message[]>([])
   const [history, setHistory] = useState<StoredConvo[]>([])
   const [showHistory, setShowHistory] = useState(false)
@@ -789,16 +1689,20 @@ export default function KitchenChat() {
   const [isRecording, setIsRecording] = useState(false)
   const [pendingImage, setPendingImage] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState('')
+  const [isScanning, setIsScanning] = useState(false)
   const mediaRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
+  const scanRef = useRef<HTMLInputElement>(null)
 
   // Start fresh on every mount — history accessible via Historial button
   useEffect(() => {
     const h = new Date().getHours()
     setGreeting(h < 13 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches')
+    setMomento(getMomento(h))
+    fetch('/api/alerts').then(r => r.json()).then(d => { if (d.alerts) setAlerts(d.alerts) }).catch(() => {})
     // Save any previous conversation to history before starting fresh
     const current = loadCurrent()
     if (current.length > 0) {
@@ -859,6 +1763,11 @@ export default function KitchenChat() {
     const apiMessages = messages.flatMap(m => {
       if (m.role === 'brief_cards') return [{ role: 'assistant' as const, content: '[Brief diario generado y mostrado al usuario]' }]
       if (m.role === 'pedido_selector') return [{ role: 'assistant' as const, content: '[Selector de proveedores mostrado al usuario]' }]
+      if (m.role === 'necesidades_pedido') return [{ role: 'assistant' as const, content: '[Análisis de pedidos pendientes mostrado al usuario con opciones por proveedor]' }]
+      if (m.role === 'compra_semanal') return [{ role: 'assistant' as const, content: '[Lista de la compra semanal generada y mostrada al usuario, agrupada por proveedor con cantidades y coste estimado]' }]
+      if (m.role === 'facturas_pagar') return [{ role: 'assistant' as const, content: '[Lista de facturas pendientes mostrada al usuario con botón para marcar cada una como pagada]' }]
+      if (m.role === 'albaran_guardado') return [{ role: 'assistant' as const, content: '[Albarán guardado con todas sus líneas — precios actualizados en el sistema]' }]
+      if (m.role === 'informe_semanal') return [{ role: 'assistant' as const, content: '[Informe semanal generado y mostrado al usuario con gasto, merma, facturas y alertas]' }]
       if (m.role === 'whatsapp_proposal') return [{ role: 'assistant' as const, content: '[Borrador de WhatsApp generado y mostrado al usuario]' }]
       if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice') return []
       return [m]
@@ -886,11 +1795,21 @@ export default function KitchenChat() {
         setMessages(prev => [...prev, { role: 'brief_cards', content: '', briefCards: json.briefCards }])
       } else if (json.pedidoSelector) {
         setMessages(prev => [...prev, { role: 'pedido_selector', content: '', pedidoSelector: json.pedidoSelector }])
+      } else if (json.necesidadesPedido) {
+        setMessages(prev => [...prev, { role: 'necesidades_pedido', content: '', necesidadesPedido: json.necesidadesPedido }])
+      } else if (json.compraSemanal) {
+        setMessages(prev => [...prev, { role: 'compra_semanal', content: '', compraSemanal: json.compraSemanal }])
+      } else if (json.facturasPagar) {
+        setMessages(prev => [...prev, { role: 'facturas_pagar', content: '', facturasPagar: json.facturasPagar }])
+      } else if (json.albaranGuardado) {
+        setMessages(prev => [...prev, { role: 'albaran_guardado', content: '', albaranGuardado: json.albaranGuardado }])
+      } else if (json.informeSemanal) {
+        setMessages(prev => [...prev, { role: 'informe_semanal', content: '', informeSemanal: json.informeSemanal }])
       } else if (json.whatsappProposal) {
         setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
         const newMsgs: Message[] = []
-        if (json.reply) newMsgs.push({ role: 'assistant', content: json.reply })
+        if (json.reply) newMsgs.push({ role: 'assistant', content: json.reply, chartData: json.chartData || undefined })
         if (json.emailProposal) newMsgs.push({ role: 'email_proposal', content: '', emailProposal: json.emailProposal })
         if (newMsgs.length) setMessages(prev => [...prev, ...newMsgs])
       }
@@ -936,6 +1855,23 @@ export default function KitchenChat() {
     reader.onload = () => setPendingImage(reader.result as string)
     reader.readAsDataURL(file)
     e.target.value = ''
+  }
+
+  function handleScan(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsScanning(true)
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = reader.result as string
+      e.target.value = ''
+      setIsScanning(false)
+      send(
+        'Analiza este documento. Extrae todos los datos en una tabla clara. Si es un albarán: proveedor, número, fecha, líneas de productos con cantidades y precios unitarios y totales. Si es una factura: número, proveedor, fecha de factura, fecha de vencimiento, base imponible, IVA, total. Al final pregúntame si quiero guardarlo.',
+        img
+      )
+    }
+    reader.readAsDataURL(file)
   }
 
   const iconAI = (
@@ -1021,7 +1957,7 @@ export default function KitchenChat() {
                 <button
                   onClick={startBrief}
                   disabled={isLoading}
-                  style={{ width: '100%', marginBottom: 16, padding: '16px 20px', backgroundColor: '#19f973', border: 'none', borderRadius: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+                  style={{ width: '100%', marginBottom: 10, padding: '16px 20px', backgroundColor: '#19f973', border: 'none', borderRadius: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
                 >
                   <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -1031,13 +1967,93 @@ export default function KitchenChat() {
                   </span>
                 </button>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {SUGGESTIONS.map(s => (
-                    <button key={s} onClick={() => send(s)} style={{ textAlign: 'left', backgroundColor: '#ffffff', border: '1px solid #e8e2db', borderRadius: 14, padding: '14px 16px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', cursor: 'pointer' }}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                {/* Scan button */}
+                <button
+                  onClick={() => scanRef.current?.click()}
+                  disabled={isLoading || isScanning}
+                  style={{ width: '100%', marginBottom: 16, padding: '16px 20px', backgroundColor: '#3d3834', border: 'none', borderRadius: 16, cursor: isLoading || isScanning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, opacity: isLoading || isScanning ? 0.6 : 1 }}
+                >
+                  {isScanning ? (
+                    <>
+                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#f5f2ee" strokeWidth={2} style={{ flexShrink: 0 }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <div style={{ textAlign: 'left' }}>
+                        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#f5f2ee', margin: 0 }}>Analizando documento...</p>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#f5f2ee', opacity: 0.5, margin: 0 }}>El AI está extrayendo los datos</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#f5f2ee" strokeWidth={1.8} style={{ flexShrink: 0 }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <div style={{ textAlign: 'left' }}>
+                        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#f5f2ee', margin: 0 }}>Escanear albarán o factura</p>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#f5f2ee', opacity: 0.5, margin: 0 }}>Foto → datos extraídos automáticamente</p>
+                      </div>
+                    </>
+                  )}
+                </button>
+
+                {/* Proactive alerts */}
+                {alerts.filter(a => !dismissedAlerts[a.id]).length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                    {alerts.filter(a => !dismissedAlerts[a.id]).map(alert => {
+                      const colors = {
+                        danger:  { bg: '#fff1f2', border: '#fca5a5', title: '#991b1b', detail: '#dc2626' },
+                        warning: { bg: '#fffbeb', border: '#fcd34d', title: '#92400e', detail: '#b45309' },
+                        info:    { bg: '#f0f9ff', border: '#bae6fd', title: '#0c4a6e', detail: '#0369a1' },
+                      }[alert.tipo]
+                      return (
+                        <div key={alert.id} style={{ backgroundColor: colors.bg, border: `1.5px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 12, color: colors.title, margin: 0 }}>{alert.titulo}</p>
+                            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: colors.detail, opacity: 0.8, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.detalle}</p>
+                          </div>
+                          {alert.chat && (
+                            <button
+                              onClick={() => send(alert.chat!)}
+                              style={{ flexShrink: 0, padding: '5px 10px', backgroundColor: '#fff', border: `1px solid ${colors.border}`, borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 10, color: colors.title, fontWeight: 600 }}
+                            >
+                              Ver →
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setDismissedAlerts(prev => ({ ...prev, [alert.id]: true }))}
+                            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: colors.title, opacity: 0.4, fontSize: 14, lineHeight: 1, padding: '0 2px' }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {momento && (
+                  <>
+                    <div style={{ marginBottom: 8 }}>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {momento.momento}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      {momento.sugerencias.map((s, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => s.scan ? scanRef.current?.click() : send(s.chat)}
+                          disabled={isLoading}
+                          style={{ textAlign: 'left', backgroundColor: '#ffffff', border: '1px solid #e8e2db', borderRadius: 14, padding: '13px 14px', cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.5 : 1, display: 'flex', flexDirection: 'column', gap: 3 }}
+                        >
+                          <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', lineHeight: 1.3 }}>{s.label}</span>
+                          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, lineHeight: 1.4 }}>{s.sub}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -1096,6 +2112,58 @@ export default function KitchenChat() {
                   )
                 }
 
+                // Necesidades de pedido card
+                if (msg.role === 'necesidades_pedido' && msg.necesidadesPedido) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <NecesidadesPedidoCard
+                        data={msg.necesidadesPedido}
+                        onInsertMessage={(newMsg) => setMessages(prev => [...prev, newMsg])}
+                      />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'facturas_pagar' && msg.facturasPagar) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <FacturasCard data={msg.facturasPagar} />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'compra_semanal' && msg.compraSemanal) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <CompraSemanalCard
+                        data={msg.compraSemanal}
+                        onInsertMessage={(newMsg) => setMessages(prev => [...prev, newMsg])}
+                      />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'albaran_guardado' && msg.albaranGuardado) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <AlbaranGuardadoCard data={msg.albaranGuardado} />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'informe_semanal' && msg.informeSemanal) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <InformeSemanalCard data={msg.informeSemanal} />
+                    </div>
+                  )
+                }
+
                 return (
                   <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', gap: 10 }}>
                     {msg.role === 'assistant' && (
@@ -1105,6 +2173,7 @@ export default function KitchenChat() {
                     )}
                     <div style={{ maxWidth: '78%', borderRadius: 18, padding: '12px 18px', backgroundColor: msg.role === 'user' ? '#3d3834' : '#ffffff', color: msg.role === 'user' ? '#dfd5c9' : '#3d3834', border: msg.role === 'assistant' ? '1px solid #e8e2db' : 'none' }}>
                       {msg.image && <img src={msg.image} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 200, objectFit: 'cover' }} />}
+                      {msg.chartData && <MiniChart data={msg.chartData} />}
                       {msg.role === 'user' ? (
                         <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, lineHeight: 1.65, color: '#dfd5c9', margin: 0 }}>{msg.content}</p>
                       ) : (
@@ -1142,7 +2211,7 @@ export default function KitchenChat() {
                 </svg>
               </button>
               {/* Cámara */}
-              <button onClick={() => cameraRef.current?.click()} title="Abrir camara" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3d3834', opacity: 0.55 }}>
+              <button onClick={() => scanRef.current?.click()} title="Escanear albarán o factura" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#3d3834', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f5f2ee', opacity: isLoading ? 0.4 : 0.85 }}>
                 <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1150,6 +2219,7 @@ export default function KitchenChat() {
               </button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImage} />
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleImage} />
+              <input ref={scanRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleScan} />
               {/* Micro */}
               <button onClick={isRecording ? stopRecording : startRecording} title={isRecording ? 'Detener' : 'Nota de voz'} style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: isRecording ? '#19f973' : '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isRecording ? '#2a2522' : '#3d3834', opacity: isRecording ? 1 : 0.55 }}>
                 {isRecording

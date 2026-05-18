@@ -254,6 +254,27 @@ const tools: any[] = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'pedidos_pendientes_recibir',
+      description: 'Lista los pedidos/listas de pedido pendientes de confirmar recepción',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'alertas_subida_precio',
+      description: 'Muestra los ingredientes cuyo precio ha subido significativamente comparando primero y último registro',
+      parameters: {
+        type: 'object',
+        properties: {
+          umbral_pct: { type: 'number', description: 'Porcentaje mínimo de subida. Default 10.' },
+        },
+      },
+    },
+  },
   // ── MERMA ─────────────────────────────────────────────────
   {
     type: 'function',
@@ -872,6 +893,54 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     return `__BRIEF_CARDS__${JSON.stringify({ saludo, fecha: hoy, cards })}`
   }
 
+  // ── PEDIDOS PENDIENTES DE RECIBIR ────────────────────────
+  if (name === 'pedidos_pendientes_recibir') {
+    const pedidos = db.prepare(
+      `SELECT id, descr, data, year, month FROM lista_pedidos WHERE user_id=? AND pending_receive>0 ORDER BY id DESC LIMIT 20`
+    ).all(userId) as any[]
+    if (!pedidos.length) return 'No hay pedidos pendientes de confirmar recepción.'
+    const enriched = pedidos.map((p: any) => {
+      let lineas: any[] = []
+      try { lineas = JSON.parse(p.data || '[]') } catch {}
+      return {
+        id: p.id,
+        descr: p.descr || 'Sin nombre',
+        mes: p.month && p.year ? `${p.year}-${String(p.month).padStart(2, '0')}` : null,
+        lineas: lineas.slice(0, 6),
+        total_lineas: lineas.length,
+      }
+    })
+    return `__PEDIDOS_RECIBIR_CARDS__${JSON.stringify({ pedidos: enriched })}`
+  }
+
+  // ── ALERTAS SUBIDA DE PRECIO ──────────────────────────────
+  if (name === 'alertas_subida_precio') {
+    const umbral = (args.umbral_pct || 10) / 100
+    const allPrecios = db.prepare(
+      'SELECT nombre, precio, vendor, fecha FROM precio_historial WHERE user_id=? ORDER BY nombre, id ASC'
+    ).all(userId) as any[]
+    const precioMap: Record<string, { first: number; last: number; lastVendor: string | null; lastFecha: string }> = {}
+    for (const p of allPrecios) {
+      if (!precioMap[p.nombre]) precioMap[p.nombre] = { first: p.precio, last: p.precio, lastVendor: p.vendor, lastFecha: p.fecha }
+      precioMap[p.nombre].last = p.precio
+      precioMap[p.nombre].lastVendor = p.vendor
+      precioMap[p.nombre].lastFecha = p.fecha
+    }
+    const subidas = Object.entries(precioMap)
+      .filter(([, v]) => v.first > 0 && ((v.last - v.first) / v.first) >= umbral)
+      .map(([nombre, v]) => ({
+        nombre,
+        precio_anterior: v.first,
+        precio_actual: v.last,
+        diff_pct: Math.round(((v.last - v.first) / v.first) * 100),
+        vendor: v.lastVendor,
+        fecha: v.lastFecha,
+      }))
+      .sort((a, b) => b.diff_pct - a.diff_pct)
+    if (!subidas.length) return `No hay ingredientes con subidas de precio superiores al ${Math.round(umbral * 100)}%.`
+    return `__PRECIOS_ALERTA_CARDS__${JSON.stringify({ subidas, umbral_pct: Math.round(umbral * 100) })}`
+  }
+
   // ── REGISTRAR MERMA ───────────────────────────────────────
   if (name === 'registrar_merma') {
     try {
@@ -1110,7 +1179,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
   if (name === 'analizar_food_cost_recetas') {
     const umbral = (args.umbral_pct || 33) / 100
     const recetas = db.prepare(`
-      SELECT r.nombre, r.precio_venta, r.raciones,
+      SELECT r.id, r.nombre, r.precio_venta, r.raciones,
              ROUND(SUM(
                CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
                     WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
@@ -1126,20 +1195,15 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
 
     if (!recetas.length) return 'No hay recetas con precio de venta definido.'
 
-    const result = recetas.map(r => {
+    const enriched = recetas.map((r: any) => {
       const pct = Math.round((r.coste_total / r.precio_venta) * 100)
-      const nivel = pct > 40 ? 'CRITICO' : pct > 33 ? 'REVISAR' : pct > 28 ? 'ACEPTABLE' : 'EXCELENTE'
-      const pvSugerido = r.coste_total > 0 ? Math.ceil(r.coste_total / 0.30 * 100) / 100 : null
-      return `• ${r.nombre}: coste ${r.coste_total}€ / PVP ${r.precio_venta}€ → ${pct}% [${nivel}]${nivel !== 'EXCELENTE' && nivel !== 'ACEPTABLE' && pvSugerido ? ` — PVP sugerido: ${pvSugerido}€` : ''}`
+      const pvSugerido = r.coste_total > 0 ? Math.ceil((r.coste_total / 0.30) * 100) / 100 : null
+      const nivel: 'critico' | 'revisar' | 'aceptable' | 'excelente' =
+        pct > 40 ? 'critico' : pct > 33 ? 'revisar' : pct > 28 ? 'aceptable' : 'excelente'
+      return { id: r.id, nombre: r.nombre, coste: r.coste_total, pvp: r.precio_venta, pct, pvSugerido, nivel }
     })
 
-    const criticas = recetas.filter(r => (r.coste_total / r.precio_venta) > umbral)
-    const header = `Food cost por receta (precios actuales):\n`
-    const footer = criticas.length > 0
-      ? `\n\n${criticas.length} receta${criticas.length > 1 ? 's' : ''} por encima del ${Math.round(umbral * 100)}%.`
-      : `\n\nTodas las recetas están dentro del umbral del ${Math.round(umbral * 100)}%.`
-
-    return header + result.join('\n') + footer
+    return `__FOOD_COST_CARDS__${JSON.stringify({ recetas: enriched, umbral_pct: Math.round(umbral * 100) })}`
   }
 
   // ── CALCULAR COMPRA SEMANAL ───────────────────────────────
@@ -1522,13 +1586,15 @@ REGLAS:
 - "resumen/informe/cómo estamos/brief/qué pasa/estado general/panel" → informe_diario (genera tarjetas visuales)
 - "gasto/cuánto gastamos" → resumen_gastos o gasto_por_proveedor (genera gráfico automáticamente)
 - "ingredientes más caros/baratos" → top_ingredientes_coste (genera gráfico)
-- "food cost/rentabilidad/qué platos revisar/margen de platos" → analizar_food_cost_recetas
+- "food cost/rentabilidad/qué platos revisar/margen de platos/cuál tiene el food cost más alto" → analizar_food_cost_recetas (genera tarjetas visuales por receta)
 - "quién cobra más barato/comparativa precios/ahorro proveedor/precio X entre proveedores" → comparar_precios_proveedor
-- "facturas pendientes/qué debo pagar/pagar facturas" → listar_facturas_para_pagar (genera tarjeta interactiva con botón de pago por factura)
+- "facturas pendientes/qué debo pagar/pagar facturas/qué tengo que pagar/facturas vencidas" → listar_facturas_para_pagar (genera tarjeta interactiva con botón de pago)
 - "he pagado/marca como pagada/ya pagué a X" → marcar_factura_pagada
+- "pedidos pendientes de recibir/qué tengo por recibir/entregas pendientes" → pedidos_pendientes_recibir (genera tarjetas de pedido)
+- "ingredientes han subido de precio/alertas de precio/qué ha subido/subidas de coste" → alertas_subida_precio (genera tarjetas visuales)
 - "merma/pérdidas" → ver_merma (genera gráfico si hay datos suficientes)
 - "evolución/precio/ha subido X" → historial_precio_ingrediente (genera gráfico de línea)
-- "busca/qué ingredientes/cuáles" → buscar_ingrediente
+- "busca/qué ingredientes/cuáles/ingredientes sin coste" → buscar_ingrediente (genera tarjetas visuales)
 - "esta semana hago/voy a hacer/planificar producción/cuánto tengo que pedir para X raciones" → calcular_compra_semanal con los platos y raciones mencionados
 - PEDIDOS — flujo obligatorio cuando el usuario diga "quiero pedir/hacer un pedido/qué tengo que pedir/repón":
   1. JAMÁS preguntes "qué proveedor". Llama YA a analizar_necesidades_pedido — genera una tarjeta interactiva con botones por proveedor.
@@ -1588,6 +1654,9 @@ REGLAS:
   let informeSemanal: any = null
   let ingredientesCards: any = null
   let proveedoresCards: any = null
+  let pedidosRecibirCards: any = null
+  let preciosAlertaCards: any = null
+  let foodCostCards: any = null
 
   for (const tc of toolCalls) {
     const args = JSON.parse(tc.function.arguments)
@@ -1625,6 +1694,15 @@ REGLAS:
     } else if (result.startsWith('__PROVEEDORES_CARDS__')) {
       proveedoresCards = JSON.parse(result.slice('__PROVEEDORES_CARDS__'.length))
       results.push('Lista de proveedores generada.')
+    } else if (result.startsWith('__PEDIDOS_RECIBIR_CARDS__')) {
+      pedidosRecibirCards = JSON.parse(result.slice('__PEDIDOS_RECIBIR_CARDS__'.length))
+      results.push('Pedidos pendientes generados.')
+    } else if (result.startsWith('__PRECIOS_ALERTA_CARDS__')) {
+      preciosAlertaCards = JSON.parse(result.slice('__PRECIOS_ALERTA_CARDS__'.length))
+      results.push('Alertas de precio generadas.')
+    } else if (result.startsWith('__FOOD_COST_CARDS__')) {
+      foodCostCards = JSON.parse(result.slice('__FOOD_COST_CARDS__'.length))
+      results.push('Análisis de food cost generado.')
     } else if (result.startsWith('__CHART__')) {
       const parsed = JSON.parse(result.slice('__CHART__'.length))
       chartData = parsed.chart
@@ -1644,6 +1722,9 @@ REGLAS:
   if (informeSemanal)      return NextResponse.json({ reply: '', action: toolNames, informeSemanal })
   if (ingredientesCards)   return NextResponse.json({ reply: '', action: toolNames, ingredientesCards })
   if (proveedoresCards)    return NextResponse.json({ reply: '', action: toolNames, proveedoresCards })
+  if (pedidosRecibirCards) return NextResponse.json({ reply: '', action: toolNames, pedidosRecibirCards })
+  if (preciosAlertaCards)  return NextResponse.json({ reply: '', action: toolNames, preciosAlertaCards })
+  if (foodCostCards)       return NextResponse.json({ reply: '', action: toolNames, foodCostCards })
   if (whatsappProposal)    return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
 
   // Simple CRUD tools → return result directly, no follow-up LLM call

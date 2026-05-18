@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       tipo: 'danger',
       titulo: `${facVencidas.c} factura${facVencidas.c > 1 ? 's' : ''} vencida${facVencidas.c > 1 ? 's' : ''}`,
       detalle: `${facVencidas.t || 0} EUR sin pagar`,
-      chat: 'Dime qué facturas están vencidas y qué tengo que hacer',
+      chat: 'Muéstrame las facturas pendientes para pagarlas',
       href: '/dashboard/compras/facturas',
     })
   }
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
       tipo: 'warning',
       titulo: `${facProximas.c} factura${facProximas.c > 1 ? 's' : ''} vence${facProximas.c > 1 ? 'n' : ''} en 5 días`,
       detalle: `${facProximas.t || 0} EUR`,
-      chat: 'Qué facturas vencen esta semana?',
+      chat: 'Muéstrame las facturas pendientes para pagarlas',
       href: '/dashboard/compras/facturas',
     })
   }
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       tipo: 'info',
       titulo: `${pedPend.c} pedido${pedPend.c > 1 ? 's' : ''} pendiente${pedPend.c > 1 ? 's' : ''} de recibir`,
       detalle: 'Entregas aún sin confirmar',
-      chat: 'Qué pedidos tengo pendientes de recibir?',
+      chat: 'Qué pedidos tengo pendientes de recibir',
       href: '/dashboard/compras/pedidos',
     })
   }
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
       tipo: 'warning',
       titulo: `${subidas.length} ingrediente${subidas.length > 1 ? 's' : ''} ha${subidas.length > 1 ? 'n' : ''} subido de precio`,
       detalle: subidas.map(([n, v]) => `${n} +${Math.round(((v.last - v.first) / v.first) * 100)}%`).join(' · '),
-      chat: 'Qué ingredientes han subido de precio recientemente?',
+      chat: 'Qué ingredientes han subido de precio',
       href: '/dashboard/analytics',
     })
   }
@@ -181,7 +181,7 @@ export async function GET(req: NextRequest) {
       tipo: 'danger',
       titulo: `${recetasCriticas.length} plato${recetasCriticas.length > 1 ? 's' : ''} con food cost crítico`,
       detalle,
-      chat: 'Qué platos tienen el food cost más alto y cómo puedo reducirlo?',
+      chat: 'Qué platos tienen el food cost más alto',
       href: '/dashboard/sangrado',
     })
   }

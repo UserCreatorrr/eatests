@@ -103,7 +103,7 @@ interface ProveedorItem {
 }
 
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar' | 'albaran_guardado' | 'informe_semanal' | 'ingredientes_cards' | 'proveedores_cards'
+  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar' | 'albaran_guardado' | 'informe_semanal' | 'ingredientes_cards' | 'proveedores_cards' | 'pedidos_recibir_cards' | 'precios_alerta_cards' | 'food_cost_cards'
   content: string
   image?: string
   emailProposal?: EmailProposal
@@ -118,6 +118,9 @@ interface Message {
   chartData?: ChartData
   ingredientesCards?: { ingredientes: IngredienteItem[]; filtro: string }
   proveedoresCards?: { proveedores: ProveedorItem[] }
+  pedidosRecibirCards?: { pedidos: { id: number; descr: string; mes: string | null; lineas: any[]; total_lineas: number }[] }
+  preciosAlertaCards?: { subidas: { nombre: string; precio_anterior: number; precio_actual: number; diff_pct: number; vendor: string | null; fecha: string }[]; umbral_pct: number }
+  foodCostCards?: { recetas: { id: number; nombre: string; coste: number; pvp: number; pct: number; pvSugerido: number | null; nivel: 'critico' | 'revisar' | 'aceptable' | 'excelente' }[]; umbral_pct: number }
 }
 
 const CARD_ICONS: Record<string, JSX.Element> = {
@@ -880,6 +883,140 @@ function ProveedoresCard({ data }: { data: { proveedores: ProveedorItem[] } }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function PedidosRecibirCard({ data }: { data: { pedidos: { id: number; descr: string; mes: string | null; lineas: any[]; total_lineas: number }[] } }) {
+  const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      <div style={{ backgroundColor: '#1e3a5f', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#bfdbfe', margin: '0 0 1px' }}>Pedidos pendientes de recibir</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#93c5fd', opacity: 0.7, margin: 0 }}>
+            {data.pedidos.length} entrega{data.pedidos.length !== 1 ? 's' : ''} sin confirmar
+          </p>
+        </div>
+        <a href="/dashboard/compras/pedidos" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#93c5fd', textDecoration: 'none' }}>
+          Gestionar →
+        </a>
+      </div>
+      <div style={{ border: '1px solid #bfdbfe40', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
+        {data.pedidos.map((p, i) => (
+          <div key={p.id} style={{ padding: '11px 16px', borderBottom: i < data.pedidos.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: 0 }}>{p.descr}</p>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                {p.mes && <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#6b6560', backgroundColor: '#f5f2ee', padding: '2px 7px', borderRadius: 5 }}>{p.mes}</span>}
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 7px', borderRadius: 5 }}>
+                  {p.total_lineas} artículo{p.total_lineas !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+            {p.lineas.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {p.lineas.slice(0, 4).map((l: any, j: number) => (
+                  <span key={j} style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#6b6560', backgroundColor: '#f5f2ee', padding: '2px 8px', borderRadius: 5 }}>
+                    {l.nombre || l.descr || l.item || String(l)}
+                  </span>
+                ))}
+                {p.total_lineas > 4 && <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#9c958f' }}>+{p.total_lineas - 4} más</span>}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PreciosAlertaCard({ data }: { data: { subidas: { nombre: string; precio_anterior: number; precio_actual: number; diff_pct: number; vendor: string | null; fecha: string }[]; umbral_pct: number } }) {
+  const fmt = (v: number) => `${v.toFixed(2)}€`
+  return (
+    <div style={{ width: '100%', maxWidth: 560 }}>
+      <div style={{ backgroundColor: '#78350f', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#fef3c7', margin: '0 0 1px' }}>Subidas de precio</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#fcd34d', opacity: 0.8, margin: 0 }}>
+            {data.subidas.length} ingrediente{data.subidas.length !== 1 ? 's' : ''} con subida &gt;{data.umbral_pct}%
+          </p>
+        </div>
+        <a href="/dashboard/analytics" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#fcd34d', textDecoration: 'none' }}>
+          Ver analytics →
+        </a>
+      </div>
+      <div style={{ border: '1px solid #fcd34d40', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
+        {data.subidas.map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.subidas.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.nombre}</p>
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
+                {s.vendor ? `${s.vendor} · ` : ''}{s.fecha}
+              </p>
+            </div>
+            <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: '#dc2626', margin: '0 0 2px' }}>
+                +{s.diff_pct}%
+              </p>
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#9c958f', margin: 0 }}>
+                {fmt(s.precio_anterior)} → {fmt(s.precio_actual)}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const FOOD_COST_COLORS = {
+  critico:   { bg: '#fef2f2', text: '#dc2626', badge: '#fee2e2', dot: '#dc2626' },
+  revisar:   { bg: '#fffbeb', text: '#d97706', badge: '#fef3c7', dot: '#d97706' },
+  aceptable: { bg: '#f0fdf4', text: '#16a34a', badge: '#dcfce7', dot: '#16a34a' },
+  excelente: { bg: '#f0fdf4', text: '#15803d', badge: '#dcfce7', dot: '#15803d' },
+}
+const FOOD_COST_LABELS = { critico: 'CRÍTICO', revisar: 'REVISAR', aceptable: 'OK', excelente: 'EXCELENTE' }
+
+function FoodCostCard({ data }: { data: { recetas: { id: number; nombre: string; coste: number; pvp: number; pct: number; pvSugerido: number | null; nivel: 'critico' | 'revisar' | 'aceptable' | 'excelente' }[]; umbral_pct: number } }) {
+  const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
+  const criticas = data.recetas.filter(r => r.nivel === 'critico' || r.nivel === 'revisar').length
+  return (
+    <div style={{ width: '100%', maxWidth: 580 }}>
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#dfd5c9', margin: '0 0 1px' }}>Food cost por receta</p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
+            {data.recetas.length} recetas analizadas{criticas > 0 && <span style={{ color: '#fca5a5' }}> · {criticas} a revisar</span>}
+          </p>
+        </div>
+        <a href="/dashboard/sangrado" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#19f973', textDecoration: 'none' }}>
+          Ver escandallo →
+        </a>
+      </div>
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
+        {data.recetas.map((r, i) => {
+          const col = FOOD_COST_COLORS[r.nivel]
+          return (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.recetas.length - 1 ? '1px solid #f5f2ee' : 'none', backgroundColor: col.bg }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: col.dot, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.nombre}</p>
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
+                  Coste {fmt(r.coste)} · PVP {fmt(r.pvp)}
+                  {r.pvSugerido && r.nivel !== 'aceptable' && r.nivel !== 'excelente' && <span style={{ color: col.text }}> · PVP sugerido {fmt(r.pvSugerido)}</span>}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, color: col.text, margin: '0 0 2px' }}>{r.pct}%</p>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 8.5, fontWeight: 700, color: col.text, backgroundColor: col.badge, padding: '2px 6px', borderRadius: 5, letterSpacing: '0.04em' }}>
+                  {FOOD_COST_LABELS[r.nivel]}
+                </span>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -1790,7 +1927,7 @@ function loadCurrent(): Message[] {
 
 function saveCurrent(messages: Message[]) {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && m.role !== 'necesidades_pedido' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal' && m.role !== 'ingredientes_cards' && m.role !== 'proveedores_cards')))
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && m.role !== 'necesidades_pedido' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal' && m.role !== 'ingredientes_cards' && m.role !== 'proveedores_cards' && m.role !== 'pedidos_recibir_cards' && m.role !== 'precios_alerta_cards' && m.role !== 'food_cost_cards')))
   } catch {}
 }
 
@@ -1888,6 +2025,9 @@ export default function KitchenChat() {
       if (m.role === 'informe_semanal') return [{ role: 'assistant' as const, content: '[Informe semanal generado y mostrado al usuario con gasto, merma, facturas y alertas]' }]
       if (m.role === 'ingredientes_cards') return [{ role: 'assistant' as const, content: `[Lista de ${m.ingredientesCards?.ingredientes?.length ?? 0} ingredientes mostrada al usuario en tarjetas]` }]
       if (m.role === 'proveedores_cards') return [{ role: 'assistant' as const, content: `[Lista de ${m.proveedoresCards?.proveedores?.length ?? 0} proveedores mostrada al usuario en tarjetas]` }]
+      if (m.role === 'pedidos_recibir_cards') return [{ role: 'assistant' as const, content: `[${m.pedidosRecibirCards?.pedidos?.length ?? 0} pedidos pendientes de recibir mostrados al usuario en tarjetas]` }]
+      if (m.role === 'precios_alerta_cards') return [{ role: 'assistant' as const, content: `[${m.preciosAlertaCards?.subidas?.length ?? 0} alertas de subida de precio mostradas al usuario en tarjetas]` }]
+      if (m.role === 'food_cost_cards') return [{ role: 'assistant' as const, content: `[Análisis de food cost de ${m.foodCostCards?.recetas?.length ?? 0} recetas mostrado al usuario en tarjetas]` }]
       if (m.role === 'whatsapp_proposal') return [{ role: 'assistant' as const, content: '[Borrador de WhatsApp generado y mostrado al usuario]' }]
       if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice') return []
       return [m]
@@ -1929,6 +2069,12 @@ export default function KitchenChat() {
         setMessages(prev => [...prev, { role: 'ingredientes_cards', content: '', ingredientesCards: json.ingredientesCards }])
       } else if (json.proveedoresCards) {
         setMessages(prev => [...prev, { role: 'proveedores_cards', content: '', proveedoresCards: json.proveedoresCards }])
+      } else if (json.pedidosRecibirCards) {
+        setMessages(prev => [...prev, { role: 'pedidos_recibir_cards', content: '', pedidosRecibirCards: json.pedidosRecibirCards }])
+      } else if (json.preciosAlertaCards) {
+        setMessages(prev => [...prev, { role: 'precios_alerta_cards', content: '', preciosAlertaCards: json.preciosAlertaCards }])
+      } else if (json.foodCostCards) {
+        setMessages(prev => [...prev, { role: 'food_cost_cards', content: '', foodCostCards: json.foodCostCards }])
       } else if (json.whatsappProposal) {
         setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
@@ -2302,6 +2448,33 @@ export default function KitchenChat() {
                     <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ width: 28, height: 28, flexShrink: 0 }} />
                       <ProveedoresCard data={msg.proveedoresCards} />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'pedidos_recibir_cards' && msg.pedidosRecibirCards) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <PedidosRecibirCard data={msg.pedidosRecibirCards} />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'precios_alerta_cards' && msg.preciosAlertaCards) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <PreciosAlertaCard data={msg.preciosAlertaCards} />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'food_cost_cards' && msg.foodCostCards) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <FoodCostCard data={msg.foodCostCards} />
                     </div>
                   )
                 }

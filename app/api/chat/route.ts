@@ -275,6 +275,14 @@ const tools: any[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'alertas_predictivas',
+      description: 'Análisis predictivo: proyección de food cost, ciclos de reposición, aceleración de precios y cash flow por semana. Anticipa problemas antes de que ocurran.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
   // ── MERMA ─────────────────────────────────────────────────
   {
     type: 'function',
@@ -941,6 +949,198 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     return `__PRECIOS_ALERTA_CARDS__${JSON.stringify({ subidas, umbral_pct: Math.round(umbral * 100) })}`
   }
 
+  // ── ALERTAS PREDICTIVAS ──────────────────────────────────
+  if (name === 'alertas_predictivas') {
+    const hoy = new Date()
+    const hoyStr = hoy.toISOString().split('T')[0]
+
+    // (a) FOOD COST PROYECTADO: para cada receta activa con PVP, simula coste si los precios
+    // siguen la pendiente actual de los últimos 90 días (regresión lineal simple por ingrediente).
+    type IngrTrend = { ingId: number; nombre: string; pendientePorDia: number; ultimoPrecio: number }
+    const ingrTrends: Record<number, IngrTrend> = {}
+    const precios90 = db.prepare(`
+      SELECT i.id as ingId, ph.nombre, ph.precio, julianday(ph.fecha) as dia
+      FROM precio_historial ph
+      JOIN ingredientes i ON i.descr = ph.nombre AND i.user_id = ph.user_id
+      WHERE ph.user_id=? AND date(ph.fecha) >= date('now','-90 days')
+      ORDER BY ph.nombre, ph.fecha ASC
+    `).all(userId) as any[]
+    const agruparPorIng: Record<number, { nombre: string; pts: { x: number; y: number }[] }> = {}
+    for (const r of precios90) {
+      if (!agruparPorIng[r.ingId]) agruparPorIng[r.ingId] = { nombre: r.nombre, pts: [] }
+      agruparPorIng[r.ingId].pts.push({ x: r.dia, y: r.precio })
+    }
+    for (const [idStr, v] of Object.entries(agruparPorIng)) {
+      const pts = v.pts
+      if (pts.length < 2) continue
+      // Linear regression: slope = Σ((x-x̄)(y-ȳ)) / Σ((x-x̄)²)
+      const xMean = pts.reduce((s, p) => s + p.x, 0) / pts.length
+      const yMean = pts.reduce((s, p) => s + p.y, 0) / pts.length
+      let num = 0, den = 0
+      for (const p of pts) { num += (p.x - xMean) * (p.y - yMean); den += (p.x - xMean) ** 2 }
+      const slope = den > 0 ? num / den : 0
+      ingrTrends[+idStr] = { ingId: +idStr, nombre: v.nombre, pendientePorDia: slope, ultimoPrecio: pts[pts.length - 1].y }
+    }
+
+    const recetas = db.prepare(`
+      SELECT r.id, r.nombre, r.precio_venta
+      FROM escandallo_receta r
+      WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0
+    `).all(userId) as any[]
+
+    const fcProyectado: { receta: string; pct_actual: number; pct_30: number; pct_60: number; ingrediente_top: string | null }[] = []
+    for (const r of recetas) {
+      const lineas = db.prepare(`
+        SELECT l.ingrediente_id, l.cantidad, l.coste_unitario, i.cost
+        FROM escandallo_lineas l
+        LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+        WHERE l.receta_id=? AND l.user_id=?
+      `).all(r.id, userId) as any[]
+      if (!lineas.length) continue
+      let costeActual = 0, coste30 = 0, coste60 = 0
+      let topImpacto = { nombre: '', delta: 0 }
+      for (const l of lineas) {
+        const costoBase = (l.ingrediente_id && l.cost != null) ? l.cost : (l.coste_unitario ?? 0)
+        const cant = l.cantidad || 0
+        costeActual += costoBase * cant
+        const trend = l.ingrediente_id ? ingrTrends[l.ingrediente_id] : null
+        const c30 = trend ? Math.max(0, costoBase + trend.pendientePorDia * 30) : costoBase
+        const c60 = trend ? Math.max(0, costoBase + trend.pendientePorDia * 60) : costoBase
+        coste30 += c30 * cant
+        coste60 += c60 * cant
+        const delta = (c60 - costoBase) * cant
+        if (trend && delta > topImpacto.delta) topImpacto = { nombre: trend.nombre, delta }
+      }
+      const pctActual = (costeActual / r.precio_venta) * 100
+      const pct30 = (coste30 / r.precio_venta) * 100
+      const pct60 = (coste60 / r.precio_venta) * 100
+      // Solo alertar si cruza umbral 33% en 60 días o ya está subiendo >3 puntos
+      if (pct60 >= 33 && pct60 - pctActual >= 2) {
+        fcProyectado.push({
+          receta: r.nombre,
+          pct_actual: Math.round(pctActual),
+          pct_30: Math.round(pct30),
+          pct_60: Math.round(pct60),
+          ingrediente_top: topImpacto.nombre || null,
+        })
+      }
+    }
+    fcProyectado.sort((a, b) => b.pct_60 - a.pct_60)
+
+    // (b) CICLOS DE REPOSICIÓN: mediana de días entre entregas por ingrediente.
+    const ingredientesProv = db.prepare(`
+      SELECT i.descr as nombre, p.descr as proveedor
+      FROM ingredientes i
+      JOIN proveedores p ON p.id = i.proveedor_id
+      WHERE i.user_id=?
+    `).all(userId) as any[]
+    const ciclos: { ingrediente: string; proveedor: string; ciclo_dias: number; dias_desde: number; toca: 'hoy' | 'manana' | 'retrasado' }[] = []
+    for (const it of ingredientesProv) {
+      const fechas = db.prepare(`
+        SELECT DISTINCT date(fecha) as fecha FROM lineas_albaran_compra
+        WHERE user_id=? AND nombre=? ORDER BY fecha ASC
+      `).all(userId, it.nombre) as any[]
+      if (fechas.length < 3) continue
+      const gaps: number[] = []
+      for (let i = 1; i < fechas.length; i++) {
+        const d1 = new Date(fechas[i - 1].fecha).getTime()
+        const d2 = new Date(fechas[i].fecha).getTime()
+        gaps.push(Math.round((d2 - d1) / 86400000))
+      }
+      gaps.sort((a, b) => a - b)
+      const mediana = gaps[Math.floor(gaps.length / 2)]
+      if (mediana < 1 || mediana > 60) continue
+      const ultima = new Date(fechas[fechas.length - 1].fecha)
+      const diasDesde = Math.floor((hoy.getTime() - ultima.getTime()) / 86400000)
+      const diff = diasDesde - mediana
+      if (diff >= -1) {
+        ciclos.push({
+          ingrediente: it.nombre,
+          proveedor: it.proveedor,
+          ciclo_dias: mediana,
+          dias_desde: diasDesde,
+          toca: diff >= 1 ? 'retrasado' : diff === 0 ? 'hoy' : 'manana',
+        })
+      }
+    }
+    ciclos.sort((a, b) => b.dias_desde - b.ciclo_dias - (a.dias_desde - a.ciclo_dias))
+
+    // (c) ACELERACIÓN DE PRECIO: 3+ subidas consecutivas en últimos 90 días
+    const aceleracion: { nombre: string; subidas_consecutivas: number; precio_inicio: number; precio_actual: number; diff_pct: number }[] = []
+    const preciosCons = db.prepare(`
+      SELECT nombre, precio, fecha FROM precio_historial
+      WHERE user_id=? AND date(fecha) >= date('now','-90 days')
+      ORDER BY nombre, fecha ASC, id ASC
+    `).all(userId) as any[]
+    const porNombre: Record<string, number[]> = {}
+    for (const p of preciosCons) {
+      if (!porNombre[p.nombre]) porNombre[p.nombre] = []
+      porNombre[p.nombre].push(p.precio)
+    }
+    for (const [nombre, precios] of Object.entries(porNombre)) {
+      if (precios.length < 4) continue
+      let subidasConsec = 0
+      for (let i = 1; i < precios.length; i++) {
+        if (precios[i] > precios[i - 1]) subidasConsec++
+        else break
+      }
+      // Recalcular desde el final: cuántas subidas seguidas hacia atrás
+      let count = 0
+      for (let i = precios.length - 1; i > 0; i--) {
+        if (precios[i] > precios[i - 1]) count++
+        else break
+      }
+      if (count >= 3) {
+        const inicio = precios[precios.length - 1 - count]
+        const actual = precios[precios.length - 1]
+        aceleracion.push({
+          nombre,
+          subidas_consecutivas: count,
+          precio_inicio: inicio,
+          precio_actual: actual,
+          diff_pct: inicio > 0 ? Math.round(((actual - inicio) / inicio) * 100) : 0,
+        })
+      }
+    }
+    aceleracion.sort((a, b) => b.diff_pct - a.diff_pct)
+
+    // (d) CASH FLOW POR SEMANA: facturas pendientes agrupadas por semana ISO de date_due
+    const facturas = db.prepare(`
+      SELECT total, date_due FROM facturas_compra
+      WHERE user_id=? AND (paid=0 OR paid IS NULL) AND date_due IS NOT NULL
+        AND date(date_due) >= date('now','-7 days') AND date(date_due) <= date('now','+45 days')
+    `).all(userId) as any[]
+    const porSemana: Record<string, { inicio: string; fin: string; total: number; count: number; vencidas: number }> = {}
+    for (const f of facturas) {
+      const d = new Date(f.date_due)
+      // Comenzar la semana en lunes
+      const dow = (d.getDay() + 6) % 7
+      const lunes = new Date(d)
+      lunes.setDate(d.getDate() - dow)
+      const domingo = new Date(lunes)
+      domingo.setDate(lunes.getDate() + 6)
+      const key = lunes.toISOString().split('T')[0]
+      if (!porSemana[key]) porSemana[key] = { inicio: key, fin: domingo.toISOString().split('T')[0], total: 0, count: 0, vencidas: 0 }
+      porSemana[key].total += (f.total || 0)
+      porSemana[key].count++
+      if (d < hoy) porSemana[key].vencidas++
+    }
+    const cashflow = Object.values(porSemana)
+      .map(s => ({ ...s, total: Math.round(s.total * 100) / 100 }))
+      .sort((a, b) => a.inicio.localeCompare(b.inicio))
+
+    const totalAlertas = fcProyectado.length + ciclos.length + aceleracion.length + cashflow.length
+    if (totalAlertas === 0) return 'No hay alertas predictivas. Todo apunta a estabilidad en los próximos 60 días.'
+
+    return `__ALERTAS_PREDICTIVAS_CARDS__${JSON.stringify({
+      generado: new Date().toISOString(),
+      fc_proyectado: fcProyectado.slice(0, 6),
+      ciclos_reposicion: ciclos.slice(0, 8),
+      aceleracion_precio: aceleracion.slice(0, 6),
+      cashflow,
+    })}`
+  }
+
   // ── REGISTRAR MERMA ───────────────────────────────────────
   if (name === 'registrar_merma') {
     try {
@@ -1592,6 +1792,7 @@ REGLAS:
 - "he pagado/marca como pagada/ya pagué a X" → marcar_factura_pagada
 - "pedidos pendientes de recibir/qué tengo por recibir/entregas pendientes" → pedidos_pendientes_recibir (genera tarjetas de pedido)
 - "ingredientes han subido de precio/alertas de precio/qué ha subido/subidas de coste" → alertas_subida_precio (genera tarjetas visuales)
+- "qué problemas vienen/anticipa/predicción/proyección/qué va a pasar/avísame antes/predictivo/tendencias/qué pasará/cómo me afectará" → alertas_predictivas (proyecciones a 30/60 días)
 - "merma/pérdidas" → ver_merma (genera gráfico si hay datos suficientes)
 - "evolución/precio/ha subido X" → historial_precio_ingrediente (genera gráfico de línea)
 - "busca/qué ingredientes/cuáles/ingredientes sin coste" → buscar_ingrediente (genera tarjetas visuales)
@@ -1657,6 +1858,7 @@ REGLAS:
   let pedidosRecibirCards: any = null
   let preciosAlertaCards: any = null
   let foodCostCards: any = null
+  let alertasPredictivasCards: any = null
 
   for (const tc of toolCalls) {
     const args = JSON.parse(tc.function.arguments)
@@ -1703,6 +1905,9 @@ REGLAS:
     } else if (result.startsWith('__FOOD_COST_CARDS__')) {
       foodCostCards = JSON.parse(result.slice('__FOOD_COST_CARDS__'.length))
       results.push('Análisis de food cost generado.')
+    } else if (result.startsWith('__ALERTAS_PREDICTIVAS_CARDS__')) {
+      alertasPredictivasCards = JSON.parse(result.slice('__ALERTAS_PREDICTIVAS_CARDS__'.length))
+      results.push('Alertas predictivas generadas.')
     } else if (result.startsWith('__CHART__')) {
       const parsed = JSON.parse(result.slice('__CHART__'.length))
       chartData = parsed.chart
@@ -1725,6 +1930,7 @@ REGLAS:
   if (pedidosRecibirCards) return NextResponse.json({ reply: '', action: toolNames, pedidosRecibirCards })
   if (preciosAlertaCards)  return NextResponse.json({ reply: '', action: toolNames, preciosAlertaCards })
   if (foodCostCards)       return NextResponse.json({ reply: '', action: toolNames, foodCostCards })
+  if (alertasPredictivasCards) return NextResponse.json({ reply: '', action: toolNames, alertasPredictivasCards })
   if (whatsappProposal)    return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
 
   // Simple CRUD tools → return result directly, no follow-up LLM call

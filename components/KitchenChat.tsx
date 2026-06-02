@@ -103,7 +103,7 @@ interface ProveedorItem {
 }
 
 interface Message {
-  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar' | 'albaran_guardado' | 'informe_semanal' | 'ingredientes_cards' | 'proveedores_cards' | 'pedidos_recibir_cards' | 'precios_alerta_cards' | 'food_cost_cards'
+  role: 'user' | 'assistant' | 'email_proposal' | 'whatsapp_proposal' | 'brief_cards' | 'pedido_selector' | 'necesidades_pedido' | 'compra_semanal' | 'facturas_pagar' | 'albaran_guardado' | 'informe_semanal' | 'ingredientes_cards' | 'proveedores_cards' | 'pedidos_recibir_cards' | 'precios_alerta_cards' | 'food_cost_cards' | 'alertas_predictivas_cards'
   content: string
   image?: string
   emailProposal?: EmailProposal
@@ -121,6 +121,15 @@ interface Message {
   pedidosRecibirCards?: { pedidos: { id: number; descr: string; mes: string | null; lineas: any[]; total_lineas: number }[] }
   preciosAlertaCards?: { subidas: { nombre: string; precio_anterior: number; precio_actual: number; diff_pct: number; vendor: string | null; fecha: string }[]; umbral_pct: number }
   foodCostCards?: { recetas: { id: number; nombre: string; coste: number; pvp: number; pct: number; pvSugerido: number | null; nivel: 'critico' | 'revisar' | 'aceptable' | 'excelente' }[]; umbral_pct: number }
+  alertasPredictivasCards?: AlertasPredictivasData
+}
+
+interface AlertasPredictivasData {
+  generado: string
+  fc_proyectado: { receta: string; pct_actual: number; pct_30: number; pct_60: number; ingrediente_top: string | null }[]
+  ciclos_reposicion: { ingrediente: string; proveedor: string; ciclo_dias: number; dias_desde: number; toca: 'hoy' | 'manana' | 'retrasado' }[]
+  aceleracion_precio: { nombre: string; subidas_consecutivas: number; precio_inicio: number; precio_actual: number; diff_pct: number }[]
+  cashflow: { inicio: string; fin: string; total: number; count: number; vencidas: number }[]
 }
 
 const CARD_ICONS: Record<string, JSX.Element> = {
@@ -1022,6 +1031,236 @@ function FoodCostCard({ data }: { data: { recetas: { id: number; nombre: string;
   )
 }
 
+function AlertasPredictivasCard({ data, onSend }: { data: AlertasPredictivasData; onSend: (text: string) => void }) {
+  const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
+  const semanaLabel = (s: { inicio: string; fin: string }) => {
+    const d1 = new Date(s.inicio), d2 = new Date(s.fin)
+    const opt: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' }
+    return `${d1.toLocaleDateString('es-ES', opt)} → ${d2.toLocaleDateString('es-ES', opt)}`
+  }
+  const tocaLabel = { hoy: 'HOY', manana: 'MAÑANA', retrasado: 'RETRASADO' }
+  const tocaColor = { hoy: '#d97706', manana: '#2563eb', retrasado: '#dc2626' }
+  const tocaBg = { hoy: '#fffbeb', manana: '#eff6ff', retrasado: '#fef2f2' }
+
+  const maxCashflow = Math.max(1, ...data.cashflow.map(c => c.total))
+  const totalSecciones =
+    (data.fc_proyectado.length > 0 ? 1 : 0) +
+    (data.ciclos_reposicion.length > 0 ? 1 : 0) +
+    (data.aceleracion_precio.length > 0 ? 1 : 0) +
+    (data.cashflow.length > 0 ? 1 : 0)
+
+  const sectionTitle = (label: string, badge: string, color: string) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px 8px' }}>
+      <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 12, color: '#3d3834', letterSpacing: '0.02em' }}>{label}</span>
+      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, color, backgroundColor: color + '18', padding: '2px 7px', borderRadius: 5, letterSpacing: '0.05em' }}>{badge}</span>
+    </div>
+  )
+
+  return (
+    <div style={{ width: '100%', maxWidth: 620 }}>
+      {/* Header con gradient */}
+      <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)', borderRadius: '16px 16px 0 0', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 14 }}>🔮</span>
+            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#fff', margin: 0 }}>
+              Análisis predictivo
+            </p>
+          </div>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#c7d2fe', margin: '3px 0 0', opacity: 0.85 }}>
+            {totalSecciones} señal{totalSecciones !== 1 ? 'es' : ''} a 30–60 días vista
+          </p>
+        </div>
+        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#a5b4fc', backgroundColor: '#ffffff15', padding: '4px 9px', borderRadius: 7, letterSpacing: '0.05em' }}>
+          BETA
+        </span>
+      </div>
+
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', backgroundColor: '#fff', overflow: 'hidden' }}>
+
+        {/* FOOD COST PROYECTADO */}
+        {data.fc_proyectado.length > 0 && (
+          <div>
+            {sectionTitle('Food cost proyectado', 'PROYECCIÓN 60D', '#dc2626')}
+            <div style={{ padding: '0 18px 12px' }}>
+              {data.fc_proyectado.map((r, i) => {
+                const cruza33 = r.pct_60 >= 33 && r.pct_actual < 33
+                return (
+                  <div key={i} style={{
+                    backgroundColor: cruza33 ? '#fef2f2' : '#fffbeb',
+                    border: `1px solid ${cruza33 ? '#fca5a5' : '#fcd34d'}`,
+                    borderRadius: 10, padding: '10px 12px', marginBottom: 6,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                      <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {r.receta}
+                      </p>
+                      {cruza33 && (
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 8.5, fontWeight: 700, color: '#dc2626', backgroundColor: '#fee2e2', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.04em', flexShrink: 0, marginLeft: 8 }}>
+                          CRUZA 33%
+                        </span>
+                      )}
+                    </div>
+                    {/* Mini timeline */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#9c958f' }}>HOY</span>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 700, color: r.pct_actual >= 33 ? '#dc2626' : '#3d3834' }}>{r.pct_actual}%</span>
+                      </div>
+                      <span style={{ color: '#d1c5b8', fontSize: 14 }}>→</span>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#9c958f' }}>+30d</span>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 600, color: r.pct_30 >= 33 ? '#dc2626' : '#3d3834' }}>{r.pct_30}%</span>
+                      </div>
+                      <span style={{ color: '#d1c5b8', fontSize: 14 }}>→</span>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#9c958f' }}>+60d</span>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 700, color: r.pct_60 >= 33 ? '#dc2626' : '#3d3834' }}>{r.pct_60}%</span>
+                      </div>
+                    </div>
+                    {r.ingrediente_top && (
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#92400e', margin: '6px 0 0' }}>
+                        Mayor impacto: <span style={{ fontWeight: 700 }}>{r.ingrediente_top}</span>
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* CICLOS DE REPOSICIÓN */}
+        {data.ciclos_reposicion.length > 0 && (
+          <div style={{ borderTop: '1px solid #f5f2ee' }}>
+            {sectionTitle('Ciclos de reposición', 'PEDIDOS', '#2563eb')}
+            <div style={{ padding: '0 18px 12px' }}>
+              {data.ciclos_reposicion.map((c, i) => (
+                <div key={i} style={{
+                  backgroundColor: tocaBg[c.toca],
+                  border: `1px solid ${tocaColor[c.toca]}30`,
+                  borderRadius: 10, padding: '8px 12px', marginBottom: 6,
+                  display: 'flex', alignItems: 'center', gap: 10,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {c.ingrediente}
+                    </p>
+                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
+                      {c.proveedor} · ciclo {c.ciclo_dias}d · última hace {c.dias_desde}d
+                    </p>
+                  </div>
+                  <span style={{
+                    fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700,
+                    color: tocaColor[c.toca], backgroundColor: '#fff',
+                    padding: '3px 8px', borderRadius: 6, letterSpacing: '0.05em',
+                    flexShrink: 0, border: `1px solid ${tocaColor[c.toca]}40`,
+                  }}>
+                    {tocaLabel[c.toca]}
+                  </span>
+                </div>
+              ))}
+              <button
+                onClick={() => onSend('Quiero hacer un pedido')}
+                style={{
+                  marginTop: 4, fontFamily: 'DM Mono, monospace', fontSize: 10.5, fontWeight: 600,
+                  color: '#2563eb', backgroundColor: '#eff6ff',
+                  border: '1px solid #2563eb30', borderRadius: 7,
+                  padding: '5px 12px', cursor: 'pointer',
+                }}
+              >
+                Preparar pedidos →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ACELERACIÓN DE PRECIO */}
+        {data.aceleracion_precio.length > 0 && (
+          <div style={{ borderTop: '1px solid #f5f2ee' }}>
+            {sectionTitle('Aceleración sostenida de precio', 'TENDENCIA', '#d97706')}
+            <div style={{ padding: '0 18px 12px' }}>
+              {data.aceleracion_precio.map((a, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 12px', marginBottom: 4,
+                  backgroundColor: '#fffbeb', borderRadius: 10,
+                  border: '1px solid #fcd34d40',
+                }}>
+                  <div style={{ display: 'flex', gap: 2, alignItems: 'end', flexShrink: 0, height: 18 }}>
+                    {Array.from({ length: a.subidas_consecutivas }).map((_, j) => (
+                      <div key={j} style={{
+                        width: 4, height: 5 + j * 3,
+                        backgroundColor: '#d97706', borderRadius: 1,
+                      }} />
+                    ))}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {a.nombre}
+                    </p>
+                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
+                      {a.subidas_consecutivas} subidas seguidas · {fmt(a.precio_inicio)} → {fmt(a.precio_actual)}
+                    </p>
+                  </div>
+                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: '#d97706', flexShrink: 0 }}>
+                    +{a.diff_pct}%
+                  </span>
+                </div>
+              ))}
+              <button
+                onClick={() => onSend('Muéstrame alternativas de proveedor más baratas para estos ingredientes')}
+                style={{
+                  marginTop: 4, fontFamily: 'DM Mono, monospace', fontSize: 10.5, fontWeight: 600,
+                  color: '#d97706', backgroundColor: '#fffbeb',
+                  border: '1px solid #d9770630', borderRadius: 7,
+                  padding: '5px 12px', cursor: 'pointer',
+                }}
+              >
+                Buscar alternativas →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CASH FLOW */}
+        {data.cashflow.length > 0 && (
+          <div style={{ borderTop: '1px solid #f5f2ee' }}>
+            {sectionTitle('Cash flow por semana', 'PAGOS', '#7c3aed')}
+            <div style={{ padding: '0 18px 14px' }}>
+              {data.cashflow.map((s, i) => (
+                <div key={i} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, color: '#3d3834' }}>
+                      {semanaLabel(s)} · {s.count} fra{s.count !== 1 ? 's' : ''}
+                      {s.vencidas > 0 && <span style={{ color: '#dc2626', fontWeight: 700 }}> · {s.vencidas} vencida{s.vencidas !== 1 ? 's' : ''}</span>}
+                    </span>
+                    <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 12, color: s.vencidas > 0 ? '#dc2626' : '#3d3834' }}>
+                      {fmt(s.total)}
+                    </span>
+                  </div>
+                  <div style={{ height: 6, backgroundColor: '#f5f2ee', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${Math.min(100, (s.total / maxCashflow) * 100)}%`,
+                      background: s.vencidas > 0
+                        ? 'linear-gradient(90deg, #dc2626, #f87171)'
+                        : 'linear-gradient(90deg, #7c3aed, #a78bfa)',
+                      borderRadius: 3,
+                      transition: 'width 0.4s',
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  )
+}
+
 function CompraSemanalCard({ data, onInsertMessage }: { data: CompraSemanalData; onInsertMessage: (m: Message) => void }) {
   const [expanded, setExpanded] = useState<Record<number, boolean>>({})
 
@@ -1890,8 +2129,8 @@ function getMomento(hour: number): MomentoData {
     momento: 'Cierre',
     sugerencias: [
       { label: 'Resumen del día', sub: 'Gastos, pedidos y merma', chat: 'Dame el resumen completo del día de hoy' },
+      { label: 'Anticipar problemas', sub: 'Predicción a 60 días', chat: 'Hazme el análisis predictivo' },
       { label: 'Merma de cierre', sub: 'Registrar sobras', chat: 'Quiero registrar la merma de cierre' },
-      { label: 'Pedidos sin recibir', sub: 'Entregas pendientes', chat: '¿Qué pedidos tengo pendientes de recibir?' },
       { label: 'Balance del mes', sub: 'Cómo vamos de costes', chat: '¿Cómo vamos de gasto este mes?' },
     ],
   }
@@ -1927,7 +2166,7 @@ function loadCurrent(): Message[] {
 
 function saveCurrent(messages: Message[]) {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && m.role !== 'necesidades_pedido' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal' && m.role !== 'ingredientes_cards' && m.role !== 'proveedores_cards' && m.role !== 'pedidos_recibir_cards' && m.role !== 'precios_alerta_cards' && m.role !== 'food_cost_cards')))
+    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages.filter(m => m.role !== 'email_proposal' && m.role !== 'brief_cards' && m.role !== 'pedido_selector' && m.role !== 'necesidades_pedido' && (m.role as string) !== 'channel_choice' && (m.role as string) !== 'whatsapp_proposal' && m.role !== 'ingredientes_cards' && m.role !== 'proveedores_cards' && m.role !== 'pedidos_recibir_cards' && m.role !== 'precios_alerta_cards' && m.role !== 'food_cost_cards' && m.role !== 'alertas_predictivas_cards')))
   } catch {}
 }
 
@@ -2028,6 +2267,7 @@ export default function KitchenChat() {
       if (m.role === 'pedidos_recibir_cards') return [{ role: 'assistant' as const, content: `[${m.pedidosRecibirCards?.pedidos?.length ?? 0} pedidos pendientes de recibir mostrados al usuario en tarjetas]` }]
       if (m.role === 'precios_alerta_cards') return [{ role: 'assistant' as const, content: `[${m.preciosAlertaCards?.subidas?.length ?? 0} alertas de subida de precio mostradas al usuario en tarjetas]` }]
       if (m.role === 'food_cost_cards') return [{ role: 'assistant' as const, content: `[Análisis de food cost de ${m.foodCostCards?.recetas?.length ?? 0} recetas mostrado al usuario en tarjetas]` }]
+      if (m.role === 'alertas_predictivas_cards') return [{ role: 'assistant' as const, content: '[Análisis predictivo mostrado al usuario: food cost proyectado, ciclos de reposición, aceleración de precios y cash flow]' }]
       if (m.role === 'whatsapp_proposal') return [{ role: 'assistant' as const, content: '[Borrador de WhatsApp generado y mostrado al usuario]' }]
       if (m.role === 'email_proposal' || (m.role as string) === 'channel_choice') return []
       return [m]
@@ -2075,6 +2315,8 @@ export default function KitchenChat() {
         setMessages(prev => [...prev, { role: 'precios_alerta_cards', content: '', preciosAlertaCards: json.preciosAlertaCards }])
       } else if (json.foodCostCards) {
         setMessages(prev => [...prev, { role: 'food_cost_cards', content: '', foodCostCards: json.foodCostCards }])
+      } else if (json.alertasPredictivasCards) {
+        setMessages(prev => [...prev, { role: 'alertas_predictivas_cards', content: '', alertasPredictivasCards: json.alertasPredictivasCards }])
       } else if (json.whatsappProposal) {
         setMessages(prev => [...prev, { role: 'whatsapp_proposal', content: '', whatsappProposal: json.whatsappProposal }])
       } else {
@@ -2475,6 +2717,15 @@ export default function KitchenChat() {
                     <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ width: 28, height: 28, flexShrink: 0 }} />
                       <FoodCostCard data={msg.foodCostCards} />
+                    </div>
+                  )
+                }
+
+                if (msg.role === 'alertas_predictivas_cards' && msg.alertasPredictivasCards) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                      <AlertasPredictivasCard data={msg.alertasPredictivasCards} onSend={send} />
                     </div>
                   )
                 }

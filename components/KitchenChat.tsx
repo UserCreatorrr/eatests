@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { tk, ff } from '@/lib/design'
+import { MbCard, MbRow, MbBadge, MbSparkline, MbBar, MbSection, MbTimeline } from '@/components/cards/MbCard'
 
 interface EmailProposal {
   proveedor: string
@@ -275,66 +277,82 @@ function renderBriefText(text: string) {
 }
 
 function BriefCards({ data, onAction }: { data: BriefData; onAction: (chat: string) => void }) {
+  const urgenciaToStatus: Record<string, 'ok' | 'warn' | 'crit' | 'neutral'> = {
+    normal: 'neutral', warning: 'warn', danger: 'crit',
+  }
   return (
     <div style={{ width: '100%', maxWidth: 620 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-        </div>
-        <div>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#3d3834', margin: 0 }}>{data.saludo}</p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4, margin: 0 }}>Brief del {data.fecha}</p>
+      {/* Editorial header */}
+      <div style={{
+        background: tk.iron, color: tk.cream,
+        padding: '14px 18px', marginBottom: 12,
+        position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          backgroundImage:
+            `linear-gradient(to right, rgba(223,213,201,0.06) 1px, transparent 1px),
+             linear-gradient(to bottom, rgba(223,213,201,0.06) 1px, transparent 1px)`,
+          backgroundSize: '14px 14px',
+        }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <p style={{
+            fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.18em',
+            color: tk.apple, margin: 0, textTransform: 'uppercase' as const,
+          }}>
+            BRIEF · {data.fecha?.toUpperCase()}
+          </p>
+          <p style={{
+            fontFamily: ff.display, fontWeight: 600, fontSize: 20, lineHeight: 1.1,
+            margin: '4px 0 0', letterSpacing: '-0.015em',
+          }}>{data.saludo}</p>
         </div>
       </div>
 
       {/* Cards grid */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {data.cards.map(card => {
-          const colors = URGENCIA_COLORS[card.urgencia]
+          const status = urgenciaToStatus[card.urgencia] || 'neutral'
           return (
-            <div key={card.id} style={{ backgroundColor: colors.bg, border: `1.5px solid ${colors.border}`, borderRadius: 14, padding: '14px 16px' }}>
-              {/* Card header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <span style={{ color: colors.icon, display: 'flex', alignItems: 'center' }}>{CARD_ICONS[card.icon]}</span>
-                <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#3d3834', flex: 1 }}>{card.titulo}</span>
-                {colors.badge && (
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: colors.badge, flexShrink: 0 }} />
-                )}
-              </div>
-
-              {/* Items */}
-              <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <MbCard
+              key={card.id}
+              category={card.titulo.toUpperCase()}
+              status={status}
+              title={card.titulo}
+              maxWidth={620}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, marginBottom: card.acciones.length > 0 ? 12 : 0 }}>
                 {card.items.map((item, i) => (
-                  <p key={i} style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.8, margin: 0, lineHeight: 1.5 }}>
-                    {renderBriefText(item)}
-                  </p>
+                  <p key={i} style={{
+                    fontFamily: ff.mono, fontSize: 11.5, color: tk.iron,
+                    opacity: 0.85, margin: 0, lineHeight: 1.55,
+                  }}>{renderBriefText(item)}</p>
                 ))}
               </div>
-
-              {/* Action buttons */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {card.acciones.map((accion, i) => (
-                  accion.href ? (
-                    <a
-                      key={i}
-                      href={accion.href}
-                      style={{ padding: '6px 12px', backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                    >
-                      {accion.label} →
-                    </a>
-                  ) : (
-                    <button
-                      key={i}
-                      onClick={() => onAction(accion.chat!)}
-                      style={{ padding: '6px 12px', backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834' }}
-                    >
-                      {accion.label}
-                    </button>
-                  )
-                ))}
-              </div>
-            </div>
+              {card.acciones.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6, marginTop: 4 }}>
+                  {card.acciones.map((accion, i) => (
+                    accion.href ? (
+                      <a key={i} href={accion.href} style={{
+                        padding: '5px 11px', background: tk.paper,
+                        border: `1.5px solid ${tk.iron}`,
+                        fontFamily: ff.mono, fontSize: 10.5, fontWeight: 600,
+                        color: tk.iron, textDecoration: 'none',
+                        letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+                      }}>{accion.label} →</a>
+                    ) : (
+                      <button key={i} onClick={() => onAction(accion.chat!)} style={{
+                        padding: '5px 11px', background: tk.paper,
+                        border: `1.5px solid ${tk.iron}`, cursor: 'pointer',
+                        fontFamily: ff.mono, fontSize: 10.5, fontWeight: 600,
+                        color: tk.iron,
+                        letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+                      }}>{accion.label}</button>
+                    )
+                  ))}
+                </div>
+              )}
+            </MbCard>
           )
         })}
       </div>
@@ -702,17 +720,21 @@ function FacturasCard({ data }: { data: FacturasPagarData }) {
   const [pendientes, setPendientes] = useState<FacturaPendiente[]>(data.facturas)
   const [paying, setPaying] = useState<Record<number, boolean>>({})
   const [payingAll, setPayingAll] = useState(false)
+  const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
 
   if (pendientes.length === 0) {
     return (
-      <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: 16, padding: '16px 20px', maxWidth: 520 }}>
-        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#16a34a', margin: 0 }}>Todas las facturas están pagadas</p>
-      </div>
+      <MbCard
+        category="FACTURAS · ESTADO"
+        timestamp={new Date().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
+        status="ok"
+        title="Todo pagado"
+        figure="✓"
+        sub="No hay facturas pendientes en este momento."
+        maxWidth={520}
+      ><></></MbCard>
     )
   }
-
-  const total = pendientes.reduce((s, f) => s + (f.total || 0), 0)
-  const vencidas = pendientes.filter(f => f.vencida)
 
   async function pagarUna(id: number) {
     setPaying(prev => ({ ...prev, [id]: true }))
@@ -728,306 +750,227 @@ function FacturasCard({ data }: { data: FacturasPagarData }) {
     setPayingAll(false)
   }
 
-  const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid #f0ebe4' }
+  const total = pendientes.reduce((s, f) => s + (f.total || 0), 0)
+  const vencidas = pendientes.filter(f => f.vencida)
+  const status = vencidas.length > 0 ? 'crit' : 'warn'
+  const ts = new Date().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()
 
   return (
-    <div style={{ width: '100%', maxWidth: 560 }}>
-      {/* Header */}
-      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#dfd5c9', margin: '0 0 2px' }}>Facturas pendientes de pago</p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
-            {pendientes.length} factura{pendientes.length > 1 ? 's' : ''}{vencidas.length > 0 ? ` · ${vencidas.length} vencida${vencidas.length > 1 ? 's' : ''}` : ''}
-          </p>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#dfd5c9', opacity: 0.45, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total pendiente</p>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: vencidas.length > 0 ? '#fca5a5' : '#19f973', margin: 0 }}>{total.toFixed(2)}€</p>
-        </div>
-      </div>
-
-      {/* Lista */}
-      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', padding: '4px 20px 0', backgroundColor: '#fff' }}>
-        {pendientes.map(f => {
-          const overdue = f.vencida
-          const soon = !overdue && f.date_due && (new Date(f.date_due).getTime() - Date.now()) < 5 * 86400000
-          const dueBadgeColor = overdue ? '#fef2f2' : soon ? '#fffbeb' : '#f0f9ff'
-          const dueBadgeText = overdue ? '#dc2626' : soon ? '#92400e' : '#0369a1'
-          const dueBorderColor = overdue ? '#fca5a5' : soon ? '#fcd34d' : '#bae6fd'
-          return (
-            <div key={f.id} style={rowStyle}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#3d3834', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {f.vendor || 'Sin proveedor'}
-                </p>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: 0 }}>
-                  {f.invoice_num || 'S/N'}{f.date_invoice ? ` · ${f.date_invoice}` : ''}
-                </p>
+    <MbCard
+      category={vencidas.length > 0 ? 'FACTURAS · VENCIDAS' : 'FACTURAS · PENDIENTES'}
+      timestamp={ts}
+      status={status}
+      title={vencidas.length > 0 ? 'Sin pagar pasada fecha' : 'Pendientes de pago'}
+      figure={pendientes.length}
+      sub={<>{fmt(total)} acumulados{vencidas.length > 0 && <> · <span style={{ color: tk.terra }}>{vencidas.length} vencida{vencidas.length > 1 ? 's' : ''}</span></>}</>}
+      cta={{ label: payingAll ? 'Procesando…' : `Marcar las ${pendientes.length} como pagadas`, onClick: payingAll ? undefined : pagarTodas }}
+      maxWidth={560}
+    >
+      {pendientes.map((f, i) => {
+        const overdue = f.vencida
+        const soon = !overdue && f.date_due && (new Date(f.date_due).getTime() - Date.now()) < 5 * 86400000
+        const dueText = overdue ? `vencida hace ${Math.abs(f.dias_vencida ?? 0)}d` : soon ? `vence pronto · ${f.date_due}` : (f.date_due || '')
+        return (
+          <div key={f.id} style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '8px 0',
+            borderBottom: i < pendientes.length - 1 ? `1px solid ${tk.iron20}` : 'none',
+            fontSize: 11.5,
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: tk.iron, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {f.vendor || 'Sin proveedor'}
               </div>
-              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: '#3d3834', flexShrink: 0 }}>
-                {f.total != null ? `${f.total}€` : '-'}
-              </span>
-              {f.date_due && (
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, padding: '2px 6px', borderRadius: 5, backgroundColor: dueBadgeColor, color: dueBadgeText, border: `1px solid ${dueBorderColor}`, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                  {overdue ? `${Math.abs(f.dias_vencida ?? 0)}d vencida` : f.date_due}
-                </span>
-              )}
-              <button
-                onClick={() => pagarUna(f.id)}
-                disabled={paying[f.id]}
-                style={{ flexShrink: 0, padding: '5px 12px', backgroundColor: paying[f.id] ? '#f0fdf4' : '#19f973', border: 'none', borderRadius: 8, cursor: paying[f.id] ? 'default' : 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#2a2522', opacity: paying[f.id] ? 0.6 : 1 }}
-              >
-                {paying[f.id] ? '...' : 'Pagada'}
-              </button>
+              <div style={{ color: tk.iron40, fontSize: 10.5 }}>
+                {f.invoice_num || 'S/N'}{dueText && <> · {dueText}</>}
+              </div>
             </div>
-          )
-        })}
-      </div>
-
-      {/* Footer */}
-      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '12px 20px', backgroundColor: '#faf9f7', display: 'flex', justifyContent: 'flex-end' }}>
-        <button
-          onClick={pagarTodas}
-          disabled={payingAll}
-          style={{ padding: '8px 18px', backgroundColor: '#3d3834', border: 'none', borderRadius: 10, cursor: payingAll ? 'default' : 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#dfd5c9', opacity: payingAll ? 0.6 : 1 }}
-        >
-          {payingAll ? 'Procesando...' : 'Marcar todas como pagadas'}
-        </button>
-      </div>
-    </div>
+            <span style={{
+              fontVariantNumeric: 'tabular-nums', color: overdue ? tk.terra : tk.iron,
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}>
+              {f.total != null ? fmt(f.total) : '—'}
+            </span>
+            <button
+              onClick={() => pagarUna(f.id)}
+              disabled={paying[f.id]}
+              style={{
+                flexShrink: 0, padding: '4px 10px',
+                background: paying[f.id] ? tk.creamSoft : tk.apple,
+                border: `1px solid ${tk.iron}`,
+                cursor: paying[f.id] ? 'default' : 'pointer',
+                fontFamily: ff.mono, fontSize: 10, fontWeight: 600,
+                color: tk.iron, letterSpacing: '0.06em',
+                opacity: paying[f.id] ? 0.6 : 1,
+              }}
+            >
+              {paying[f.id] ? '…' : 'PAGADA'}
+            </button>
+          </div>
+        )
+      })}
+    </MbCard>
   )
 }
 
 function IngredientesCard({ data }: { data: { ingredientes: IngredienteItem[]; filtro: string } }) {
   const sinCoste = data.ingredientes.filter(i => !i.cost || i.cost === 0)
-  const conCoste = data.ingredientes.filter(i => i.cost && i.cost > 0)
   const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(v)
-
+  const ts = new Date().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()
+  const status = sinCoste.length > 0 ? 'warn' : 'ok'
   return (
-    <div style={{ width: '100%', maxWidth: 560 }}>
-      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#dfd5c9', margin: '0 0 1px' }}>
-            Ingredientes{data.filtro ? ` · ${data.filtro}` : ''}
-          </p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
-            {data.ingredientes.length} resultado{data.ingredientes.length !== 1 ? 's' : ''}
-            {sinCoste.length > 0 && <span style={{ color: '#fca5a5' }}> · {sinCoste.length} sin coste</span>}
-          </p>
-        </div>
-        <a href="/dashboard/ingredientes" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#19f973', textDecoration: 'none', opacity: 0.8 }}>
-          Ver todos →
-        </a>
-      </div>
-      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
-        {data.ingredientes.map((ing, i) => {
-          const hasCost = ing.cost && ing.cost > 0
-          return (
-            <div key={ing.id} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px',
-              borderBottom: i < data.ingredientes.length - 1 ? '1px solid #f5f2ee' : 'none',
-            }}>
-              <div style={{
-                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                backgroundColor: hasCost ? '#16a34a' : '#dc2626',
-              }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {ing.descr}
-                </p>
-                {ing.type && (
-                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#9c958f', margin: 0 }}>{ing.type}</p>
-                )}
-              </div>
-              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', flexShrink: 0 }}>
-                {ing.unit || '—'}
-              </span>
-              <span style={{
-                fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, flexShrink: 0,
-                color: hasCost ? '#3d3834' : '#dc2626',
-                minWidth: 60, textAlign: 'right' as const,
-              }}>
-                {hasCost ? fmt(ing.cost!) : 'Sin coste'}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+    <MbCard
+      category={`INGREDIENTES${data.filtro ? ' · ' + data.filtro.toUpperCase() : ''}`}
+      timestamp={ts}
+      status={status}
+      title={sinCoste.length > 0 ? 'Faltan costes por registrar' : 'Catálogo al día'}
+      figure={data.ingredientes.length}
+      sub={sinCoste.length > 0 ? `${sinCoste.length} sin coste · afecta al escandallo` : `${data.ingredientes.length} con coste registrado`}
+      cta={{ label: 'Ver todos', onClick: () => { if (typeof window !== 'undefined') window.location.href = '/dashboard/ingredientes' } }}
+      maxWidth={560}
+    >
+      {data.ingredientes.slice(0, 25).map((ing, i, arr) => {
+        const hasCost = ing.cost && ing.cost > 0
+        return (
+          <MbRow
+            key={ing.id}
+            label={ing.descr}
+            meta={<>{ing.type || '—'}{ing.unit && <> · {ing.unit}</>}</>}
+            right={hasCost ? fmt(ing.cost!) : <MbBadge variant="terra">SIN COSTE</MbBadge>}
+            rightVariant={hasCost ? 'default' : 'crit'}
+            isLast={i === arr.length - 1}
+          />
+        )
+      })}
+    </MbCard>
   )
 }
 
 function ProveedoresCard({ data }: { data: { proveedores: ProveedorItem[] } }) {
+  const ts = new Date().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()
   return (
-    <div style={{ width: '100%', maxWidth: 520 }}>
-      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#dfd5c9', margin: '0 0 1px' }}>Proveedores</p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
-            {data.proveedores.length} resultado{data.proveedores.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <a href="/dashboard/proveedores" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#19f973', textDecoration: 'none', opacity: 0.8 }}>
-          Ver todos →
-        </a>
-      </div>
-      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
-        {data.proveedores.map((p, i) => (
-          <div key={p.id} style={{
-            display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
-            borderBottom: i < data.proveedores.length - 1 ? '1px solid #f5f2ee' : 'none',
-          }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#f5f2ee', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 12, color: '#3d3834' }}>
-                {p.descr.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {p.descr}
-              </p>
-              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
-                {p.descr_type || '—'}{p.mail ? ` · ${p.mail}` : ''}{p.phone ? ` · ${p.phone}` : ''}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <MbCard
+      category="PROVEEDORES"
+      timestamp={ts}
+      status="neutral"
+      title="Catálogo de proveedores"
+      figure={data.proveedores.length}
+      sub="Activos en tu cocina"
+      cta={{ label: 'Ver todos', onClick: () => { if (typeof window !== 'undefined') window.location.href = '/dashboard/proveedores' } }}
+      maxWidth={520}
+    >
+      {data.proveedores.map((p, i, arr) => (
+        <MbRow
+          key={p.id}
+          label={p.descr}
+          meta={<>{p.descr_type || '—'}{p.mail && <> · {p.mail}</>}{p.phone && <> · {p.phone}</>}</>}
+          isLast={i === arr.length - 1}
+        />
+      ))}
+    </MbCard>
   )
 }
 
 function PedidosRecibirCard({ data }: { data: { pedidos: { id: number; descr: string; mes: string | null; lineas: any[]; total_lineas: number }[] } }) {
-  const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
+  const ts = new Date().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()
   return (
-    <div style={{ width: '100%', maxWidth: 560 }}>
-      <div style={{ backgroundColor: '#1e3a5f', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#bfdbfe', margin: '0 0 1px' }}>Pedidos pendientes de recibir</p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#93c5fd', opacity: 0.7, margin: 0 }}>
-            {data.pedidos.length} entrega{data.pedidos.length !== 1 ? 's' : ''} sin confirmar
-          </p>
-        </div>
-        <a href="/dashboard/compras/pedidos" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#93c5fd', textDecoration: 'none' }}>
-          Gestionar →
-        </a>
-      </div>
-      <div style={{ border: '1px solid #bfdbfe40', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
-        {data.pedidos.map((p, i) => (
-          <div key={p.id} style={{ padding: '11px 16px', borderBottom: i < data.pedidos.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: 0 }}>{p.descr}</p>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                {p.mes && <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#6b6560', backgroundColor: '#f5f2ee', padding: '2px 7px', borderRadius: 5 }}>{p.mes}</span>}
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 7px', borderRadius: 5 }}>
-                  {p.total_lineas} artículo{p.total_lineas !== 1 ? 's' : ''}
-                </span>
-              </div>
-            </div>
-            {p.lineas.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {p.lineas.slice(0, 4).map((l: any, j: number) => (
-                  <span key={j} style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#6b6560', backgroundColor: '#f5f2ee', padding: '2px 8px', borderRadius: 5 }}>
-                    {l.nombre || l.descr || l.item || String(l)}
-                  </span>
-                ))}
-                {p.total_lineas > 4 && <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#9c958f' }}>+{p.total_lineas - 4} más</span>}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+    <MbCard
+      category="PEDIDOS · POR RECIBIR"
+      timestamp={ts}
+      status="neutral"
+      title="Entregas sin confirmar"
+      figure={data.pedidos.length}
+      sub="Albaranes esperados esta semana"
+      cta={{ label: 'Confirmar recepción', onClick: () => { if (typeof window !== 'undefined') window.location.href = '/dashboard/compras/pedidos' } }}
+      maxWidth={560}
+    >
+      {data.pedidos.map((p, i) => {
+        const lineasPreview = p.lineas.slice(0, 3)
+          .map((l: any) => l.nombre || l.descr || l.item || String(l))
+          .join(' · ')
+        return (
+          <MbRow
+            key={p.id}
+            label={p.descr}
+            meta={<>{p.mes && <>{p.mes} · </>}{p.total_lineas} línea{p.total_lineas !== 1 ? 's' : ''}{lineasPreview && <> · {lineasPreview}</>}{p.total_lineas > 3 && <> · +{p.total_lineas - 3} más</>}</>}
+            right={<MbBadge variant="iron">{p.total_lineas} ART.</MbBadge>}
+            isLast={i === data.pedidos.length - 1}
+          />
+        )
+      })}
+    </MbCard>
   )
 }
 
 function PreciosAlertaCard({ data }: { data: { subidas: { nombre: string; precio_anterior: number; precio_actual: number; diff_pct: number; vendor: string | null; fecha: string }[]; umbral_pct: number } }) {
   const fmt = (v: number) => `${v.toFixed(2)}€`
+  const ts = new Date().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()
+  const peor = data.subidas.reduce((m, s) => Math.max(m, s.diff_pct), 0)
+  const status = peor >= 30 ? 'crit' : 'warn'
   return (
-    <div style={{ width: '100%', maxWidth: 560 }}>
-      <div style={{ backgroundColor: '#78350f', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#fef3c7', margin: '0 0 1px' }}>Subidas de precio</p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#fcd34d', opacity: 0.8, margin: 0 }}>
-            {data.subidas.length} ingrediente{data.subidas.length !== 1 ? 's' : ''} con subida &gt;{data.umbral_pct}%
-          </p>
-        </div>
-        <a href="/dashboard/analytics" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#fcd34d', textDecoration: 'none' }}>
-          Ver analytics →
-        </a>
-      </div>
-      <div style={{ border: '1px solid #fcd34d40', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
-        {data.subidas.map((s, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.subidas.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.nombre}</p>
-              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
-                {s.vendor ? `${s.vendor} · ` : ''}{s.fecha}
-              </p>
-            </div>
-            <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
-              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: '#dc2626', margin: '0 0 2px' }}>
-                +{s.diff_pct}%
-              </p>
-              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#9c958f', margin: 0 }}>
-                {fmt(s.precio_anterior)} → {fmt(s.precio_actual)}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <MbCard
+      category="PRECIOS · SUBIDAS DETECTADAS"
+      timestamp={ts}
+      status={status}
+      title="Ingredientes subiendo"
+      figure={data.subidas.length}
+      sub={`Por encima del ${data.umbral_pct}% de variación`}
+      cta={{ label: 'Ver desviaciones', onClick: () => { if (typeof window !== 'undefined') window.location.href = '/dashboard/analytics' } }}
+      maxWidth={560}
+    >
+      {data.subidas.map((s, i) => {
+        const variant = s.diff_pct >= 30 ? 'terra' : 'clay'
+        return (
+          <MbRow
+            key={i}
+            label={s.nombre}
+            meta={<>{s.vendor ? `${s.vendor} · ` : ''}{fmt(s.precio_anterior)} → {fmt(s.precio_actual)} · {s.fecha}</>}
+            right={<MbBadge variant={variant}>+{s.diff_pct}%</MbBadge>}
+            isLast={i === data.subidas.length - 1}
+          />
+        )
+      })}
+    </MbCard>
   )
 }
 
-const FOOD_COST_COLORS = {
-  critico:   { bg: '#fef2f2', text: '#dc2626', badge: '#fee2e2', dot: '#dc2626' },
-  revisar:   { bg: '#fffbeb', text: '#d97706', badge: '#fef3c7', dot: '#d97706' },
-  aceptable: { bg: '#f0fdf4', text: '#16a34a', badge: '#dcfce7', dot: '#16a34a' },
-  excelente: { bg: '#f0fdf4', text: '#15803d', badge: '#dcfce7', dot: '#15803d' },
+const FC_BADGE: Record<'critico' | 'revisar' | 'aceptable' | 'excelente', { variant: 'apple' | 'clay' | 'terra'; label: string }> = {
+  critico:   { variant: 'terra', label: 'CRÍTICO' },
+  revisar:   { variant: 'clay',  label: 'REVISAR' },
+  aceptable: { variant: 'apple', label: 'OK' },
+  excelente: { variant: 'apple', label: 'EXCELENTE' },
 }
-const FOOD_COST_LABELS = { critico: 'CRÍTICO', revisar: 'REVISAR', aceptable: 'OK', excelente: 'EXCELENTE' }
 
 function FoodCostCard({ data }: { data: { recetas: { id: number; nombre: string; coste: number; pvp: number; pct: number; pvSugerido: number | null; nivel: 'critico' | 'revisar' | 'aceptable' | 'excelente' }[]; umbral_pct: number } }) {
   const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
   const criticas = data.recetas.filter(r => r.nivel === 'critico' || r.nivel === 'revisar').length
+  const status = criticas > 0 ? (data.recetas.some(r => r.nivel === 'critico') ? 'crit' : 'warn') : 'ok'
+  const ts = new Date().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()
   return (
-    <div style={{ width: '100%', maxWidth: 580 }}>
-      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#dfd5c9', margin: '0 0 1px' }}>Food cost por receta</p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#dfd5c9', opacity: 0.5, margin: 0 }}>
-            {data.recetas.length} recetas analizadas{criticas > 0 && <span style={{ color: '#fca5a5' }}> · {criticas} a revisar</span>}
-          </p>
-        </div>
-        <a href="/dashboard/sangrado" style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 600, color: '#19f973', textDecoration: 'none' }}>
-          Ver escandallo →
-        </a>
-      </div>
-      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', backgroundColor: '#fff' }}>
-        {data.recetas.map((r, i) => {
-          const col = FOOD_COST_COLORS[r.nivel]
-          return (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.recetas.length - 1 ? '1px solid #f5f2ee' : 'none', backgroundColor: col.bg }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: col.dot, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.nombre}</p>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
-                  Coste {fmt(r.coste)} · PVP {fmt(r.pvp)}
-                  {r.pvSugerido && r.nivel !== 'aceptable' && r.nivel !== 'excelente' && <span style={{ color: col.text }}> · PVP sugerido {fmt(r.pvSugerido)}</span>}
-                </p>
-              </div>
-              <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, color: col.text, margin: '0 0 2px' }}>{r.pct}%</p>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 8.5, fontWeight: 700, color: col.text, backgroundColor: col.badge, padding: '2px 6px', borderRadius: 5, letterSpacing: '0.04em' }}>
-                  {FOOD_COST_LABELS[r.nivel]}
-                </span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+    <MbCard
+      category="ESCANDALLO · FC ACTUAL"
+      timestamp={ts}
+      status={status}
+      title={criticas > 0 ? 'Recetas a revisar' : 'Todas dentro de objetivo'}
+      figure={criticas}
+      sub={criticas > 0 ? `Por encima del ${data.umbral_pct}% de food cost` : `${data.recetas.length} recetas analizadas`}
+      cta={{ label: 'Ver escandallo completo', onClick: () => { if (typeof window !== 'undefined') window.location.href = '/dashboard/sangrado' } }}
+      maxWidth={560}
+    >
+      {data.recetas.map((r, i) => {
+        const b = FC_BADGE[r.nivel]
+        const showSugerido = r.pvSugerido && (r.nivel === 'critico' || r.nivel === 'revisar')
+        return (
+          <MbRow
+            key={r.id}
+            label={r.nombre}
+            meta={<>Coste {fmt(r.coste)} · PVP {fmt(r.pvp)}{showSugerido && <> · PVP sugerido <span style={{ color: tk.iron, borderBottom: `1px solid ${tk.clay}` }}>{fmt(r.pvSugerido!)}</span></>}</>}
+            right={<MbBadge variant={b.variant}>{r.pct}%</MbBadge>}
+            isLast={i === data.recetas.length - 1}
+          />
+        )
+      })}
+    </MbCard>
   )
 }
 
@@ -1038,9 +981,11 @@ function AlertasPredictivasCard({ data, onSend }: { data: AlertasPredictivasData
     const opt: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' }
     return `${d1.toLocaleDateString('es-ES', opt)} → ${d2.toLocaleDateString('es-ES', opt)}`
   }
-  const tocaLabel = { hoy: 'HOY', manana: 'MAÑANA', retrasado: 'RETRASADO' }
-  const tocaColor = { hoy: '#d97706', manana: '#2563eb', retrasado: '#dc2626' }
-  const tocaBg = { hoy: '#fffbeb', manana: '#eff6ff', retrasado: '#fef2f2' }
+  const tocaBadge: Record<'hoy' | 'manana' | 'retrasado', { variant: 'clay' | 'iron' | 'terra'; label: string }> = {
+    hoy:       { variant: 'clay',  label: 'HOY' },
+    manana:    { variant: 'iron',  label: 'MAÑANA' },
+    retrasado: { variant: 'terra', label: 'RETRASADO' },
+  }
 
   const maxCashflow = Math.max(1, ...data.cashflow.map(c => c.total))
   const totalSecciones =
@@ -1049,215 +994,137 @@ function AlertasPredictivasCard({ data, onSend }: { data: AlertasPredictivasData
     (data.aceleracion_precio.length > 0 ? 1 : 0) +
     (data.cashflow.length > 0 ? 1 : 0)
 
-  const sectionTitle = (label: string, badge: string, color: string) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px 8px' }}>
-      <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 12, color: '#3d3834', letterSpacing: '0.02em' }}>{label}</span>
-      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, color, backgroundColor: color + '18', padding: '2px 7px', borderRadius: 5, letterSpacing: '0.05em' }}>{badge}</span>
-    </div>
-  )
+  // Status derivado: si hay cualquier sección crítica → crit; si hay warnings → warn
+  const cruzaUmbral = data.fc_proyectado.some(r => r.pct_60 >= 33)
+  const hayRetrasos = data.ciclos_reposicion.some(c => c.toca === 'retrasado')
+  const hayVencidas = data.cashflow.some(s => s.vencidas > 0)
+  const cardStatus = (cruzaUmbral || hayRetrasos || hayVencidas) ? 'crit' : (totalSecciones > 0 ? 'warn' : 'ok')
+
+  const now = new Date()
+  const ts = now.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()
 
   return (
-    <div style={{ width: '100%', maxWidth: 620 }}>
-      {/* Header con gradient */}
-      <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)', borderRadius: '16px 16px 0 0', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 14 }}>🔮</span>
-            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#fff', margin: 0 }}>
-              Análisis predictivo
-            </p>
-          </div>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#c7d2fe', margin: '3px 0 0', opacity: 0.85 }}>
-            {totalSecciones} señal{totalSecciones !== 1 ? 'es' : ''} a 30–60 días vista
-          </p>
-        </div>
-        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#a5b4fc', backgroundColor: '#ffffff15', padding: '4px 9px', borderRadius: 7, letterSpacing: '0.05em' }}>
-          BETA
-        </span>
-      </div>
-
-      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', backgroundColor: '#fff', overflow: 'hidden' }}>
-
-        {/* FOOD COST PROYECTADO */}
-        {data.fc_proyectado.length > 0 && (
-          <div>
-            {sectionTitle('Food cost proyectado', 'PROYECCIÓN 60D', '#dc2626')}
-            <div style={{ padding: '0 18px 12px' }}>
-              {data.fc_proyectado.map((r, i) => {
-                const cruza33 = r.pct_60 >= 33 && r.pct_actual < 33
-                return (
-                  <div key={i} style={{
-                    backgroundColor: cruza33 ? '#fef2f2' : '#fffbeb',
-                    border: `1px solid ${cruza33 ? '#fca5a5' : '#fcd34d'}`,
-                    borderRadius: 10, padding: '10px 12px', marginBottom: 6,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                      <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                        {r.receta}
-                      </p>
-                      {cruza33 && (
-                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 8.5, fontWeight: 700, color: '#dc2626', backgroundColor: '#fee2e2', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.04em', flexShrink: 0, marginLeft: 8 }}>
-                          CRUZA 33%
-                        </span>
-                      )}
-                    </div>
-                    {/* Mini timeline */}
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#9c958f' }}>HOY</span>
-                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 700, color: r.pct_actual >= 33 ? '#dc2626' : '#3d3834' }}>{r.pct_actual}%</span>
-                      </div>
-                      <span style={{ color: '#d1c5b8', fontSize: 14 }}>→</span>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#9c958f' }}>+30d</span>
-                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 600, color: r.pct_30 >= 33 ? '#dc2626' : '#3d3834' }}>{r.pct_30}%</span>
-                      </div>
-                      <span style={{ color: '#d1c5b8', fontSize: 14 }}>→</span>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#9c958f' }}>+60d</span>
-                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 700, color: r.pct_60 >= 33 ? '#dc2626' : '#3d3834' }}>{r.pct_60}%</span>
-                      </div>
-                    </div>
-                    {r.ingrediente_top && (
-                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#92400e', margin: '6px 0 0' }}>
-                        Mayor impacto: <span style={{ fontWeight: 700 }}>{r.ingrediente_top}</span>
-                      </p>
-                    )}
-                  </div>
-                )
-              })}
+    <MbCard
+      category="PREDICCIÓN · 60 DÍAS VISTA"
+      timestamp={ts}
+      status={cardStatus}
+      title={totalSecciones === 1 ? '1 señal sobre la mesa' : `${totalSecciones} señales sobre la mesa`}
+      figure={totalSecciones}
+      sub="Lo que va a romperse si no haces nada"
+      maxWidth={640}
+    >
+      {/* FOOD COST PROYECTADO */}
+      {data.fc_proyectado.length > 0 && data.fc_proyectado.map((r, i) => {
+        const cruza = r.pct_60 >= 33
+        return (
+          <div key={`fc-${i}`} style={{
+            background: tk.paper, border: `1.5px solid ${tk.iron}`,
+            padding: '12px 14px', marginBottom: 8,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4, gap: 10 }}>
+              <div style={{
+                fontFamily: ff.display, fontWeight: 600, fontSize: 13.5, color: tk.iron,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+              }}>{r.receta}</div>
+              {cruza && <MbBadge variant="terra">CRUZA 33%</MbBadge>}
             </div>
+            <MbTimeline cols={[
+              { label: 'HOY',  value: `${r.pct_actual}%`, variant: r.pct_actual >= 33 ? 'crit' : 'default' },
+              { label: '+30d', value: `${r.pct_30}%`,     variant: r.pct_30     >= 33 ? 'crit' : r.pct_30 >= 30 ? 'warn' : 'default' },
+              { label: '+60d', value: `${r.pct_60}%`,     variant: r.pct_60     >= 33 ? 'crit' : r.pct_60 >= 30 ? 'warn' : 'default' },
+            ]} />
+            {r.ingrediente_top && (
+              <div style={{ fontFamily: ff.mono, fontSize: 10.5, color: tk.iron60, marginTop: 8 }}>
+                Mayor impacto: <span style={{ color: tk.iron, borderBottom: `1.5px solid ${tk.clay}`, paddingBottom: 1 }}>{r.ingrediente_top}</span>
+              </div>
+            )}
           </div>
-        )}
+        )
+      })}
 
-        {/* CICLOS DE REPOSICIÓN */}
-        {data.ciclos_reposicion.length > 0 && (
-          <div style={{ borderTop: '1px solid #f5f2ee' }}>
-            {sectionTitle('Ciclos de reposición', 'PEDIDOS', '#2563eb')}
-            <div style={{ padding: '0 18px 12px' }}>
-              {data.ciclos_reposicion.map((c, i) => (
-                <div key={i} style={{
-                  backgroundColor: tocaBg[c.toca],
-                  border: `1px solid ${tocaColor[c.toca]}30`,
-                  borderRadius: 10, padding: '8px 12px', marginBottom: 6,
-                  display: 'flex', alignItems: 'center', gap: 10,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {c.ingrediente}
-                    </p>
-                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
-                      {c.proveedor} · ciclo {c.ciclo_dias}d · última hace {c.dias_desde}d
-                    </p>
+      {/* CICLOS DE REPOSICIÓN */}
+      {data.ciclos_reposicion.length > 0 && (
+        <MbSection title="Ciclos de reposición" badge={`${data.ciclos_reposicion.length} TOCA PEDIR`} badgeVariant="clay">
+          {data.ciclos_reposicion.map((c, i) => {
+            const b = tocaBadge[c.toca]
+            return (
+              <MbRow
+                key={`cr-${i}`}
+                label={c.ingrediente}
+                meta={`${c.proveedor} · ciclo ${c.ciclo_dias}d · última hace ${c.dias_desde}d`}
+                right={<MbBadge variant={b.variant}>{b.label}</MbBadge>}
+                isLast={i === data.ciclos_reposicion.length - 1}
+              />
+            )
+          })}
+        </MbSection>
+      )}
+
+      {/* ACELERACIÓN DE PRECIO */}
+      {data.aceleracion_precio.length > 0 && (
+        <MbSection title="Aceleración sostenida de precio" badge="TENDENCIA" badgeVariant="clay">
+          {data.aceleracion_precio.map((a, i) => {
+            // 7 puntos sintéticos basados en subidas_consecutivas
+            const heights = Array.from({ length: 7 }).map((_, j) => 20 + j * (70 / Math.max(1, a.subidas_consecutivas)))
+            const variant = a.diff_pct >= 40 ? 'crit' : 'warn'
+            return (
+              <div key={`ap-${i}`} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '8px 0', borderBottom: i < data.aceleracion_precio.length - 1 ? `1px solid ${tk.iron20}` : 'none',
+                gap: 14,
+              }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontFamily: ff.mono, fontSize: 11.5, color: tk.iron, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nombre}</div>
+                  <div style={{ fontFamily: ff.mono, fontSize: 10.5, color: tk.iron40 }}>
+                    {a.subidas_consecutivas} subidas seguidas · {fmt(a.precio_inicio)} → {fmt(a.precio_actual)}
                   </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                  <MbSparkline heights={heights} variant={variant} />
                   <span style={{
-                    fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700,
-                    color: tocaColor[c.toca], backgroundColor: '#fff',
-                    padding: '3px 8px', borderRadius: 6, letterSpacing: '0.05em',
-                    flexShrink: 0, border: `1px solid ${tocaColor[c.toca]}40`,
-                  }}>
-                    {tocaLabel[c.toca]}
-                  </span>
+                    fontFamily: ff.display, fontWeight: 600, fontSize: 16,
+                    color: variant === 'crit' ? tk.terra : tk.clay,
+                    minWidth: 50, textAlign: 'right' as const, fontVariantNumeric: 'tabular-nums',
+                  }}>+{a.diff_pct}%</span>
                 </div>
-              ))}
-              <button
-                onClick={() => onSend('Quiero hacer un pedido')}
-                style={{
-                  marginTop: 4, fontFamily: 'DM Mono, monospace', fontSize: 10.5, fontWeight: 600,
-                  color: '#2563eb', backgroundColor: '#eff6ff',
-                  border: '1px solid #2563eb30', borderRadius: 7,
-                  padding: '5px 12px', cursor: 'pointer',
-                }}
-              >
-                Preparar pedidos →
-              </button>
-            </div>
-          </div>
-        )}
+              </div>
+            )
+          })}
+          <button
+            onClick={() => onSend('Muéstrame alternativas de proveedor más baratas para estos ingredientes')}
+            style={{
+              marginTop: 10, fontFamily: ff.mono, fontSize: 10.5,
+              color: tk.iron, background: tk.paper,
+              border: `1.5px solid ${tk.iron}`,
+              padding: '6px 12px', cursor: 'pointer',
+              letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+            }}
+          >Buscar alternativas →</button>
+        </MbSection>
+      )}
 
-        {/* ACELERACIÓN DE PRECIO */}
-        {data.aceleracion_precio.length > 0 && (
-          <div style={{ borderTop: '1px solid #f5f2ee' }}>
-            {sectionTitle('Aceleración sostenida de precio', 'TENDENCIA', '#d97706')}
-            <div style={{ padding: '0 18px 12px' }}>
-              {data.aceleracion_precio.map((a, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '8px 12px', marginBottom: 4,
-                  backgroundColor: '#fffbeb', borderRadius: 10,
-                  border: '1px solid #fcd34d40',
-                }}>
-                  <div style={{ display: 'flex', gap: 2, alignItems: 'end', flexShrink: 0, height: 18 }}>
-                    {Array.from({ length: a.subidas_consecutivas }).map((_, j) => (
-                      <div key={j} style={{
-                        width: 4, height: 5 + j * 3,
-                        backgroundColor: '#d97706', borderRadius: 1,
-                      }} />
-                    ))}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {a.nombre}
-                    </p>
-                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9c958f', margin: 0 }}>
-                      {a.subidas_consecutivas} subidas seguidas · {fmt(a.precio_inicio)} → {fmt(a.precio_actual)}
-                    </p>
-                  </div>
-                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: '#d97706', flexShrink: 0 }}>
-                    +{a.diff_pct}%
-                  </span>
-                </div>
-              ))}
-              <button
-                onClick={() => onSend('Muéstrame alternativas de proveedor más baratas para estos ingredientes')}
-                style={{
-                  marginTop: 4, fontFamily: 'DM Mono, monospace', fontSize: 10.5, fontWeight: 600,
-                  color: '#d97706', backgroundColor: '#fffbeb',
-                  border: '1px solid #d9770630', borderRadius: 7,
-                  padding: '5px 12px', cursor: 'pointer',
-                }}
-              >
-                Buscar alternativas →
-              </button>
+      {/* CASH FLOW */}
+      {data.cashflow.length > 0 && (
+        <MbSection title="Cash flow por semana" badge={hayVencidas ? 'SEMANA EN ROJO' : 'PAGOS'} badgeVariant={hayVencidas ? 'terra' : 'iron'}>
+          {data.cashflow.map((s, i) => (
+            <div key={`cf-${i}`} style={{ marginBottom: i < data.cashflow.length - 1 ? 10 : 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                <span style={{ fontFamily: ff.mono, fontSize: 10.5, color: tk.iron60 }}>
+                  {semanaLabel(s)} · {s.count} fra{s.count !== 1 ? 's' : ''}
+                  {s.vencidas > 0 && <span style={{ color: tk.terra }}> · {s.vencidas} vencida{s.vencidas !== 1 ? 's' : ''}</span>}
+                </span>
+                <span style={{
+                  fontFamily: ff.display, fontWeight: 600, fontSize: 13,
+                  color: s.vencidas > 0 ? tk.terra : tk.iron,
+                  fontVariantNumeric: 'tabular-nums',
+                }}>{fmt(s.total)}</span>
+              </div>
+              <MbBar pct={(s.total / maxCashflow) * 100} variant={s.vencidas > 0 ? 'crit' : 'default'} />
             </div>
-          </div>
-        )}
-
-        {/* CASH FLOW */}
-        {data.cashflow.length > 0 && (
-          <div style={{ borderTop: '1px solid #f5f2ee' }}>
-            {sectionTitle('Cash flow por semana', 'PAGOS', '#7c3aed')}
-            <div style={{ padding: '0 18px 14px' }}>
-              {data.cashflow.map((s, i) => (
-                <div key={i} style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
-                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, color: '#3d3834' }}>
-                      {semanaLabel(s)} · {s.count} fra{s.count !== 1 ? 's' : ''}
-                      {s.vencidas > 0 && <span style={{ color: '#dc2626', fontWeight: 700 }}> · {s.vencidas} vencida{s.vencidas !== 1 ? 's' : ''}</span>}
-                    </span>
-                    <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 12, color: s.vencidas > 0 ? '#dc2626' : '#3d3834' }}>
-                      {fmt(s.total)}
-                    </span>
-                  </div>
-                  <div style={{ height: 6, backgroundColor: '#f5f2ee', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${Math.min(100, (s.total / maxCashflow) * 100)}%`,
-                      background: s.vencidas > 0
-                        ? 'linear-gradient(90deg, #dc2626, #f87171)'
-                        : 'linear-gradient(90deg, #7c3aed, #a78bfa)',
-                      borderRadius: 3,
-                      transition: 'width 0.4s',
-                    }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-      </div>
-    </div>
+          ))}
+        </MbSection>
+      )}
+    </MbCard>
   )
 }
 
@@ -2452,126 +2319,163 @@ export default function KitchenChat() {
           <div style={{ maxWidth: '720px', margin: '0 auto' }}>
 
             {messages.length === 0 && (
-              <div style={{ paddingTop: 40, paddingBottom: 24 }}>
-                <div style={{ width: 64, height: 64, borderRadius: 18, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                  <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
+              <div style={{ paddingTop: 28, paddingBottom: 24 }}>
+
+                {/* BRIEF BANNER · iron with grid texture */}
+                <div style={{
+                  background: tk.iron, color: tk.cream,
+                  padding: '22px 24px', marginBottom: 14, position: 'relative', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    position: 'absolute', inset: 0, pointerEvents: 'none',
+                    backgroundImage:
+                      `linear-gradient(to right, rgba(223,213,201,0.06) 1px, transparent 1px),
+                       linear-gradient(to bottom, rgba(223,213,201,0.06) 1px, transparent 1px)`,
+                    backgroundSize: '14px 14px',
+                  }} />
+                  <div style={{ position: 'relative', zIndex: 1 }}>
+                    <p style={{
+                      fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.18em',
+                      color: tk.apple, margin: '0 0 8px', textTransform: 'uppercase' as const,
+                    }}>
+                      {(momento?.momento || 'COCINA').toUpperCase()} · {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }).toUpperCase()}
+                    </p>
+                    <h1 style={{
+                      fontFamily: ff.display, fontWeight: 600, fontSize: 24, lineHeight: 1.1,
+                      letterSpacing: '-0.015em', margin: '0 0 16px',
+                    }}>
+                      {greeting || 'Buenos días'}.<br />
+                      <span style={{ opacity: 0.55 }}>¿Qué quieres hacer hoy?</span>
+                    </h1>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={startBrief}
+                        disabled={isLoading}
+                        style={{
+                          padding: '8px 14px', background: tk.apple, color: tk.iron,
+                          border: 'none', cursor: 'pointer',
+                          fontFamily: ff.mono, fontSize: 11, fontWeight: 600,
+                          letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: 8,
+                        }}
+                      >
+                        BRIEF DEL DÍA <span style={{ opacity: 0.5 }}>→</span>
+                      </button>
+                      <button
+                        onClick={() => scanRef.current?.click()}
+                        disabled={isLoading || isScanning}
+                        style={{
+                          padding: '8px 14px', background: 'transparent', color: tk.cream,
+                          border: `1.5px solid ${tk.cream}`, cursor: isLoading || isScanning ? 'not-allowed' : 'pointer',
+                          fontFamily: ff.mono, fontSize: 11, fontWeight: 600,
+                          letterSpacing: '0.06em', opacity: isLoading || isScanning ? 0.5 : 1,
+                          display: 'inline-flex', alignItems: 'center', gap: 8,
+                        }}
+                      >
+                        {isScanning ? 'ANALIZANDO…' : 'ESCANEAR ALBARÁN'} <span style={{ opacity: 0.5 }}>↗</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 20, color: '#3d3834', textAlign: 'center', margin: '0 0 6px' }}>
-                  En que te ayudo hoy?
-                </p>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.4, textAlign: 'center', margin: '0 0 28px' }}>
-                  Pregunta sobre tu cocina, sube una foto de albaran o graba una nota de voz
-                </p>
 
-                {/* Brief button */}
-                <button
-                  onClick={startBrief}
-                  disabled={isLoading}
-                  style={{ width: '100%', marginBottom: 10, padding: '16px 20px', backgroundColor: '#19f973', border: 'none', borderRadius: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
-                >
-                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#2a2522' }}>
-                    {greeting || 'Buenos días'} — Brief del día
-                  </span>
-                </button>
-
-                {/* Scan button */}
-                <button
-                  onClick={() => scanRef.current?.click()}
-                  disabled={isLoading || isScanning}
-                  style={{ width: '100%', marginBottom: 16, padding: '16px 20px', backgroundColor: '#3d3834', border: 'none', borderRadius: 16, cursor: isLoading || isScanning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, opacity: isLoading || isScanning ? 0.6 : 1 }}
-                >
-                  {isScanning ? (
-                    <>
-                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#f5f2ee" strokeWidth={2} style={{ flexShrink: 0 }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      <div style={{ textAlign: 'left' }}>
-                        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#f5f2ee', margin: 0 }}>Analizando documento...</p>
-                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#f5f2ee', opacity: 0.5, margin: 0 }}>El AI está extrayendo los datos</p>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#f5f2ee" strokeWidth={1.8} style={{ flexShrink: 0 }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <div style={{ textAlign: 'left' }}>
-                        <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: '#f5f2ee', margin: 0 }}>Escanear albarán o factura</p>
-                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#f5f2ee', opacity: 0.5, margin: 0 }}>Foto → datos extraídos automáticamente</p>
-                      </div>
-                    </>
-                  )}
-                </button>
-
-                {/* Proactive alerts */}
+                {/* PROACTIVE ALERT CHIPS · brand-tonal */}
                 {alerts.filter(a => !dismissedAlerts[a.id]).length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
                     {alerts.filter(a => !dismissedAlerts[a.id]).map(alert => {
-                      const colors = {
-                        danger:  { bg: '#fff1f2', border: '#fca5a5', title: '#991b1b', detail: '#dc2626' },
-                        warning: { bg: '#fffbeb', border: '#fcd34d', title: '#92400e', detail: '#b45309' },
-                        info:    { bg: '#f0f9ff', border: '#bae6fd', title: '#0c4a6e', detail: '#0369a1' },
-                      }[alert.tipo]
+                      const variant = alert.tipo === 'danger' ? 'crit' : alert.tipo === 'warning' ? 'warn' : 'neutral'
+                      const dotColor = variant === 'crit' ? tk.terra : variant === 'warn' ? tk.clay : tk.iron20
+                      const borderColor = variant === 'crit' ? tk.terra : variant === 'warn' ? tk.clay : tk.iron20
+                      const bgColor = variant === 'crit' ? tk.terraSoft : tk.paper
+                      const textColor = variant === 'crit' ? tk.terra : tk.iron
                       return (
-                        <div key={alert.id} style={{ backgroundColor: colors.bg, border: `1.5px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 12, color: colors.title, margin: 0 }}>{alert.titulo}</p>
-                            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: colors.detail, opacity: 0.8, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.detalle}</p>
-                          </div>
-                          {alert.chat && (
-                            <button
-                              onClick={() => send(alert.chat!)}
-                              style={{ flexShrink: 0, padding: '5px 10px', backgroundColor: '#fff', border: `1px solid ${colors.border}`, borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 10, color: colors.title, fontWeight: 600 }}
-                            >
-                              Ver →
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setDismissedAlerts(prev => ({ ...prev, [alert.id]: true }))}
-                            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: colors.title, opacity: 0.4, fontSize: 14, lineHeight: 1, padding: '0 2px' }}
-                          >
-                            ×
-                          </button>
-                        </div>
+                        <button
+                          key={alert.id}
+                          onClick={() => alert.chat ? send(alert.chat) : null}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 8,
+                            padding: '7px 11px', background: bgColor,
+                            border: `1.5px solid ${borderColor}`, cursor: alert.chat ? 'pointer' : 'default',
+                            fontFamily: ff.mono, fontSize: 11, color: textColor,
+                          }}
+                        >
+                          <span style={{ width: 6, height: 6, background: dotColor, flexShrink: 0 }} />
+                          <span>{alert.titulo}</span>
+                          {alert.detalle && <span style={{ opacity: 0.5, fontSize: 10 }}>· {alert.detalle.length > 40 ? alert.detalle.slice(0, 40) + '…' : alert.detalle}</span>}
+                          <span
+                            onClick={e => { e.stopPropagation(); setDismissedAlerts(prev => ({ ...prev, [alert.id]: true })) }}
+                            style={{ marginLeft: 4, opacity: 0.4, cursor: 'pointer', fontSize: 13, lineHeight: 1 }}
+                          >×</span>
+                        </button>
                       )
                     })}
                   </div>
                 )}
 
+                {/* MOMENT STRIP · 4 cells, one in iron negative */}
                 {momento && (
-                  <>
-                    <div style={{ marginBottom: 8 }}>
-                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        {momento.momento}
-                      </span>
+                  <div>
+                    <p style={{
+                      fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.18em',
+                      color: tk.iron40, textTransform: 'uppercase' as const,
+                      margin: '0 0 8px',
+                    }}>
+                      {momento.momento} · {new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+                      gap: 1, background: tk.iron, border: `1.5px solid ${tk.iron}`,
+                    }}>
+                      {momento.sugerencias.map((s, idx) => {
+                        // La acción central (idx 0 ó idx 2 según el set) se destaca en iron negativo
+                        const isFeatured = idx === 0 || (s.scan === true)
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => s.scan ? scanRef.current?.click() : send(s.chat)}
+                            disabled={isLoading}
+                            style={{
+                              textAlign: 'left' as const,
+                              background: isFeatured ? tk.iron : tk.paper,
+                              color: isFeatured ? tk.cream : tk.iron,
+                              border: 'none', padding: '14px 14px 16px',
+                              cursor: isLoading ? 'not-allowed' : 'pointer',
+                              opacity: isLoading ? 0.5 : 1,
+                              display: 'flex', flexDirection: 'column' as const, gap: 2,
+                              minHeight: 80,
+                            }}
+                            onMouseEnter={e => { if (!isFeatured) (e.currentTarget as HTMLButtonElement).style.background = tk.creamSoft }}
+                            onMouseLeave={e => { if (!isFeatured) (e.currentTarget as HTMLButtonElement).style.background = tk.paper }}
+                          >
+                            <span style={{
+                              fontFamily: ff.display, fontWeight: 600, fontSize: 13,
+                              lineHeight: 1.2, letterSpacing: '-0.005em',
+                            }}>{s.label}</span>
+                            <span style={{
+                              fontFamily: ff.mono, fontSize: 10.5,
+                              opacity: isFeatured ? 0.55 : 0.6,
+                              lineHeight: 1.4, marginTop: 2,
+                            }}>{s.sub}</span>
+                          </button>
+                        )
+                      })}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      {momento.sugerencias.map((s, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => s.scan ? scanRef.current?.click() : send(s.chat)}
-                          disabled={isLoading}
-                          style={{ textAlign: 'left', backgroundColor: '#ffffff', border: '1px solid #e8e2db', borderRadius: 14, padding: '13px 14px', cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.5 : 1, display: 'flex', flexDirection: 'column', gap: 3 }}
-                        >
-                          <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834', lineHeight: 1.3 }}>{s.label}</span>
-                          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, lineHeight: 1.4 }}>{s.sub}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
+                  </div>
                 )}
               </div>
             )}
 
             {actionMsg && (
-              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 16px', marginBottom: 12 }}>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#166534', margin: 0 }}>Accion ejecutada: {actionMsg}</p>
+              <div style={{
+                background: tk.appleSoft, border: `1.5px solid ${tk.appleDeep}`,
+                padding: '8px 14px', marginBottom: 12,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{ width: 6, height: 6, background: tk.appleDeep, flexShrink: 0 }} />
+                <p style={{
+                  fontFamily: ff.mono, fontSize: 11, color: tk.appleDeep, margin: 0,
+                  letterSpacing: '0.05em',
+                }}>
+                  ACCIÓN EJECUTADA · <span style={{ color: tk.iron }}>{actionMsg}</span>
+                </p>
               </div>
             )}
 
@@ -2733,20 +2637,26 @@ export default function KitchenChat() {
                 return (
                   <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', gap: 10 }}>
                     {msg.role === 'assistant' && (
-                      <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0, backgroundColor: tk.apple, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
                         {iconAI}
                       </div>
                     )}
-                    <div style={{ maxWidth: '78%', borderRadius: 18, padding: '12px 18px', backgroundColor: msg.role === 'user' ? '#3d3834' : '#ffffff', color: msg.role === 'user' ? '#dfd5c9' : '#3d3834', border: msg.role === 'assistant' ? '1px solid #e8e2db' : 'none' }}>
-                      {msg.image && <img src={msg.image} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 200, objectFit: 'cover' }} />}
+                    <div style={{
+                      maxWidth: '78%',
+                      padding: '12px 18px',
+                      backgroundColor: msg.role === 'user' ? tk.iron : tk.paper,
+                      color: msg.role === 'user' ? tk.cream : tk.iron,
+                      border: msg.role === 'assistant' ? `1.5px solid ${tk.iron20}` : 'none',
+                    }}>
+                      {msg.image && <img src={msg.image} alt="" style={{ width: '100%', marginBottom: 10, maxHeight: 200, objectFit: 'cover', display: 'block' }} />}
                       {msg.chartData && <MiniChart data={msg.chartData} />}
                       {msg.role === 'user' ? (
-                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, lineHeight: 1.65, color: '#dfd5c9', margin: 0 }}>{msg.content}</p>
+                        <p style={{ fontFamily: ff.mono, fontSize: 13, lineHeight: 1.6, color: tk.cream, margin: 0 }}>{msg.content}</p>
                       ) : (
                         <MarkdownContent content={msg.content} />
                       )}
                       {msg.role === 'assistant' && isLoading && i === messages.length - 1 && !msg.content && (
-                        <span style={{ color: '#19f973' }}>|</span>
+                        <span style={{ color: tk.apple }}>|</span>
                       )}
                     </div>
                   </div>
@@ -2763,22 +2673,26 @@ export default function KitchenChat() {
             {pendingImage && (
               <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <img src={pendingImage} alt="" style={{ height: 52, borderRadius: 10, objectFit: 'cover' }} />
-                  <button onClick={() => setPendingImage(null)} style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', backgroundColor: '#dc2626', color: 'white', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer' }}>x</button>
+                  <img src={pendingImage} alt="" style={{ height: 52, objectFit: 'cover', display: 'block', border: `1.5px solid ${tk.iron20}` }} />
+                  <button onClick={() => setPendingImage(null)} style={{ position: 'absolute', top: -8, right: -8, width: 18, height: 18, background: tk.iron, color: tk.cream, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
                 </div>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4 }}>Foto adjunta</p>
+                <p style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, margin: 0, letterSpacing: '0.04em' }}>FOTO ADJUNTA</p>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: '#ffffff', border: '1.5px solid #e8e2db', borderRadius: 18, padding: '8px 10px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: tk.paper, border: `1.5px solid ${tk.iron}`,
+              padding: '8px 10px',
+            }}>
               {/* Galería */}
-              <button onClick={() => fileRef.current?.click()} title="Subir foto" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3d3834', opacity: 0.55 }}>
-                <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <button onClick={() => fileRef.current?.click()} title="Subir foto" style={{ width: 32, height: 32, flexShrink: 0, background: tk.creamSoft, border: `1px solid ${tk.iron20}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: tk.iron }}>
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </button>
               {/* Cámara */}
-              <button onClick={() => scanRef.current?.click()} title="Escanear albarán o factura" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#3d3834', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f5f2ee', opacity: isLoading ? 0.4 : 0.85 }}>
-                <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <button onClick={() => scanRef.current?.click()} title="Escanear albarán o factura" style={{ width: 32, height: 32, flexShrink: 0, background: tk.iron, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: tk.apple, opacity: isLoading ? 0.5 : 1 }}>
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -2787,10 +2701,10 @@ export default function KitchenChat() {
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleImage} />
               <input ref={scanRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleScan} />
               {/* Micro */}
-              <button onClick={isRecording ? stopRecording : startRecording} title={isRecording ? 'Detener' : 'Nota de voz'} style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: isRecording ? '#19f973' : '#f5f2ee', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isRecording ? '#2a2522' : '#3d3834', opacity: isRecording ? 1 : 0.55 }}>
+              <button onClick={isRecording ? stopRecording : startRecording} title={isRecording ? 'Detener' : 'Nota de voz'} style={{ width: 32, height: 32, flexShrink: 0, background: isRecording ? tk.apple : tk.creamSoft, border: `1px solid ${isRecording ? tk.iron : tk.iron20}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: tk.iron }}>
                 {isRecording
-                  ? <span style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: '#2a2522', display: 'block' }} />
-                  : <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                  ? <span style={{ width: 10, height: 10, background: tk.iron, display: 'block' }} />
+                  : <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
                 }
               </button>
               <input
@@ -2798,19 +2712,19 @@ export default function KitchenChat() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input, pendingImage || undefined) } }}
-                placeholder={isRecording ? 'Grabando nota de voz...' : 'Pregunta algo sobre tu cocina...'}
+                placeholder={isRecording ? 'Grabando nota de voz…' : 'Pregunta algo sobre tu cocina…'}
                 disabled={isLoading || isRecording}
                 autoFocus
-                style={{ flex: 1, outline: 'none', background: 'transparent', border: 'none', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834' }}
+                style={{ flex: 1, outline: 'none', background: 'transparent', border: 'none', fontFamily: ff.mono, fontSize: 13, color: tk.iron, padding: '0 6px' }}
               />
-              <button onClick={() => send(input, pendingImage || undefined)} disabled={isLoading || (!input.trim() && !pendingImage)} style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, backgroundColor: '#19f973', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2a2522', opacity: isLoading || (!input.trim() && !pendingImage) ? 0.3 : 1 }}>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <button onClick={() => send(input, pendingImage || undefined)} disabled={isLoading || (!input.trim() && !pendingImage)} style={{ width: 36, height: 32, flexShrink: 0, background: tk.apple, border: `1px solid ${tk.iron}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: tk.iron, opacity: isLoading || (!input.trim() && !pendingImage) ? 0.4 : 1 }}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
                 </svg>
               </button>
             </div>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.28, textAlign: 'center', marginTop: 8 }}>
-              Accede a datos detallados desde el menu lateral
+            <p style={{ fontFamily: ff.mono, fontSize: 10, color: tk.iron40, textAlign: 'center', marginTop: 10, letterSpacing: '0.08em' }}>
+              ACCEDE A DATOS DETALLADOS DESDE EL MENÚ LATERAL
             </p>
           </div>
         </div>

@@ -32,16 +32,37 @@
   font-display: swap;
 }
 
-/* ─── Tokens ──────────────────────────────────────────────────── */
+/* ─── Tokens (editorial operational) ──────────────────────────── */
 :root {
+  /* Legacy aliases — kept to not break anything */
   --dark:    #3d3834;
   --darker:  #2a2522;
   --green:   #19f973;
   --green-d: #0fcc5e;
   --cream:   #dfd5c9;
-  --bg:      #f5f2ee;
+  --bg:      #f5f0e6;
   --surface: #ffffff;
   --border:  #e8e2db;
+
+  /* Brand */
+  --apple:       #19F973;
+  --apple-soft:  #d6f9e0;
+  --apple-deep:  #0fa651;
+  --iron:        #3D3834;
+  --iron-60:     #6c635a;
+  --iron-40:     #9a8f82;
+  --iron-20:     #c4b8a8;
+
+  /* Surfaces */
+  --cream-bg:    #f5f0e6;  /* page bg */
+  --paper:       #faf6ec;  /* card bg */
+  --cream-soft:  #ece4d8;  /* row bg */
+
+  /* Semantic (warm, tonal — not bombero rainbow) */
+  --clay:        #c97b3d;
+  --clay-soft:   #fcf2e8;
+  --terra:       #a83e1e;
+  --terra-soft:  #fbeae2;
 }
 
 * { box-sizing: border-box; }

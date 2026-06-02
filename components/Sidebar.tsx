@@ -176,18 +176,21 @@ export default function Sidebar() {
         <Link
           href="/onboarding"
           style={{
-            display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 10,
-            background: 'linear-gradient(135deg, rgba(124,58,237,0.18), rgba(76,29,149,0.10))',
-            border: '1px solid rgba(167,139,250,0.25)',
+            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+            background: 'rgba(25,249,115,0.06)',
+            border: '1px solid rgba(25,249,115,0.30)',
             textDecoration: 'none',
+            borderRadius: 0,
           }}
         >
-          <span style={{ fontSize: 13 }}>✨</span>
+          <span style={{ width: 16, height: 16, background: '#19F973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ width: 6, height: 6, background: '#3D3834', display: 'block' }} />
+          </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 11.5, color: '#dfd5c9', margin: 0 }}>
+            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 11.5, color: '#dfd5c9', margin: 0, letterSpacing: '-0.005em' }}>
               Configurar con IA
             </p>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#c4b5fd', opacity: 0.8, margin: 0 }}>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#dfd5c9', opacity: 0.55, margin: '1px 0 0', letterSpacing: '0.04em' }}>
               Carta + facturas → escandallo
             </p>
           </div>

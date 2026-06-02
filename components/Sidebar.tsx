@@ -172,7 +172,29 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="px-3 pt-2">
+        <Link
+          href="/onboarding"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 10,
+            background: 'linear-gradient(135deg, rgba(124,58,237,0.18), rgba(76,29,149,0.10))',
+            border: '1px solid rgba(167,139,250,0.25)',
+            textDecoration: 'none',
+          }}
+        >
+          <span style={{ fontSize: 13 }}>✨</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 11.5, color: '#dfd5c9', margin: 0 }}>
+              Configurar con IA
+            </p>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#c4b5fd', opacity: 0.8, margin: 0 }}>
+              Carta + facturas → escandallo
+            </p>
+          </div>
+        </Link>
+      </div>
+
+      <div className="px-4 py-4 mt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         <SidebarUser />
       </div>
     </aside>

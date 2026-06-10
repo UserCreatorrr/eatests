@@ -17,6 +17,13 @@ const ALLOWED_TABLES = new Set([
   'facturas_compra',
   'facturas_venta',
   'escandallo_receta',
+  // Labor + Productivity
+  'locations',
+  'empleados',
+  'turnos',
+  'ventas_franja',
+  'targets_productividad',
+  'reports_recipients',
 ])
 
 // Map URL slugs to table names
@@ -32,6 +39,13 @@ const TABLE_MAP: Record<string, string> = {
   'facturas-compra': 'facturas_compra',
   'facturas-venta': 'facturas_venta',
   'escandallo-receta': 'escandallo_receta',
+  // Labor + Productivity
+  'locations': 'locations',
+  'empleados': 'empleados',
+  'turnos': 'turnos',
+  'ventas-franja': 'ventas_franja',
+  'targets': 'targets_productividad',
+  'reports-recipients': 'reports_recipients',
 }
 
 export async function GET(

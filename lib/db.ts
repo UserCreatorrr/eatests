@@ -316,6 +316,107 @@ function initSchema(db: Database.Database) {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- ─── LABOR COST + PRODUCTIVITY ──────────────────────────────
+    CREATE TABLE IF NOT EXISTS locations (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT NOT NULL REFERENCES users(id),
+      site_id    TEXT NOT NULL,
+      nombre     TEXT NOT NULL,
+      ciudad     TEXT,
+      activo     INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS empleados (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         TEXT NOT NULL REFERENCES users(id),
+      employee_id     TEXT,                       -- código externo (Factorial/etc.)
+      nombre          TEXT NOT NULL,
+      site_id         TEXT,                       -- centro principal
+      rol             TEXT,                       -- Cocina/Sala/Reparto/Manager...
+      tipo_contrato   TEXT,                       -- fijo/temporal/extra
+      coste_hora      REAL,                       -- €/h bruto
+      coste_empresa   REAL,                       -- €/h con SS (opcional)
+      contract_hours_week REAL,                   -- horas contratadas/semana
+      activo          INTEGER DEFAULT 1,
+      created_at      TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS turnos (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id           TEXT NOT NULL REFERENCES users(id),
+      site_id           TEXT,
+      employee_id       INTEGER,                  -- FK empleados.id
+      employee_name     TEXT,                     -- denormalizado para imports sin match
+      rol               TEXT,
+      servicio          TEXT,                     -- Desayuno/Comida/Cena/Prep/Cierre
+      fecha             TEXT NOT NULL,            -- YYYY-MM-DD
+      start_time        TEXT NOT NULL,            -- HH:MM
+      end_time          TEXT NOT NULL,
+      break_minutes     INTEGER DEFAULT 0,
+      horas_plan        REAL,                     -- horas programadas (calculado o input)
+      horas_real        REAL,                     -- horas reales (si hay fichaje)
+      coste_hora        REAL,                     -- snapshot al momento del turno
+      source            TEXT DEFAULT 'manual',    -- manual/csv/factorial/sesame
+      overnight         INTEGER DEFAULT 0,        -- 1 si cruza medianoche
+      created_at        TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS ventas_franja (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id          TEXT NOT NULL REFERENCES users(id),
+      site_id          TEXT,
+      fecha            TEXT NOT NULL,
+      timeslot_start   TEXT NOT NULL,            -- HH:MM
+      timeslot_end     TEXT NOT NULL,
+      channel          TEXT,                     -- Sala/Delivery/Glovo/...
+      sales_net        REAL DEFAULT 0,
+      covers           INTEGER,
+      orders           INTEGER,
+      tickets          INTEGER,
+      source           TEXT DEFAULT 'manual',
+      created_at       TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS targets_productividad (
+      id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id                  TEXT NOT NULL REFERENCES users(id),
+      site_id                  TEXT,
+      servicio                 TEXT,             -- 'All day' o Desayuno/Comida/Cena
+      target_labor_pct         REAL,             -- ej. 22.0
+      target_splh              REAL,             -- ventas/hora objetivo
+      target_sales_per_employee REAL,
+      target_productivity_index REAL,            -- 0-100
+      min_staff_role           INTEGER,
+      max_staff_role           INTEGER,
+      rol                      TEXT,             -- opcional, si target por rol
+      created_at               TEXT DEFAULT (datetime('now'))
+    );
+
+    -- ─── REPORTS / DAILY BRIEF ──────────────────────────────────
+    CREATE TABLE IF NOT EXISTS reports_briefs (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       TEXT NOT NULL REFERENCES users(id),
+      scope         TEXT NOT NULL,              -- 'grupo' o 'local'
+      site_id       TEXT,                       -- null si grupo
+      fecha         TEXT NOT NULL,
+      payload       TEXT NOT NULL,              -- JSON con kpis, alertas, prioridades
+      data_quality  TEXT DEFAULT 'OK',          -- OK | PARCIAL
+      created_at    TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS reports_recipients (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT NOT NULL REFERENCES users(id),
+      email      TEXT NOT NULL,
+      nombre     TEXT,
+      role_in_org TEXT,                          -- CEO/COO/AM/KM/...
+      scope      TEXT NOT NULL,                 -- 'grupo' | 'local'
+      site_id    TEXT,                          -- requerido si scope='local'
+      activo     INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `)
 
   const hash = bcrypt.hashSync('Marginbites2026+', 10)

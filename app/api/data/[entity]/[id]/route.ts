@@ -16,6 +16,12 @@ const TABLE_MAP: Record<string, string> = {
   'facturas-compra': 'facturas_compra',
   'facturas-venta': 'facturas_venta',
   'escandallo-receta': 'escandallo_receta',
+  'locations': 'locations',
+  'empleados': 'empleados',
+  'turnos': 'turnos',
+  'ventas-franja': 'ventas_franja',
+  'targets': 'targets_productividad',
+  'reports-recipients': 'reports_recipients',
 }
 
 export async function PUT(

@@ -97,7 +97,7 @@ function TabResumen() {
           <BarChart data={(data?.gastoMensual ?? []).map((d: any) => ({ ...d, mesCorto: mesCorto(d.mes) }))}>
             <XAxis dataKey="mesCorto" tick={{ ...mono(10), fill: '#3d3834', opacity: 0.5 } as any} axisLine={false} tickLine={false} />
             <YAxis tick={{ ...mono(10), fill: '#3d3834', opacity: 0.5 } as any} axisLine={false} tickLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k€` : `${v}€`} width={48} />
-            <Tooltip formatter={(v: any) => eur(v)} contentStyle={{ fontFamily: 'DM Mono, monospace', fontSize: 11, borderRadius: 10, border: '1px solid #e8e2db' }} />
+            <Tooltip formatter={(v: any) => eur(v)} contentStyle={{ fontFamily: 'DM Mono, monospace', fontSize: 11, borderRadius: 0, border: '1px solid #e8e2db' }} />
             <Bar dataKey="total" fill="#19f973" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -116,7 +116,7 @@ function TabResumen() {
                   {data.gastoPorMesActual.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
                 <Legend formatter={(v) => <span style={mono(11)}>{v}</span>} />
-                <Tooltip formatter={(v: any) => eur(v)} contentStyle={{ fontFamily: 'DM Mono, monospace', fontSize: 11, borderRadius: 10, border: '1px solid #e8e2db' }} />
+                <Tooltip formatter={(v: any) => eur(v)} contentStyle={{ fontFamily: 'DM Mono, monospace', fontSize: 11, borderRadius: 0, border: '1px solid #e8e2db' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -382,7 +382,7 @@ function TabDesviaciones() {
             <p style={label}>Mismo producto, precios distintos entre proveedores</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {inconsistencias.map((inc: any, i: number) => (
-                <div key={i} style={{ padding: 16, backgroundColor: '#fff9f0', borderRadius: 10, border: '1px solid #fcf2e8' }}>
+                <div key={i} style={{ padding: 16, backgroundColor: '#fff9f0', borderRadius: 0, border: '1px solid #fcf2e8' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                     <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: 0 }}>{inc.nombre}</p>
                     <div style={{ display: 'flex', gap: 6 }}>
@@ -547,7 +547,7 @@ function TabConsumo() {
   }
   useEffect(load, [])
 
-  async function registrarProduccion() {
+  async function registrarProducción() {
     if (!form.nombre || !form.raciones) return
     setSaving(true)
     const receta = data?.recetas?.find((r: any) => r.nombre.toLowerCase().includes(form.nombre.toLowerCase()))
@@ -586,7 +586,7 @@ function TabConsumo() {
           </datalist>
           <input placeholder="Raciones" type="number" value={form.raciones}
             onChange={e => setForm(f => ({ ...f, raciones: e.target.value }))} style={{ ...inputStyle, width: 120 }} />
-          <button onClick={registrarProduccion} disabled={saving || !form.nombre || !form.raciones}
+          <button onClick={registrarProducción} disabled={saving || !form.nombre || !form.raciones}
             style={{ ...mono(12), padding: '8px 20px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#2a2522', fontWeight: 700 }}>
             {saving ? 'Guardando…' : 'Registrar'}
           </button>

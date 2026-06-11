@@ -28,7 +28,7 @@ export default async function ComprasPage() {
     <div className="p-8">
       <div className="page-header">
         <h1 className="page-title">Compras</h1>
-        <p className="page-subtitle">Gestion de pedidos, albaranes y facturas de compra</p>
+        <p className="page-subtitle">Gestión de pedidos, albaranes y facturas de compra</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 32 }}>

@@ -123,7 +123,7 @@ export default function IngredientesPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar ingrediente, tipo, proveedor..."
-          style={{ width: '100%', maxWidth: 480, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }}
+          style={{ width: '100%', maxWidth: 480, padding: '10px 14px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }}
           onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
           onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
         />
@@ -132,7 +132,7 @@ export default function IngredientesPage() {
       {loading ? (
         <p className="page-subtitle">Cargando...</p>
       ) : (
-        <div style={{ backgroundColor: '#fff', borderRadius: 14, border: '1px solid #e8e2db', overflow: 'hidden' }}>
+        <div style={{ backgroundColor: '#fff', borderRadius: 0, border: '1px solid #e8e2db', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#ece4d8' }}>
@@ -205,7 +205,7 @@ export default function IngredientesPage() {
       {/* Modal */}
       {modalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: 20, padding: '28px 32px', width: 480, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: 0, padding: '28px 32px', width: 480, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 16, color: '#3d3834', margin: '0 0 24px' }}>
               {editingId ? 'Editar ingrediente' : 'Nuevo ingrediente'}
             </h2>
@@ -223,7 +223,7 @@ export default function IngredientesPage() {
                     type={f.type || 'text'}
                     value={(form as any)[f.key] ?? ''}
                     onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec' }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec' }}
                     onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
                     onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
                   />
@@ -232,10 +232,10 @@ export default function IngredientesPage() {
             </div>
             {msg && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#a83e1e', marginTop: 10 }}>{msg}</p>}
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-              <button onClick={save} disabled={saving} style={{ flex: 1, padding: '11px', backgroundColor: '#19f973', border: 'none', borderRadius: 12, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#2a2522', opacity: saving ? 0.6 : 1 }}>
+              <button onClick={save} disabled={saving} style={{ flex: 1, padding: '11px', backgroundColor: '#19f973', border: 'none', borderRadius: 0, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#2a2522', opacity: saving ? 0.6 : 1 }}>
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>
-              <button onClick={() => setModalOpen(false)} style={{ padding: '11px 20px', backgroundColor: '#f5f2ee', border: '1px solid #e8e2db', borderRadius: 12, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834' }}>
+              <button onClick={() => setModalOpen(false)} style={{ padding: '11px 20px', backgroundColor: '#f5f2ee', border: '1px solid #e8e2db', borderRadius: 0, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834' }}>
                 Cancelar
               </button>
             </div>

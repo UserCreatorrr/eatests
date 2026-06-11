@@ -8,7 +8,7 @@ const fields: FieldDef[] = [
   { key: 'customer_type', label: 'Tipo cliente' },
   { key: 'nif', label: 'NIF' },
   { key: 'contact', label: 'Contacto' },
-  { key: 'phone', label: 'Telefono' },
+  { key: 'phone', label: 'Teléfono' },
   { key: 'mail', label: 'Email' },
   { key: 'address', label: 'Direccion' },
   { key: 'cp', label: 'CP' },

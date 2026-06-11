@@ -74,6 +74,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Chrome autofill: evitar el fondo azul/lavanda por defecto, mantener marca */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--iron);
+  -webkit-box-shadow: 0 0 0 1000px var(--paper) inset;
+  box-shadow: 0 0 0 1000px var(--paper) inset;
+  caret-color: var(--iron);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Chillax', sans-serif;
   font-weight: 600;
@@ -114,14 +127,19 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 0.25rem;
 }
 
-/* ─── Cards ───────────────────────────────────────────────────── */
+/* ─── Cards (editorial: sharp corners, paper surface, iron border) ─ */
 .stat-card {
-  @apply bg-white rounded-xl p-6 shadow-sm;
-  border: 1px solid var(--border);
+  @apply p-6;
+  background: var(--paper);
+  border: 1.5px solid var(--iron);
+  border-radius: 0;
+  transition: border-color 0.15s;
 }
+a.stat-card:hover { border-color: var(--apple-deep); }
 .stat-card-dark {
-  background: var(--dark);
-  @apply rounded-xl p-6;
+  background: var(--iron);
+  @apply p-6;
+  border-radius: 0;
 }
 .stat-value {
   font-family: 'Chillax', sans-serif;
@@ -130,8 +148,10 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ─── Tables ──────────────────────────────────────────────────── */
 .table-wrap {
-  @apply bg-white rounded-xl overflow-hidden shadow-sm;
-  border: 1px solid var(--border);
+  @apply overflow-hidden;
+  background: var(--paper);
+  border: 1.5px solid var(--iron);
+  border-radius: 0;
 }
 .data-table {
   @apply w-full text-sm;
@@ -207,9 +227,9 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.8rem;
   font-weight: 500;
   padding: 0.65rem 1.25rem;
-  border-radius: 10px;
+  border-radius: 0;
   transition: background 0.15s;
-  border: none;
+  border: 1.5px solid var(--iron);
   cursor: pointer;
 }
 .btn-green:hover { background: var(--green-d); }

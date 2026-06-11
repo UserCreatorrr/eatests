@@ -6,8 +6,8 @@ import { useState, Suspense } from 'react'
 
 const ERROR_MESSAGES: Record<string, string> = {
   google_denied: 'Acceso con Google cancelado.',
-  google_failed: 'Error al iniciar sesion con Google. Intentalo de nuevo.',
-  google_not_configured: 'Google OAuth no esta configurado.',
+  google_failed: 'Error al iniciar sesión con Google. Inténtalo de nuevo.',
+  google_not_configured: 'Google OAuth no está configurado.',
 }
 
 function LoginForm() {
@@ -62,21 +62,21 @@ function LoginForm() {
             style={{ margin: '0 auto 16px', display: 'block' }}
           />
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#3d3834', opacity: 0.4 }}>
-            Suite de gestion para cocinas profesionales
+            Suite de gestión para cocinas profesionales
           </p>
         </div>
 
         {/* Card */}
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '32px', border: '1px solid #e8e2db', boxShadow: '0 4px 24px rgba(61,56,52,0.06)' }}>
+        <div style={{ backgroundColor: '#faf6ec', borderRadius: 0, padding: '32px', border: '1.5px solid #3d3834', boxShadow: '0 4px 24px rgba(61,56,52,0.06)' }}>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: '4px', backgroundColor: '#f5f2ee', borderRadius: '12px', padding: '4px', marginBottom: '28px' }}>
+          <div style={{ display: 'flex', gap: '4px', backgroundColor: '#f5f2ee', borderRadius: 0, padding: '4px', marginBottom: '28px' }}>
             {(['login', 'signup'] as const).map(m => (
               <button
                 key={m}
                 onClick={() => { setMode(m); setMsg(''); setIsError(false) }}
                 style={{
-                  flex: 1, padding: '8px', borderRadius: '9px', border: 'none', cursor: 'pointer',
+                  flex: 1, padding: '8px', borderRadius: 0, border: 'none', cursor: 'pointer',
                   fontFamily: 'DM Mono, monospace', fontSize: '12px',
                   backgroundColor: mode === m ? '#ffffff' : 'transparent',
                   color: '#3d3834',
@@ -84,7 +84,7 @@ function LoginForm() {
                   transition: 'all 0.15s',
                 }}
               >
-                {m === 'login' ? 'Iniciar sesion' : 'Registrarse'}
+                {m === 'login' ? 'Iniciar sesión' : 'Registrarse'}
               </button>
             ))}
           </div>
@@ -93,7 +93,7 @@ function LoginForm() {
             <div style={{
               backgroundColor: isError ? '#fbeae2' : '#d6f9e0',
               border: `1px solid ${isError ? '#a83e1e' : '#0fa651'}`,
-              borderRadius: '10px', padding: '12px 16px', marginBottom: '20px',
+              borderRadius: 0, padding: '12px 16px', marginBottom: '20px',
             }}>
               <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '12px', color: isError ? '#a83e1e' : '#0fa651', margin: 0 }}>
                 {msg}
@@ -109,7 +109,7 @@ function LoginForm() {
               onChange={e => setEmail(e.target.value)}
               placeholder="tu@email.com"
               required
-              style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '12px 16px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec', boxSizing: 'border-box' }}
               onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
               onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
             />
@@ -117,9 +117,9 @@ function LoginForm() {
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="Contrasena"
+              placeholder="Contraseña"
               required
-              style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '12px 16px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec', boxSizing: 'border-box' }}
               onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
               onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
             />
@@ -127,12 +127,12 @@ function LoginForm() {
               type="submit"
               disabled={loading}
               style={{
-                width: '100%', padding: '13px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                width: '100%', padding: '13px', borderRadius: 0, border: 'none', cursor: 'pointer',
                 backgroundColor: '#19f973', color: '#2a2522', fontFamily: 'DM Mono, monospace',
                 fontSize: '13px', fontWeight: 600, opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s',
               }}
             >
-              {loading ? 'Cargando...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
+              {loading ? 'Cargando…' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
             </button>
           </form>
 
@@ -148,7 +148,7 @@ function LoginForm() {
             onClick={signInWithGoogle}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
-              backgroundColor: '#3d3834', color: '#dfd5c9', border: 'none', borderRadius: '12px',
+              backgroundColor: '#3d3834', color: '#dfd5c9', border: 'none', borderRadius: 0,
               padding: '13px 20px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: '13px',
               transition: 'opacity 0.15s',
             }}

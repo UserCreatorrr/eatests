@@ -26,7 +26,7 @@ export default async function VentasPage() {
     <div className="p-8">
       <div className="page-header">
         <h1 className="page-title">Ventas</h1>
-        <p className="page-subtitle">Gestion de albaranes y facturas de venta</p>
+        <p className="page-subtitle">Gestión de albaranes y facturas de venta</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16, marginBottom: 32 }}>

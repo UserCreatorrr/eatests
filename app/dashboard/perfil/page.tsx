@@ -14,10 +14,10 @@ type UserData = {
 type MigrateStatus = 'idle' | 'loading' | 'success' | 'error'
 
 const S: Record<string, React.CSSProperties> = {
-  section: { backgroundColor: '#fff', borderRadius: 20, padding: '28px 32px', border: '1px solid #e8e2db', marginBottom: 20 },
-  label: { fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.55, display: 'block', marginBottom: 6 },
-  input: { width: '100%', padding: '11px 14px', borderRadius: 12, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', boxSizing: 'border-box' as const, backgroundColor: '#faf6ec' },
-  btn: { padding: '11px 22px', borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 600 },
+  section: { backgroundColor: '#faf6ec', borderRadius: 0, padding: '28px 32px', border: '1.5px solid #3d3834', marginBottom: 16 },
+  label: { fontFamily: 'DM Mono, monospace', fontSize: 9.5, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: '#9a8f82', display: 'block', marginBottom: 6 },
+  input: { width: '100%', padding: '10px 14px', borderRadius: 0, border: '1.5px solid #c4b8a8', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', boxSizing: 'border-box' as const, backgroundColor: '#dfd5c9' },
+  btn: { padding: '11px 22px', borderRadius: 0, border: '1.5px solid #3d3834', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 600, letterSpacing: '0.06em' },
 }
 
 export default function PerfilPage() {
@@ -81,7 +81,7 @@ export default function PerfilPage() {
 
   async function startMigration() {
     if (!tspoonEmail || !tspoonPass) {
-      setMigrateMsg('Introduce el email y contrasena de TSpoonLab')
+      setMigrateMsg('Introduce el email y la contraseña de TSpoonLab')
       return
     }
     setMigrateStatus('loading')
@@ -96,7 +96,7 @@ export default function PerfilPage() {
       })
       const d = await res.json()
 
-      if (!res.ok) throw new Error(d.error || 'Error al iniciar migracion')
+      if (!res.ok) throw new Error(d.error || 'Error al iniciar migración')
 
       setMigrateLog(prev => [...prev, 'Workflow iniciado en n8n', 'Autenticando en TSpoonLab...', 'Importando datos (esto puede tardar 1-2 minutos)...'])
 
@@ -111,11 +111,11 @@ export default function PerfilPage() {
           clearInterval(interval)
           setMigrateLog(prev => [...prev, `Datos recibidos: ${total} registros importados`])
           setMigrateStatus('success')
-          setMigrateMsg(`Migracion completada. ${total} registros importados.`)
+          setMigrateMsg(`Migración completada. ${total} registros importados.`)
         } else if (attempts >= 24) { // 2 min timeout
           clearInterval(interval)
           setMigrateStatus('success')
-          setMigrateMsg('Migracion iniciada. Recarga las paginas en unos minutos para ver los datos.')
+          setMigrateMsg('Migración iniciada. Recarga las páginas en unos minutos para ver los datos.')
         } else {
           setMigrateLog(prev => {
             const last = prev[prev.length - 1]
@@ -134,7 +134,7 @@ export default function PerfilPage() {
   }
 
   if (!user) {
-    return <div className="p-8"><p className="page-subtitle">Cargando...</p></div>
+    return <div className="p-8"><p className="page-subtitle">Cargando…</p></div>
   }
 
   return (
@@ -201,7 +201,7 @@ export default function PerfilPage() {
               placeholder="Tu nombre"
               style={{ ...S.input, flex: 1 }}
               onFocus={e => (e.currentTarget.style.borderColor = '#19f973')}
-              onBlur={e => (e.currentTarget.style.borderColor = '#e8e2db')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#c4b8a8')}
             />
             <button
               onClick={saveName}
@@ -222,7 +222,7 @@ export default function PerfilPage() {
       {/* Migration */}
       <div style={S.section}>
         <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 15, color: '#3d3834', margin: '0 0 6px' }}>
-          Migracion desde TSpoonLab
+          Migración desde TSpoonLab
         </h2>
         <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.5, margin: '0 0 24px' }}>
           Importa todos tus datos (ingredientes, proveedores, pedidos, albaranes y facturas) directamente desde tu cuenta de TSpoonLab.
@@ -239,11 +239,11 @@ export default function PerfilPage() {
               disabled={migrateStatus === 'loading'}
               style={S.input}
               onFocus={e => (e.currentTarget.style.borderColor = '#19f973')}
-              onBlur={e => (e.currentTarget.style.borderColor = '#e8e2db')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#c4b8a8')}
             />
           </div>
           <div>
-            <label style={S.label}>Contrasena de TSpoonLab</label>
+            <label style={S.label}>Contraseña de TSpoonLab</label>
             <input
               type="password"
               value={tspoonPass}
@@ -252,7 +252,7 @@ export default function PerfilPage() {
               disabled={migrateStatus === 'loading'}
               style={S.input}
               onFocus={e => (e.currentTarget.style.borderColor = '#19f973')}
-              onBlur={e => (e.currentTarget.style.borderColor = '#e8e2db')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#c4b8a8')}
             />
           </div>
 
@@ -275,16 +275,16 @@ export default function PerfilPage() {
                 Importando datos...
               </>
             ) : migrateStatus === 'success' ? (
-              'Migracion completada'
+              'Migración completada'
             ) : (
-              'Iniciar importacion de TSpoonLab'
+              'Iniciar importación de TSpoonLab'
             )}
           </button>
         </div>
 
         {/* Log */}
         {migrateLog.length > 0 && (
-          <div style={{ marginTop: 20, backgroundColor: '#f5f2ee', borderRadius: 12, padding: '16px 18px' }}>
+          <div style={{ marginTop: 20, backgroundColor: '#ece4d8', borderRadius: 0, padding: '16px 18px' }}>
             {migrateLog.map((line, i) => (
               <p key={i} style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.7, margin: i === 0 ? 0 : '5px 0 0' }}>
                 {i === migrateLog.length - 1 ? '> ' : '  '}{line}
@@ -295,7 +295,7 @@ export default function PerfilPage() {
 
         {migrateMsg && (
           <div style={{
-            marginTop: 16, borderRadius: 12, padding: '12px 16px',
+            marginTop: 16, borderRadius: 0, padding: '12px 16px',
             backgroundColor: migrateStatus === 'error' ? '#fbeae2' : '#d6f9e0',
             border: `1px solid ${migrateStatus === 'error' ? '#fbeae2' : '#d6f9e0'}`,
           }}>
@@ -317,7 +317,7 @@ export default function PerfilPage() {
             { label: 'Email', value: user.email },
             { label: 'Fecha de registro', value: new Date(user.created_at).toLocaleString('es-ES') },
           ].map(({ label, value }) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid #f5f2ee' }}>
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid #e8e2db' }}>
               <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.5 }}>{label}</span>
               <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', maxWidth: 320, textAlign: 'right', wordBreak: 'break-all' as const }}>{value}</span>
             </div>
@@ -330,7 +330,7 @@ export default function PerfilPage() {
             router.push('/login')
           }}
           style={{
-            width: '100%', padding: '13px 22px', borderRadius: 14, border: '1.5px solid #a83e1e',
+            width: '100%', padding: '13px 22px', borderRadius: 0, border: '1.5px solid #a83e1e',
             backgroundColor: '#fbeae2', cursor: 'pointer', display: 'flex', alignItems: 'center',
             justifyContent: 'center', gap: 10, fontFamily: 'DM Mono, monospace', fontSize: 13,
             fontWeight: 600, color: '#a83e1e',

@@ -166,7 +166,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
 
       {/* Price-change notice */}
       {hasPriceChanges && (
-        <div style={{ backgroundColor: '#fcf2e8', border: '1px solid #c97b3d', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ backgroundColor: '#fcf2e8', border: '1px solid #c97b3d', borderRadius: 0, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#c97b3d', margin: '0 0 2px' }}>
               {lineasConDelta.length} ingrediente{lineasConDelta.length > 1 ? 's' : ''} con precio actualizado
@@ -254,7 +254,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
           </div>
 
           {/* Formulario añadir */}
-          <div style={{ backgroundColor: '#faf6ec', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ backgroundColor: '#faf6ec', borderRadius: 0, padding: 16, marginBottom: 20 }}>
             <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 12px', letterSpacing: 1 }}>Añadir ingrediente</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div style={{ flex: '2 1 200px' }}>
@@ -319,7 +319,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
           </div>
 
           {/* Resumen */}
-          <div style={{ backgroundColor: '#faf6ec', borderRadius: 14, padding: 20, display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+          <div style={{ backgroundColor: '#faf6ec', borderRadius: 0, padding: 20, display: 'flex', flexWrap: 'wrap', gap: 24 }}>
             <div>
               <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 4px', letterSpacing: 1 }}>Coste total ingredientes</p>
               <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 22, color: '#3d3834', margin: 0 }}>{eur(costeTotal)}</p>

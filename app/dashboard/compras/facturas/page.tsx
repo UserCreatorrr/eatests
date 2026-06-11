@@ -41,7 +41,7 @@ function dueBadge(date_due: string | null, paid: number | null) {
     return (
       <span style={{
         fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700,
-        backgroundColor: '#fef2f2', color: '#dc2626',
+        backgroundColor: '#fbeae2', color: '#a83e1e',
         padding: '2px 7px', borderRadius: 5, marginLeft: 6, whiteSpace: 'nowrap' as const,
       }}>
         VENCIDA {dias}d
@@ -52,7 +52,7 @@ function dueBadge(date_due: string | null, paid: number | null) {
     return (
       <span style={{
         fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700,
-        backgroundColor: '#fff7ed', color: '#ea580c',
+        backgroundColor: '#fff7ed', color: '#c97b3d',
         padding: '2px 7px', borderRadius: 5, marginLeft: 6, whiteSpace: 'nowrap' as const,
       }}>
         HOY
@@ -63,7 +63,7 @@ function dueBadge(date_due: string | null, paid: number | null) {
     return (
       <span style={{
         fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700,
-        backgroundColor: '#fffbeb', color: '#d97706',
+        backgroundColor: '#fcf2e8', color: '#c97b3d',
         padding: '2px 7px', borderRadius: 5, marginLeft: 6, whiteSpace: 'nowrap' as const,
       }}>
         {diffDays}d

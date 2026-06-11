@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { tk, ff } from '@/lib/design'
 
 type Notification = {
   id: number
@@ -14,9 +15,9 @@ type Notification = {
 }
 
 const urgencyColor: Record<string, string> = {
-  alta: '#dc2626',
-  media: '#d97706',
-  baja: '#16a34a',
+  alta: tk.terra,
+  media: tk.clay,
+  baja: tk.appleDeep,
 }
 
 function timeAgo(dateStr: string): string {
@@ -140,22 +141,22 @@ export default function NotificationBell() {
         onClick={() => setOpen(o => !o)}
         title="Notificaciones"
         style={{
-          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-          backgroundColor: open ? 'rgba(25,249,115,0.08)' : 'rgba(255,255,255,0.04)',
+          width: 28, height: 28, flexShrink: 0,
+          backgroundColor: open ? 'rgba(25,249,115,0.10)' : 'rgba(255,255,255,0.04)',
           border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#dfd5c9', opacity: 0.7, position: 'relative',
+          color: tk.cream, opacity: 0.7, position: 'relative',
         }}
       >
-        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
         {unread > 0 && (
           <span style={{
             position: 'absolute', top: -4, right: -4,
-            backgroundColor: '#dc2626', color: '#fff',
-            borderRadius: '50%', width: 14, height: 14,
-            fontSize: 9, fontFamily: 'DM Mono, monospace', fontWeight: 700,
+            backgroundColor: tk.terra, color: tk.cream,
+            width: 14, height: 14,
+            fontSize: 9, fontFamily: ff.mono, fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             lineHeight: 1,
           }}>
@@ -168,31 +169,32 @@ export default function NotificationBell() {
         <div style={{
           position: 'fixed', bottom: 60, left: 16, zIndex: 1000,
           width: 340, maxHeight: 480,
-          backgroundColor: '#faf9f7', border: '1px solid #e8e2db',
-          borderRadius: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+          backgroundColor: tk.paper, border: `1.5px solid ${tk.iron}`,
+          boxShadow: '0 8px 32px rgba(61,56,52,0.22)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '14px 16px 12px', borderBottom: '1px solid #e8e2db', flexShrink: 0,
+            padding: '12px 16px', borderBottom: `1.5px solid ${tk.iron20}`, flexShrink: 0,
+            background: tk.iron,
           }}>
-            <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 13, color: '#3d3834' }}>
+            <span style={{ fontFamily: ff.mono, fontWeight: 400, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: tk.apple }}>
               Notificaciones
             </span>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               {unread > 0 && (
                 <button
                   onClick={markAllRead}
-                  style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#19f973', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  style={{ fontFamily: ff.mono, fontSize: 10, color: tk.cream, opacity: 0.7, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                 >
-                  Marcar todas leidas
+                  Marcar todas leídas
                 </button>
               )}
               <button
                 onClick={() => setOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.4, display: 'flex', alignItems: 'center', padding: 0 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: tk.cream, opacity: 0.5, display: 'flex', alignItems: 'center', padding: 0 }}
               >
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -201,11 +203,11 @@ export default function NotificationBell() {
 
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {loading ? (
-              <div style={{ padding: 24, textAlign: 'center', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4 }}>
-                Cargando...
+              <div style={{ padding: 24, textAlign: 'center', fontFamily: ff.mono, fontSize: 11, color: tk.iron40 }}>
+                Cargando…
               </div>
             ) : notifications.length === 0 ? (
-              <div style={{ padding: 24, textAlign: 'center', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4 }}>
+              <div style={{ padding: 24, textAlign: 'center', fontFamily: ff.mono, fontSize: 11, color: tk.iron40 }}>
                 Sin notificaciones activas
               </div>
             ) : (
@@ -215,30 +217,30 @@ export default function NotificationBell() {
                   onClick={() => handleNotificationClick(n)}
                   style={{
                     padding: '12px 16px',
-                    backgroundColor: n.read ? '#fff' : '#fffef9',
-                    borderLeft: `3px solid ${urgencyColor[n.urgency] || '#d97706'}`,
-                    borderBottom: '1px solid #f0ebe4',
+                    backgroundColor: n.read ? tk.paper : tk.cream,
+                    borderLeft: `3px solid ${urgencyColor[n.urgency] || tk.clay}`,
+                    borderBottom: `1px solid ${tk.iron20}`,
                     cursor: 'pointer',
                     display: 'flex', flexDirection: 'column', gap: 3,
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                     <span style={{
-                      fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 12,
-                      color: urgencyColor[n.urgency] || '#d97706', flex: 1,
+                      fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12.5,
+                      color: tk.iron, flex: 1,
                     }}>
                       {n.title}
                     </span>
                     {!n.read && (
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: urgencyColor[n.urgency], flexShrink: 0, marginTop: 3 }} />
+                      <span style={{ width: 6, height: 6, backgroundColor: urgencyColor[n.urgency], flexShrink: 0, marginTop: 4 }} />
                     )}
                   </div>
                   {n.body && (
-                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.55 }}>
+                    <span style={{ fontFamily: ff.mono, fontSize: 10, color: tk.iron60 }}>
                       {n.body}
                     </span>
                   )}
-                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.35 }}>
+                  <span style={{ fontFamily: ff.mono, fontSize: 10, color: tk.iron40 }}>
                     {timeAgo(n.created_at)}
                   </span>
                 </div>

@@ -16,8 +16,8 @@ type Alerta = {
   count: number
 }
 
-const colorMap: Record<Urgencia, string> = { alta: '#dc2626', media: '#d97706', baja: '#16a34a' }
-const bgMap: Record<Urgencia, string> = { alta: '#fef2f2', media: '#fffbeb', baja: '#f0fdf4' }
+const colorMap: Record<Urgencia, string> = { alta: '#a83e1e', media: '#c97b3d', baja: '#0fa651' }
+const bgMap: Record<Urgencia, string> = { alta: '#fbeae2', media: '#fcf2e8', baja: '#d6f9e0' }
 const labelMap: Record<Urgencia, string> = { alta: 'Urgente', media: 'Aviso', baja: 'Info' }
 
 const tipoLabel: Record<TipoAlerta, string> = {
@@ -147,7 +147,7 @@ export default function AlertasPage() {
                 ? 'Todo en orden — no hay alertas activas'
                 : <>
                     {alertas.length} alerta{alertas.length !== 1 ? 's' : ''} activa{alertas.length !== 1 ? 's' : ''}
-                    {urgentes > 0 && <> · <span style={{ color: '#dc2626' }}>{urgentes} urgente{urgentes !== 1 ? 's' : ''}</span></>}
+                    {urgentes > 0 && <> · <span style={{ color: '#a83e1e' }}>{urgentes} urgente{urgentes !== 1 ? 's' : ''}</span></>}
                     <span style={{ opacity: 0.4 }}> · actualizado {ahora}</span>
                   </>
             )}
@@ -163,15 +163,15 @@ export default function AlertasPage() {
         </div>
       ) : alertas.length === 0 ? (
         <div style={{
-          backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 14,
+          backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 14,
           padding: '24px 28px', maxWidth: 720, display: 'flex', gap: 14, alignItems: 'center',
         }}>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#16a34a', flexShrink: 0 }} />
+          <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#0fa651', flexShrink: 0 }} />
           <div>
-            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 15, color: '#166534', margin: '0 0 2px' }}>
+            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 15, color: '#0fa651', margin: '0 0 2px' }}>
               Todo en orden
             </p>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#166534', opacity: 0.7, margin: 0 }}>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#0fa651', opacity: 0.7, margin: 0 }}>
               No hay alertas activas en este momento.
             </p>
           </div>

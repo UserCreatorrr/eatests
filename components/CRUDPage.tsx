@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { tk, ff } from '@/lib/design'
 
 export type FieldDef = {
   key: string
@@ -23,8 +24,8 @@ type Props = {
   columns: ColDef[]
 }
 
-const BTN = {
-  base: { fontFamily: 'DM Mono, monospace', fontSize: 12, border: 'none', cursor: 'pointer', borderRadius: 10, padding: '8px 16px' } as React.CSSProperties,
+const BTN: React.CSSProperties = {
+  fontFamily: ff.mono, fontSize: 12, border: 'none', cursor: 'pointer', padding: '8px 16px',
 }
 
 export default function CRUDPage({ title, entity, fields, columns }: Props) {
@@ -91,44 +92,44 @@ export default function CRUDPage({ title, entity, fields, columns }: Props) {
 
   return (
     <div className="p-8">
-      <div className="table-wrap" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, padding: '24px 28px', borderBottom: '1.5px solid #e8e2db' }}>
+      <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}`, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, padding: '20px 24px', borderBottom: `1.5px solid ${tk.iron20}` }}>
           <div>
-            <h1 className="page-title">{title}</h1>
-            <p className="page-subtitle">{count.toLocaleString('es-ES')} registros</p>
+            <h1 style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 24, color: tk.iron, margin: 0, letterSpacing: '-0.015em' }}>{title}</h1>
+            <p style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, margin: '3px 0 0', letterSpacing: '0.04em' }}>{count.toLocaleString('es-ES')} registros</p>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{ position: 'relative' }}>
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#3d3834" strokeWidth={2} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: 0.4, pointerEvents: 'none' }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tk.iron} strokeWidth={1.5} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: 0.5, pointerEvents: 'none' }}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
               </svg>
               <input
                 type="text"
-                placeholder="Buscar..."
+                placeholder="Buscar…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, borderRadius: 10, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', outline: 'none', backgroundColor: '#fff', width: 200 }}
-                onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
-                onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
+                style={{ paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, border: `1.5px solid ${tk.iron20}`, fontFamily: ff.mono, fontSize: 12, color: tk.iron, outline: 'none', backgroundColor: tk.cream, width: 200 }}
+                onFocus={e => e.currentTarget.style.borderColor = tk.iron}
+                onBlur={e => e.currentTarget.style.borderColor = tk.iron20}
               />
             </div>
-            <button onClick={openAdd} style={{ ...BTN.base, backgroundColor: '#19f973', color: '#2a2522', fontWeight: 600, fontSize: 13, padding: '10px 20px' }}>
-              + Nuevo
+            <button onClick={openAdd} style={{ ...BTN, backgroundColor: tk.apple, color: tk.iron, fontWeight: 600, fontSize: 12, padding: '9px 18px', border: `1.5px solid ${tk.iron}`, letterSpacing: '0.06em' }}>
+              + NUEVO
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="empty-state"><p className="page-subtitle">Cargando...</p></div>
+          <div style={{ padding: '40px 24px', textAlign: 'center' }}><p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.iron60 }}>Cargando…</p></div>
         ) : rows.length === 0 ? (
-          <div className="empty-state"><p className="page-subtitle">Sin registros. Usa el boton "Nuevo" o importa datos desde Ajustes.</p></div>
+          <div style={{ padding: '40px 24px', textAlign: 'center' }}><p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.iron60 }}>Sin registros. Usa el botón "Nuevo" o importa datos desde Ajustes.</p></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="data-table">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: ff.mono, fontSize: 12 }}>
               <thead>
                 <tr>
-                  {columns.map((c, i) => <th key={i}>{c.label}</th>)}
-                  <th style={{ width: 80 }}></th>
+                  {columns.map((c, i) => <th key={i} style={thStyle}>{c.label}</th>)}
+                  <th style={{ ...thStyle, width: 90 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -137,14 +138,14 @@ export default function CRUDPage({ title, entity, fields, columns }: Props) {
                   const q = search.toLowerCase()
                   return Object.values(row).some(v => v != null && String(v).toLowerCase().includes(q))
                 }).map(row => (
-                  <tr key={row.id}>
+                  <tr key={row.id} style={{ borderTop: `1px solid ${tk.iron20}` }}>
                     {columns.map((c, i) => (
-                      <td key={i} className={c.className}>{c.render(row)}</td>
+                      <td key={i} className={c.className} style={tdStyle}>{c.render(row)}</td>
                     ))}
-                    <td>
+                    <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => openEdit(row)} style={{ ...BTN.base, backgroundColor: '#f5f2ee', color: '#3d3834', padding: '5px 10px', fontSize: 11 }}>Editar</button>
-                        <button onClick={() => remove(row)} style={{ ...BTN.base, backgroundColor: '#fef2f2', color: '#dc2626', padding: '5px 10px', fontSize: 11 }}>x</button>
+                        <button onClick={() => openEdit(row)} style={{ ...BTN, backgroundColor: tk.creamSoft, color: tk.iron, padding: '5px 10px', fontSize: 10.5, border: `1px solid ${tk.iron20}`, letterSpacing: '0.06em' }}>EDITAR</button>
+                        <button onClick={() => remove(row)} style={{ ...BTN, backgroundColor: tk.terraSoft, color: tk.terra, padding: '5px 10px', fontSize: 11, border: `1px solid ${tk.terra}` }}>×</button>
                       </div>
                     </td>
                   </tr>
@@ -156,33 +157,37 @@ export default function CRUDPage({ title, entity, fields, columns }: Props) {
       </div>
 
       {modalOpen && (
-        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 240, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: 20, padding: 32, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 18, color: '#3d3834', margin: '0 0 24px' }}>
-              {editing ? 'Editar registro' : `Nuevo ${title.toLowerCase().replace('s', '').trim()}`}
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {fields.filter(f => !f.readOnly).map(f => (
-                <div key={f.key}>
-                  <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.6, display: 'block', marginBottom: 5 }}>{f.label}</label>
-                  <input
-                    type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                    value={form[f.key] ?? ''}
-                    onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    step={f.type === 'number' ? 'any' : undefined}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', boxSizing: 'border-box' }}
-                    onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
-                    onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
-                  />
-                </div>
-              ))}
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(61,56,52,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }}>
+          <div style={{ backgroundColor: tk.paper, border: `1.5px solid ${tk.iron}`, padding: 0, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ background: tk.iron, color: tk.cream, padding: '14px 24px' }}>
+              <h2 style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 16, color: tk.cream, margin: 0, letterSpacing: '-0.01em' }}>
+                {editing ? 'Editar registro' : `Nuevo ${title.toLowerCase().replace(/s$/, '').trim()}`}
+              </h2>
             </div>
-            {msg && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#dc2626', marginTop: 14 }}>{msg}</p>}
-            <div style={{ display: 'flex', gap: 10, marginTop: 24, justifyContent: 'flex-end' }}>
-              <button onClick={() => setModalOpen(false)} style={{ ...BTN.base, backgroundColor: '#f5f2ee', color: '#3d3834' }}>Cancelar</button>
-              <button onClick={save} disabled={saving} style={{ ...BTN.base, backgroundColor: '#19f973', color: '#2a2522', fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
+            <div style={{ padding: 28 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {fields.filter(f => !f.readOnly).map(f => (
+                  <div key={f.key}>
+                    <label style={{ fontFamily: ff.mono, fontSize: 9.5, color: tk.iron40, letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>{f.label}</label>
+                    <input
+                      type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                      value={form[f.key] ?? ''}
+                      onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      step={f.type === 'number' ? 'any' : undefined}
+                      style={{ width: '100%', padding: '9px 12px', border: `1.5px solid ${tk.iron20}`, fontFamily: ff.mono, fontSize: 13, color: tk.iron, outline: 'none', boxSizing: 'border-box', backgroundColor: tk.cream }}
+                      onFocus={e => e.currentTarget.style.borderColor = tk.iron}
+                      onBlur={e => e.currentTarget.style.borderColor = tk.iron20}
+                    />
+                  </div>
+                ))}
+              </div>
+              {msg && <p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.terra, marginTop: 14 }}>{msg}</p>}
+              <div style={{ display: 'flex', gap: 10, marginTop: 24, justifyContent: 'flex-end' }}>
+                <button onClick={() => setModalOpen(false)} style={{ ...BTN, backgroundColor: tk.paper, color: tk.iron, border: `1.5px solid ${tk.iron}`, letterSpacing: '0.06em' }}>CANCELAR</button>
+                <button onClick={save} disabled={saving} style={{ ...BTN, backgroundColor: tk.apple, color: tk.iron, fontWeight: 600, border: `1.5px solid ${tk.iron}`, opacity: saving ? 0.6 : 1, letterSpacing: '0.06em' }}>
+                  {saving ? 'GUARDANDO…' : 'GUARDAR'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -190,3 +195,6 @@ export default function CRUDPage({ title, entity, fields, columns }: Props) {
     </div>
   )
 }
+
+const thStyle: React.CSSProperties = { padding: '10px 16px', textAlign: 'left', fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', color: tk.iron40, textTransform: 'uppercase', fontWeight: 400, background: tk.creamSoft, borderBottom: `1.5px solid ${tk.iron20}` }
+const tdStyle: React.CSSProperties = { padding: '9px 16px', color: tk.iron, fontFamily: ff.mono, fontSize: 12 }

@@ -144,9 +144,9 @@ const CARD_ICONS: Record<string, JSX.Element> = {
 }
 
 const URGENCIA_COLORS = {
-  normal:  { bg: '#f8f7f5', border: '#e8e2db', icon: '#3d3834', badge: null },
-  warning: { bg: '#fffbeb', border: '#fcd34d', icon: '#92400e', badge: '#f59e0b' },
-  danger:  { bg: '#fff1f2', border: '#fca5a5', icon: '#991b1b', badge: '#ef4444' },
+  normal:  { bg: '#ece4d8', border: '#e8e2db', icon: '#3d3834', badge: null },
+  warning: { bg: '#fcf2e8', border: '#c97b3d', icon: '#c97b3d', badge: '#c97b3d' },
+  danger:  { bg: '#fbeae2', border: '#a83e1e', icon: '#a83e1e', badge: '#a83e1e' },
 }
 
 function parseInline(text: string): (JSX.Element | string)[] {
@@ -155,7 +155,7 @@ function parseInline(text: string): (JSX.Element | string)[] {
     if (part.startsWith('**') && part.endsWith('**'))
       return <strong key={i} style={{ fontWeight: 700, color: 'inherit' }}>{part.slice(2, -2)}</strong>
     if (part.startsWith('`') && part.endsWith('`'))
-      return <code key={i} style={{ fontFamily: 'DM Mono, monospace', backgroundColor: '#f0ece8', padding: '1px 5px', borderRadius: 4, fontSize: '0.9em' }}>{part.slice(1, -1)}</code>
+      return <code key={i} style={{ fontFamily: 'DM Mono, monospace', backgroundColor: '#e8e2db', padding: '1px 5px', borderRadius: 4, fontSize: '0.9em' }}>{part.slice(1, -1)}</code>
     return part
   })
 }
@@ -210,7 +210,7 @@ function MarkdownContent({ content }: { content: string }) {
             </thead>
             <tbody>
               {dataRows.slice(1).map((row, ri) => (
-                <tr key={ri} style={{ borderBottom: ri < dataRows.length - 2 ? '1px solid #f0ece8' : 'none' }}>
+                <tr key={ri} style={{ borderBottom: ri < dataRows.length - 2 ? '1px solid #e8e2db' : 'none' }}>
                   {parseCells(row).map((cell, j) => (
                     <td key={j} style={{ padding: '7px 14px', color: '#3d3834' }}>{parseInline(cell)}</td>
                   ))}
@@ -386,15 +386,15 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
 
   if (sentInfo) {
     return (
-      <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 16, padding: '14px 18px', maxWidth: '90%' }}>
+      <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 16, padding: '14px 18px', maxWidth: '90%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#166534' }}>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#0fa651" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#0fa651' }}>
             WhatsApp enviado a {phone}
           </span>
         </div>
         {sentInfo.num_order && (
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.7, margin: '6px 0 0 28px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#0fa651', opacity: 0.7, margin: '6px 0 0 28px' }}>
             Pedido registrado: {sentInfo.num_order}
           </p>
         )}
@@ -403,20 +403,20 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
   }
 
   return (
-    <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 16, padding: 18, maxWidth: '90%' }}>
+    <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 16, padding: 18, maxWidth: '90%' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#0fa651', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
             <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.854L0 24l6.303-1.654A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.214-3.733.979 1.001-3.64-.234-.374A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
           </svg>
         </div>
         <div>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#166534', margin: 0 }}>
+          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#0fa651', margin: 0 }}>
             WhatsApp — {proposal.proveedor}
           </p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.6, margin: 0 }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#0fa651', opacity: 0.6, margin: 0 }}>
             Revisa y envía con un clic
           </p>
         </div>
@@ -424,33 +424,33 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
 
       {/* Phone */}
       <div style={{ marginBottom: 10 }}>
-        <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.6, display: 'block', marginBottom: 4 }}>Teléfono</label>
+        <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#0fa651', opacity: 0.6, display: 'block', marginBottom: 4 }}>Teléfono</label>
         <input
           value={phone}
           onChange={e => setPhone(e.target.value)}
           placeholder="+34 645 966 701"
-          style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, padding: '8px 10px', outline: 'none' }}
+          style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#0fa651', backgroundColor: '#d6f9e0', border: '1px solid #0fa651', borderRadius: 8, padding: '8px 10px', outline: 'none' }}
         />
       </div>
 
       {/* Message */}
       <div style={{ marginBottom: 12 }}>
-        <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.6, display: 'block', marginBottom: 4 }}>Mensaje</label>
+        <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#0fa651', opacity: 0.6, display: 'block', marginBottom: 4 }}>Mensaje</label>
         <textarea
           value={message}
           onChange={e => setMessage(e.target.value)}
           rows={8}
-          style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, padding: '8px 10px', outline: 'none', resize: 'vertical', lineHeight: 1.6 }}
+          style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#0fa651', backgroundColor: '#d6f9e0', border: '1px solid #0fa651', borderRadius: 8, padding: '8px 10px', outline: 'none', resize: 'vertical', lineHeight: 1.6 }}
         />
       </div>
 
-      {error && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#dc2626', margin: '0 0 10px' }}>{error}</p>}
+      {error && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#a83e1e', margin: '0 0 10px' }}>{error}</p>}
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           onClick={handleSend}
           disabled={sending}
-          style={{ flex: 1, padding: '10px 16px', backgroundColor: '#22c55e', border: 'none', borderRadius: 10, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#fff', opacity: sending ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          style={{ flex: 1, padding: '10px 16px', backgroundColor: '#0fa651', border: 'none', borderRadius: 10, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#fff', opacity: sending ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
@@ -460,7 +460,7 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
         </button>
         <button
           onClick={onDiscard}
-          style={{ padding: '10px 16px', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#166534', opacity: 0.7 }}
+          style={{ padding: '10px 16px', backgroundColor: '#d6f9e0', border: '1px solid #0fa651', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#0fa651', opacity: 0.7 }}
         >
           Descartar
         </button>
@@ -538,13 +538,13 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
       {/* === MAIN: proveedores con ingredientes asignados === */}
       {data.pedidosPorProveedor.length > 0 ? (
         <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 14, overflow: 'hidden', marginBottom: 10 }}>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, fontWeight: 600, margin: 0, padding: '8px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #f0ece8' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, fontWeight: 600, margin: 0, padding: '8px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e8e2db' }}>
             Tus proveedores · {data.pedidosPorProveedor.length} con productos asignados
           </p>
           {data.pedidosPorProveedor.map((pp, i) => {
             const isExp = expanded[pp.proveedor.id] ?? false
             return (
-              <div key={pp.proveedor.id} style={{ borderBottom: i < data.pedidosPorProveedor.length - 1 ? '1px solid #f0ece8' : 'none' }}>
+              <div key={pp.proveedor.id} style={{ borderBottom: i < data.pedidosPorProveedor.length - 1 ? '1px solid #e8e2db' : 'none' }}>
                 {/* Row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
                   {/* Toggle */}
@@ -565,14 +565,14 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
                     <button
                       onClick={() => onAction(`Preparar pedido por email a ${pp.proveedor.descr} con estos productos: ${ingText(pp.ingredientes)}`)}
                       title={pp.proveedor.mail || 'Email'}
-                      style={{ ...btnBase, backgroundColor: pp.proveedor.canal_preferido === 'email' ? '#19f973' : '#f5f2ee', borderColor: pp.proveedor.canal_preferido === 'email' ? '#19f973' : '#e8e2db', color: pp.proveedor.canal_preferido === 'email' ? '#1a3a2a' : '#3d3834', fontWeight: pp.proveedor.canal_preferido === 'email' ? 600 : 400 }}
+                      style={{ ...btnBase, backgroundColor: pp.proveedor.canal_preferido === 'email' ? '#19f973' : '#f5f2ee', borderColor: pp.proveedor.canal_preferido === 'email' ? '#19f973' : '#e8e2db', color: pp.proveedor.canal_preferido === 'email' ? '#3d3834' : '#3d3834', fontWeight: pp.proveedor.canal_preferido === 'email' ? 600 : 400 }}
                     >
                       {iconEmail} Email
                     </button>
                     <button
                       onClick={() => onAction(`Preparar pedido por WhatsApp a ${pp.proveedor.descr} con estos productos: ${ingText(pp.ingredientes)}`)}
                       title={pp.proveedor.phone || 'WhatsApp'}
-                      style={{ ...btnBase, backgroundColor: pp.proveedor.canal_preferido === 'whatsapp' ? '#dcfce7' : '#f5f2ee', borderColor: pp.proveedor.canal_preferido === 'whatsapp' ? '#86efac' : '#e8e2db', color: pp.proveedor.canal_preferido === 'whatsapp' ? '#166534' : '#3d3834', fontWeight: pp.proveedor.canal_preferido === 'whatsapp' ? 600 : 400 }}
+                      style={{ ...btnBase, backgroundColor: pp.proveedor.canal_preferido === 'whatsapp' ? '#d6f9e0' : '#f5f2ee', borderColor: pp.proveedor.canal_preferido === 'whatsapp' ? '#0fa651' : '#e8e2db', color: pp.proveedor.canal_preferido === 'whatsapp' ? '#0fa651' : '#3d3834', fontWeight: pp.proveedor.canal_preferido === 'whatsapp' ? 600 : 400 }}
                     >
                       {iconWA} WA
                     </button>
@@ -593,8 +593,8 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
           })}
         </div>
       ) : (
-        <div style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 12, padding: '12px 16px', marginBottom: 10 }}>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#92400e', margin: 0, lineHeight: 1.6 }}>
+        <div style={{ backgroundColor: '#fcf2e8', border: '1.5px solid #c97b3d', borderRadius: 12, padding: '12px 16px', marginBottom: 10 }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#c97b3d', margin: 0, lineHeight: 1.6 }}>
             Ningún ingrediente tiene proveedor asignado aún.<br />
             Ve a <strong>Ingredientes</strong> y asigna proveedores a tus productos para que el sistema sepa a quién pedir cada cosa.
           </p>
@@ -603,8 +603,8 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
 
       {/* Listas de pedido pendientes */}
       {data.pendientes.length > 0 && (
-        <div style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 12, padding: '10px 14px', marginBottom: 10 }}>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <div style={{ backgroundColor: '#fcf2e8', border: '1.5px solid #c97b3d', borderRadius: 12, padding: '10px 14px', marginBottom: 10 }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#c97b3d', fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Listas pendientes de enviar
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -617,35 +617,35 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
                     <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1 }}>📋 {lp.descr}</span>
                     <button
                       onClick={() => setExpandedPendiente(prev => ({ ...prev, [lp.id]: !isExpLP }))}
-                      style={{ padding: '4px 10px', backgroundColor: isExpLP ? '#fef3c7' : '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', whiteSpace: 'nowrap' }}
+                      style={{ padding: '4px 10px', backgroundColor: isExpLP ? '#fcf2e8' : '#fcf2e8', border: '1px solid #c97b3d', borderRadius: 6, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#c97b3d', whiteSpace: 'nowrap' }}
                     >
                       {isExpLP ? '▲ Cerrar' : 'Enviar →'}
                     </button>
                   </div>
                   {isExpLP && (
-                    <div style={{ marginTop: 8, padding: '10px 12px', backgroundColor: '#fff', border: '1px solid #fcd34d', borderRadius: 8 }}>
+                    <div style={{ marginTop: 8, padding: '10px 12px', backgroundColor: '#fff', border: '1px solid #c97b3d', borderRadius: 8 }}>
                       {suggested ? (
                         <>
-                          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', margin: '0 0 8px', opacity: 0.7 }}>
-                            Proveedor sugerido: <strong style={{ color: '#92400e', opacity: 1 }}>{suggested.descr}</strong>
+                          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#c97b3d', margin: '0 0 8px', opacity: 0.7 }}>
+                            Proveedor sugerido: <strong style={{ color: '#c97b3d', opacity: 1 }}>{suggested.descr}</strong>
                           </p>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button
                               onClick={() => onAction(`Preparar pedido por email a ${suggested.descr} para el pedido "${lp.descr}"`)}
-                              style={{ ...btnBase, flex: 1, justifyContent: 'center', backgroundColor: '#fef3c7', borderColor: '#fcd34d', color: '#92400e' }}
+                              style={{ ...btnBase, flex: 1, justifyContent: 'center', backgroundColor: '#fcf2e8', borderColor: '#c97b3d', color: '#c97b3d' }}
                             >
                               {iconEmail} Email a {suggested.descr.split(' ').slice(0,2).join(' ')}
                             </button>
                             <button
                               onClick={() => onAction(`Preparar pedido por WhatsApp a ${suggested.descr} para el pedido "${lp.descr}"`)}
-                              style={{ ...btnBase, flex: 1, justifyContent: 'center', backgroundColor: '#fef3c7', borderColor: '#fcd34d', color: '#92400e' }}
+                              style={{ ...btnBase, flex: 1, justifyContent: 'center', backgroundColor: '#fcf2e8', borderColor: '#c97b3d', color: '#c97b3d' }}
                             >
                               {iconWA} WA a {suggested.descr.split(' ').slice(0,2).join(' ')}
                             </button>
                           </div>
                         </>
                       ) : (
-                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', margin: 0 }}>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#c97b3d', margin: 0 }}>
                           Selecciona un proveedor de la lista de abajo
                         </p>
                       )}
@@ -662,7 +662,7 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
       <div style={{ marginBottom: 8 }}>
         <button
           onClick={() => setShowAllProvs(s => !s)}
-          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #d4cec8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.55, textAlign: 'center' }}
+          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #c4b8a8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.55, textAlign: 'center' }}
         >
           {showAllProvs ? '▲ Ocultar' : '+ Pedido suelto a cualquier proveedor'}
         </button>
@@ -670,7 +670,7 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
           <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 12, overflow: 'hidden', marginTop: 6 }}>
             <div style={{ maxHeight: 240, overflowY: 'auto' }}>
               {data.proveedores.map((p, i) => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: i < data.proveedores.length - 1 ? '1px solid #f0ece8' : 'none' }}>
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: i < data.proveedores.length - 1 ? '1px solid #e8e2db' : 'none' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 12, color: '#3d3834', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.descr}</p>
                     <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: 0 }}>{p.descr_type || ''}</p>
@@ -690,7 +690,7 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
       {!showOtro ? (
         <button
           onClick={() => setShowOtro(true)}
-          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #d4cec8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.4, textAlign: 'center' }}
+          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #c4b8a8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.4, textAlign: 'center' }}
         >
           + Especificar proveedor manualmente
         </button>
@@ -1156,7 +1156,7 @@ function CompraSemanalCard({ data, onInsertMessage }: { data: CompraSemanalData;
     window.open(`https://wa.me/${phone}?text=${msg}`)
   }
 
-  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid #f0ebe4' }
+  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid #e8e2db' }
   const labelStyle: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834' }
   const dimStyle: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45 }
 
@@ -1178,8 +1178,8 @@ function CompraSemanalCard({ data, onInsertMessage }: { data: CompraSemanalData;
 
       {/* Platos no encontrados */}
       {platosNok.length > 0 && (
-        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderTop: 'none', padding: '8px 18px' }}>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', margin: 0 }}>
+        <div style={{ backgroundColor: '#fcf2e8', border: '1px solid #c97b3d', borderTop: 'none', padding: '8px 18px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#c97b3d', margin: 0 }}>
             Sin escandallo: {platosNok.map(p => p.nombre).join(', ')}
           </p>
         </div>
@@ -1191,7 +1191,7 @@ function CompraSemanalCard({ data, onInsertMessage }: { data: CompraSemanalData;
           {/* Supplier header */}
           <div
             onClick={() => toggle(gi)}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 18px', cursor: 'pointer', backgroundColor: expanded[gi] ? '#faf9f7' : '#fff' }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 18px', cursor: 'pointer', backgroundColor: expanded[gi] ? '#faf6ec' : '#fff' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#19f973', flexShrink: 0 }} />
@@ -1210,7 +1210,7 @@ function CompraSemanalCard({ data, onInsertMessage }: { data: CompraSemanalData;
 
           {/* Items */}
           {expanded[gi] && (
-            <div style={{ padding: '0 18px 12px', backgroundColor: '#faf9f7' }}>
+            <div style={{ padding: '0 18px 12px', backgroundColor: '#faf6ec' }}>
               <div style={{ marginBottom: 10 }}>
                 {grupo.items.map((item, ii) => (
                   <div key={ii} style={rowStyle}>
@@ -1261,7 +1261,7 @@ function CompraSemanalCard({ data, onInsertMessage }: { data: CompraSemanalData;
 
       {/* Sin proveedor */}
       {data.sinProveedor.length > 0 && (
-        <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '11px 18px', backgroundColor: '#faf9f7' }}>
+        <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '11px 18px', backgroundColor: '#faf6ec' }}>
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>Sin proveedor asignado</p>
           {data.sinProveedor.map((item, i) => (
             <div key={i} style={rowStyle}>
@@ -1295,10 +1295,10 @@ function MiniBarChart({ data }: { data: ChartData }) {
               <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.6, width: 96, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {label}
               </span>
-              <div style={{ flex: 1, height: 13, backgroundColor: '#f0ece8', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#d97706', borderRadius: 3 }} />
+              <div style={{ flex: 1, height: 13, backgroundColor: '#e8e2db', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#c97b3d', borderRadius: 3 }} />
               </div>
-              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', width: 50, flexShrink: 0, textAlign: 'right' }}>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#c97b3d', width: 50, flexShrink: 0, textAlign: 'right' }}>
                 {d.value}{data.unidad}
               </span>
             </div>
@@ -1341,9 +1341,9 @@ function MiniLineChart({ data }: { data: ChartData }) {
             {Math.round(t === 0 ? maxV : minV)}{data.unidad}
           </text>
         ))}
-        <path d={pathD} fill="none" stroke="#d97706" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        <path d={pathD} fill="none" stroke="#c97b3d" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
         {pts.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="#d97706" />
+          <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="#c97b3d" />
         ))}
         {[pts[0], pts[pts.length - 1]].filter(Boolean).map((p, i) => (
           <text key={i} x={p.x} y={H - 4} textAnchor={i === 0 ? 'start' : 'end'} fontFamily="DM Mono, monospace" fontSize={8} fill="#3d3834" fillOpacity={0.5}>
@@ -1357,7 +1357,7 @@ function MiniLineChart({ data }: { data: ChartData }) {
 
 function MiniChart({ data }: { data: ChartData }) {
   return (
-    <div style={{ backgroundColor: '#faf9f7', border: '1px solid #e8e2db', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
+    <div style={{ backgroundColor: '#faf6ec', border: '1px solid #e8e2db', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
       {data.tipo === 'bar' ? <MiniBarChart data={data} /> : <MiniLineChart data={data} />}
     </div>
   )
@@ -1427,10 +1427,10 @@ function NecesidadesPedidoCard({
 
   if (active.length === 0) {
     return (
-      <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 14, padding: '14px 18px', maxWidth: 580 }}>
+      <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 14, padding: '14px 18px', maxWidth: 580 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#166534' }}>Todos los pedidos gestionados</span>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#0fa651" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#0fa651' }}>Todos los pedidos gestionados</span>
         </div>
       </div>
     )
@@ -1467,7 +1467,7 @@ function NecesidadesPedidoCard({
 
               {/* Expanded items list */}
               {isExp && (
-                <div style={{ borderTop: '1px solid #f0ece8', padding: '8px 14px 10px' }}>
+                <div style={{ borderTop: '1px solid #e8e2db', padding: '8px 14px 10px' }}>
                   {grupo.items.map((item, j) => (
                     <div key={j} style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '4px 0', borderBottom: j < grupo.items.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
                       <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1 }}>
@@ -1485,16 +1485,16 @@ function NecesidadesPedidoCard({
               )}
 
               {/* Action buttons */}
-              <div style={{ borderTop: '1px solid #f0ece8', padding: '10px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', backgroundColor: '#fafaf9' }}>
+              <div style={{ borderTop: '1px solid #e8e2db', padding: '10px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', backgroundColor: '#faf6ec' }}>
                 <button
                   onClick={() => handleEmail(grupo)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#1a3a2a', fontWeight: 600 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', fontWeight: 600 }}
                 >
                   {iconEmail} Email
                 </button>
                 <button
                   onClick={() => handleWhatsApp(grupo)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', fontWeight: 600 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#d6f9e0', border: '1px solid #0fa651', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#0fa651', fontWeight: 600 }}
                 >
                   {iconWA} WhatsApp
                 </button>
@@ -1508,7 +1508,7 @@ function NecesidadesPedidoCard({
                 </button>
                 <button
                   onClick={() => setDismissed(prev => ({ ...prev, [i]: true }))}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#dc2626', opacity: 0.8 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', backgroundColor: '#fff5f5', border: '1px solid #a83e1e', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#a83e1e', opacity: 0.8 }}
                 >
                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   Eliminar
@@ -1547,13 +1547,13 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
 
   if (sentInfo) {
     return (
-      <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #19f973', borderRadius: 16, padding: '14px 18px', maxWidth: '90%' }}>
+      <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #19f973', borderRadius: 16, padding: '14px 18px', maxWidth: '90%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: sentInfo.num_order ? 6 : 0 }}>
-          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#166534' }}>Email enviado a {sentInfo.to}</span>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#0fa651" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#0fa651' }}>Email enviado a {sentInfo.to}</span>
         </div>
         {sentInfo.num_order && (
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#166534', opacity: 0.7, margin: '0 0 0 28px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#0fa651', opacity: 0.7, margin: '0 0 0 28px' }}>
             Pedido creado: {sentInfo.num_order} · pendiente de recepción
           </p>
         )}
@@ -1562,7 +1562,7 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
   }
 
   return (
-    <div style={{ backgroundColor: '#fafffe', border: '1.5px solid #19f973', borderRadius: 16, padding: 18, maxWidth: '90%' }}>
+    <div style={{ backgroundColor: '#faf6ec', border: '1.5px solid #19f973', borderRadius: 16, padding: 18, maxWidth: '90%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
@@ -1592,7 +1592,7 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
         />
       </div>
 
-      {error && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#dc2626', margin: '0 0 10px' }}>{error}</p>}
+      {error && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#a83e1e', margin: '0 0 10px' }}>{error}</p>}
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button
@@ -1623,7 +1623,7 @@ function AlbaranGuardadoCard({ data }: { data: AlbaranGuardadoData }) {
   return (
     <div style={{ width: '100%', maxWidth: 560 }}>
       {/* Header */}
-      <div style={{ backgroundColor: '#1a3a2a', borderRadius: '16px 16px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ backgroundColor: '#3d3834', borderRadius: '16px 16px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#19f973" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -1648,8 +1648,8 @@ function AlbaranGuardadoCard({ data }: { data: AlbaranGuardadoData }) {
           const hasDelta = pc && pc.diff_pct !== null
           const isUp = hasDelta && pc.diff_pct! > 0
           const isDown = hasDelta && pc.diff_pct! < 0
-          const deltaBg = isUp ? '#fff1f2' : '#f0fdf4'
-          const deltaColor = isUp ? '#dc2626' : '#16a34a'
+          const deltaBg = isUp ? '#fbeae2' : '#d6f9e0'
+          const deltaColor = isUp ? '#a83e1e' : '#0fa651'
           return (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 20px', borderBottom: i < data.lineas.length - 1 ? '1px solid #f5f2ee' : 'none' }}>
               <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.nombre}</span>
@@ -1669,13 +1669,13 @@ function AlbaranGuardadoCard({ data }: { data: AlbaranGuardadoData }) {
 
       {/* Price change alerts */}
       {data.price_changes.filter(pc => pc.diff_pct !== null && Math.abs(pc.diff_pct) >= 5).length > 0 && (
-        <div style={{ border: '1px solid #fcd34d', borderTop: 'none', backgroundColor: '#fffbeb', padding: '10px 20px' }}>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Variaciones de precio</p>
+        <div style={{ border: '1px solid #c97b3d', borderTop: 'none', backgroundColor: '#fcf2e8', padding: '10px 20px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#c97b3d', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Variaciones de precio</p>
           {data.price_changes.filter(pc => pc.diff_pct !== null && Math.abs(pc.diff_pct) >= 5).map((pc, i) => (
-            <p key={i} style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e', margin: '2px 0' }}>
+            <p key={i} style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#c97b3d', margin: '2px 0' }}>
               {pc.nombre}: {pc.precio_anterior != null ? `${pc.precio_anterior}€ → ` : ''}{pc.precio_nuevo}€
               {' '}
-              <span style={{ fontWeight: 700, color: pc.diff_pct! > 0 ? '#dc2626' : '#16a34a' }}>
+              <span style={{ fontWeight: 700, color: pc.diff_pct! > 0 ? '#a83e1e' : '#0fa651' }}>
                 ({pc.diff_pct! > 0 ? '+' : ''}{pc.diff_pct}%)
               </span>
               {pc.recetas_afectadas.length > 0 && (
@@ -1688,15 +1688,15 @@ function AlbaranGuardadoCard({ data }: { data: AlbaranGuardadoData }) {
 
       {/* Food cost warning */}
       {hasFoodCostWarning && (
-        <div style={{ border: '1px solid #fca5a5', borderTop: 'none', backgroundColor: '#fff1f2', padding: '10px 20px', borderRadius: '0 0 16px 16px' }}>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#991b1b', margin: 0, whiteSpace: 'pre-line' }}>
+        <div style={{ border: '1px solid #a83e1e', borderTop: 'none', backgroundColor: '#fbeae2', padding: '10px 20px', borderRadius: '0 0 16px 16px' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#a83e1e', margin: 0, whiteSpace: 'pre-line' }}>
             {data.food_cost_impact.replace(/^[\n]+/, '')}
           </p>
         </div>
       )}
 
       {!hasFoodCostWarning && (
-        <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '10px 20px', backgroundColor: '#faf9f7' }}>
+        <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '10px 20px', backgroundColor: '#faf6ec' }}>
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: 0 }}>
             {data.lineas.length} línea{data.lineas.length !== 1 ? 's' : ''} · precios actualizados en ingredientes
           </p>
@@ -1707,7 +1707,7 @@ function AlbaranGuardadoCard({ data }: { data: AlbaranGuardadoData }) {
 }
 
 function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
-  const variacionColor = data.gasto.variacion === null ? '#3d3834' : data.gasto.variacion > 0 ? '#dc2626' : '#16a34a'
+  const variacionColor = data.gasto.variacion === null ? '#3d3834' : data.gasto.variacion > 0 ? '#a83e1e' : '#0fa651'
   const variacionLabel = data.gasto.variacion === null ? '—' : `${data.gasto.variacion > 0 ? '+' : ''}${data.gasto.variacion}%`
 
   function compartirWhatsApp() {
@@ -1739,7 +1739,7 @@ function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
         </div>
         <button
           onClick={compartirWhatsApp}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#1a3a2a' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', backgroundColor: '#19f973', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#3d3834' }}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.854L0 24l6.303-1.654A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.214-3.733.979 1.001-3.64-.234-.374A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/></svg>
           Compartir
@@ -1747,7 +1747,7 @@ function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
       </div>
 
       {/* Metrics grid */}
-      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', backgroundColor: '#faf9f7', padding: '14px 16px' }}>
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', backgroundColor: '#faf6ec', padding: '14px 16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
           {/* Gasto */}
           <div style={metricStyle}>
@@ -1760,15 +1760,15 @@ function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
           {/* Merma */}
           <div style={metricStyle}>
             <p style={metricLabel}>Merma</p>
-            <p style={{ ...metricValue, color: data.merma.total > 0 ? '#b45309' : '#16a34a' }}>{data.merma.total}€</p>
+            <p style={{ ...metricValue, color: data.merma.total > 0 ? '#c97b3d' : '#0fa651' }}>{data.merma.total}€</p>
             <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, margin: '3px 0 0' }}>
               {data.merma.eventos} registro{data.merma.eventos !== 1 ? 's' : ''}
             </p>
           </div>
           {/* Facturas vencidas */}
-          <div style={{ ...metricStyle, backgroundColor: data.facturas.vencidas_c > 0 ? '#fff1f2' : '#fff', borderColor: data.facturas.vencidas_c > 0 ? '#fca5a5' : '#e8e2db' }}>
+          <div style={{ ...metricStyle, backgroundColor: data.facturas.vencidas_c > 0 ? '#fbeae2' : '#fff', borderColor: data.facturas.vencidas_c > 0 ? '#a83e1e' : '#e8e2db' }}>
             <p style={metricLabel}>Facturas vencidas</p>
-            <p style={{ ...metricValue, color: data.facturas.vencidas_c > 0 ? '#dc2626' : '#16a34a' }}>
+            <p style={{ ...metricValue, color: data.facturas.vencidas_c > 0 ? '#a83e1e' : '#0fa651' }}>
               {data.facturas.vencidas_c > 0 ? `${data.facturas.vencidas_c} (${data.facturas.vencidas_t}€)` : 'Ninguna'}
             </p>
           </div>
@@ -1797,12 +1797,12 @@ function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
 
         {/* Subidas de precio */}
         {data.precios_subida.length > 0 && (
-          <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
-            <p style={{ ...metricLabel, color: '#92400e' }}>Subidas de precio esta semana</p>
+          <div style={{ backgroundColor: '#fcf2e8', border: '1px solid #c97b3d', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
+            <p style={{ ...metricLabel, color: '#c97b3d' }}>Subidas de precio esta semana</p>
             {data.precios_subida.map((p, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#92400e' }}>{p.nombre}</span>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#dc2626', backgroundColor: '#fff1f2', padding: '2px 6px', borderRadius: 4 }}>+{p.diff_pct}%</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#c97b3d' }}>{p.nombre}</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#a83e1e', backgroundColor: '#fbeae2', padding: '2px 6px', borderRadius: 4 }}>+{p.diff_pct}%</span>
               </div>
             ))}
           </div>
@@ -1810,19 +1810,19 @@ function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
 
         {/* Food cost crítico */}
         {data.food_cost_critico.length > 0 && (
-          <div style={{ backgroundColor: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px' }}>
-            <p style={{ ...metricLabel, color: '#991b1b' }}>Food cost crítico (&gt;35%)</p>
+          <div style={{ backgroundColor: '#fbeae2', border: '1px solid #a83e1e', borderRadius: 12, padding: '10px 14px' }}>
+            <p style={{ ...metricLabel, color: '#a83e1e' }}>Food cost crítico (&gt;35%)</p>
             {data.food_cost_critico.map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#991b1b' }}>{r.nombre}</span>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#991b1b', backgroundColor: '#fca5a5', padding: '2px 6px', borderRadius: 4 }}>{r.pct}%</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#a83e1e' }}>{r.nombre}</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, color: '#a83e1e', backgroundColor: '#a83e1e', padding: '2px 6px', borderRadius: 4 }}>{r.pct}%</span>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '10px 20px', backgroundColor: '#faf9f7' }}>
+      <div style={{ border: '1px solid #e8e2db', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '10px 20px', backgroundColor: '#faf6ec' }}>
         <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.35, margin: 0, textAlign: 'center' }}>
           Datos del periodo: últimos 7 días
         </p>

@@ -77,7 +77,7 @@ export default function SangradoPage() {
         style={{
           position: 'fixed', top: 0, right: 0, bottom: 0,
           width: 'min(680px, 90vw)',
-          backgroundColor: '#faf9f7',
+          backgroundColor: '#faf6ec',
           borderLeft: '1px solid #e8e2db',
           zIndex: 201,
           overflowY: 'auto',
@@ -88,7 +88,7 @@ export default function SangradoPage() {
       >
         {/* Drawer header */}
         <div style={{
-          position: 'sticky', top: 0, backgroundColor: '#faf9f7',
+          position: 'sticky', top: 0, backgroundColor: '#faf6ec',
           borderBottom: '1px solid #e8e2db',
           padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           zIndex: 1,
@@ -101,7 +101,7 @@ export default function SangradoPage() {
           </div>
           <button
             onClick={closeCalc}
-            style={{ background: '#f0ece8', border: 'none', borderRadius: 10, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3d3834', opacity: 0.7 }}
+            style={{ background: '#e8e2db', border: 'none', borderRadius: 10, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3d3834', opacity: 0.7 }}
           >
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

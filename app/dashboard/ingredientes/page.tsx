@@ -111,7 +111,7 @@ export default function IngredientesPage() {
         <div>
           <h1 className="page-title">Ingredientes</h1>
           <p className="page-subtitle">
-            {rows.length} ingredientes · <span style={{ color: '#166534' }}>{conProveedor} con proveedor</span> · <span style={{ opacity: 0.5 }}>{sinProveedor} sin asignar</span>
+            {rows.length} ingredientes · <span style={{ color: '#0fa651' }}>{conProveedor} con proveedor</span> · <span style={{ opacity: 0.5 }}>{sinProveedor} sin asignar</span>
           </p>
         </div>
         <button onClick={openAdd} className="btn-primary">+ Añadir</button>
@@ -135,7 +135,7 @@ export default function IngredientesPage() {
         <div style={{ backgroundColor: '#fff', borderRadius: 14, border: '1px solid #e8e2db', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: '#f8f7f5' }}>
+              <tr style={{ backgroundColor: '#ece4d8' }}>
                 {['Código', 'Nombre', 'Tipo', 'Unidad', 'Coste', 'Proveedor', ''].map(h => (
                   <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, fontWeight: 600, borderBottom: '1px solid #e8e2db', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
@@ -143,7 +143,7 @@ export default function IngredientesPage() {
             </thead>
             <tbody>
               {filtered.map((ing, idx) => (
-                <tr key={ing.id} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid #f0ece8' : 'none' }}>
+                <tr key={ing.id} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid #e8e2db' : 'none' }}>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4 }}>{ing.codi || '-'}</td>
                   <td style={{ padding: '8px 14px', fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834' }}>{ing.descr || '-'}</td>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45 }}>{ing.type || '-'}</td>
@@ -174,10 +174,10 @@ export default function IngredientesPage() {
                         onClick={() => setAssigningId(ing.id)}
                         style={{
                           width: '100%', textAlign: 'left', padding: '5px 10px',
-                          backgroundColor: ing.proveedor_id ? '#f0fdf4' : '#f8f7f5',
-                          border: `1px solid ${ing.proveedor_id ? '#86efac' : '#e8e2db'}`,
+                          backgroundColor: ing.proveedor_id ? '#d6f9e0' : '#ece4d8',
+                          border: `1px solid ${ing.proveedor_id ? '#0fa651' : '#e8e2db'}`,
                           borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12,
-                          color: ing.proveedor_id ? '#166534' : '#3d3834',
+                          color: ing.proveedor_id ? '#0fa651' : '#3d3834',
                           opacity: ing.proveedor_id ? 1 : 0.45,
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}
@@ -190,7 +190,7 @@ export default function IngredientesPage() {
 
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
                     <button onClick={() => openEdit(ing)} style={{ padding: '4px 8px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.4, fontSize: 13 }}>✏️</button>
-                    <button onClick={() => del(ing.id)} style={{ padding: '4px 8px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#dc2626', opacity: 0.5, fontSize: 13 }}>✕</button>
+                    <button onClick={() => del(ing.id)} style={{ padding: '4px 8px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#a83e1e', opacity: 0.5, fontSize: 13 }}>✕</button>
                   </td>
                 </tr>
               ))}
@@ -223,14 +223,14 @@ export default function IngredientesPage() {
                     type={f.type || 'text'}
                     value={(form as any)[f.key] ?? ''}
                     onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#fafaf9' }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec' }}
                     onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
                     onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
                   />
                 </div>
               ))}
             </div>
-            {msg && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#dc2626', marginTop: 10 }}>{msg}</p>}
+            {msg && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#a83e1e', marginTop: 10 }}>{msg}</p>}
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button onClick={save} disabled={saving} style={{ flex: 1, padding: '11px', backgroundColor: '#19f973', border: 'none', borderRadius: 12, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#2a2522', opacity: saving ? 0.6 : 1 }}>
                 {saving ? 'Guardando...' : 'Guardar'}

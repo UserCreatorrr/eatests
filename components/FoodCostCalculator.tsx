@@ -35,10 +35,10 @@ function eur(v: number | null | undefined) {
 }
 
 function foodCostBadge(pct: number) {
-  if (pct < 28) return { label: 'EXCELENTE', bg: '#f0fdf4', color: '#16a34a' }
-  if (pct < 33) return { label: 'ACEPTABLE', bg: '#fefce8', color: '#ca8a04' }
-  if (pct < 40) return { label: 'REVISAR', bg: '#fff7ed', color: '#ea580c' }
-  return { label: 'CRITICO', bg: '#fef2f2', color: '#dc2626' }
+  if (pct < 28) return { label: 'EXCELENTE', bg: '#d6f9e0', color: '#0fa651' }
+  if (pct < 33) return { label: 'ACEPTABLE', bg: '#fcf2e8', color: '#c97b3d' }
+  if (pct < 40) return { label: 'REVISAR', bg: '#fff7ed', color: '#c97b3d' }
+  return { label: 'CRITICO', bg: '#fbeae2', color: '#a83e1e' }
 }
 
 function effectiveCost(l: Linea): number | null {
@@ -140,7 +140,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
   const lineasConDelta = lineas.filter(l => priceDelta(l) !== null)
   const hasPriceChanges = lineasConDelta.length > 0
 
-  const tdStyle: React.CSSProperties = { padding: '8px 10px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', borderBottom: '1px solid #f0ebe4' }
+  const tdStyle: React.CSSProperties = { padding: '8px 10px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', borderBottom: '1px solid #e8e2db' }
   const thStyle: React.CSSProperties = { padding: '6px 10px', fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'left', borderBottom: '1px solid #e8e2db' }
 
   return (
@@ -152,7 +152,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
           <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 18, color: '#3d3834', margin: 0 }}>
             Food Cost: {recetaNombre}
           </h2>
-          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 5, backgroundColor: '#f0f9ff', color: '#0369a1', letterSpacing: '0.05em' }}>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 5, backgroundColor: '#ece4d8', color: '#6c635a', letterSpacing: '0.05em' }}>
             PRECIOS VIVOS
           </span>
         </div>
@@ -166,19 +166,19 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
 
       {/* Price-change notice */}
       {hasPriceChanges && (
-        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ backgroundColor: '#fcf2e8', border: '1px solid #c97b3d', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#92400e', margin: '0 0 2px' }}>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, color: '#c97b3d', margin: '0 0 2px' }}>
               {lineasConDelta.length} ingrediente{lineasConDelta.length > 1 ? 's' : ''} con precio actualizado
             </p>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#92400e', opacity: 0.7, margin: 0 }}>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#c97b3d', opacity: 0.7, margin: 0 }}>
               El food cost refleja los precios actuales del mercado. Sincroniza para guardarlos.
             </p>
           </div>
           <button
             onClick={syncPrecios}
             disabled={syncing}
-            style={{ flexShrink: 0, fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '7px 14px', backgroundColor: '#f59e0b', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#fff', opacity: syncing ? 0.6 : 1, whiteSpace: 'nowrap' }}
+            style={{ flexShrink: 0, fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '7px 14px', backgroundColor: '#c97b3d', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#fff', opacity: syncing ? 0.6 : 1, whiteSpace: 'nowrap' }}
           >
             {syncing ? 'Sincronizando...' : 'Sincronizar precios'}
           </button>
@@ -217,7 +217,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
                       <td style={tdStyle}>
                         <span>{l.ingrediente_id ? (l.ing_nombre || '-') : (l.nombre_libre || '-')}</span>
                         {isLive && (
-                          <span style={{ marginLeft: 5, fontFamily: 'DM Mono, monospace', fontSize: 9, padding: '1px 5px', borderRadius: 4, backgroundColor: '#f0f9ff', color: '#0369a1' }}>live</span>
+                          <span style={{ marginLeft: 5, fontFamily: 'DM Mono, monospace', fontSize: 9, padding: '1px 5px', borderRadius: 4, backgroundColor: '#ece4d8', color: '#6c635a' }}>live</span>
                         )}
                       </td>
                       <td style={tdStyle}>{l.cantidad}</td>
@@ -225,7 +225,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
                       <td style={tdStyle}>
                         <span>{cu != null ? eur(cu) : '-'}</span>
                         {delta !== null && (
-                          <span style={{ marginLeft: 6, fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, backgroundColor: delta > 0 ? '#fef2f2' : '#f0fdf4', color: delta > 0 ? '#dc2626' : '#16a34a' }}>
+                          <span style={{ marginLeft: 6, fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, backgroundColor: delta > 0 ? '#fbeae2' : '#d6f9e0', color: delta > 0 ? '#a83e1e' : '#0fa651' }}>
                             {delta > 0 ? '+' : ''}{delta}%
                           </span>
                         )}
@@ -234,7 +234,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
                       <td style={tdStyle}>
                         <button
                           onClick={() => borrarLinea(l.id)}
-                          style={{ backgroundColor: '#fef2f2', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', color: '#dc2626', fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700 }}
+                          style={{ backgroundColor: '#fbeae2', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', color: '#a83e1e', fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700 }}
                         >
                           x
                         </button>
@@ -254,7 +254,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
           </div>
 
           {/* Formulario añadir */}
-          <div style={{ backgroundColor: '#faf9f7', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ backgroundColor: '#faf6ec', borderRadius: 12, padding: 16, marginBottom: 20 }}>
             <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 12px', letterSpacing: 1 }}>Añadir ingrediente</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div style={{ flex: '2 1 200px' }}>
@@ -319,7 +319,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
           </div>
 
           {/* Resumen */}
-          <div style={{ backgroundColor: '#faf9f7', borderRadius: 14, padding: 20, display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+          <div style={{ backgroundColor: '#faf6ec', borderRadius: 14, padding: 20, display: 'flex', flexWrap: 'wrap', gap: 24 }}>
             <div>
               <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 4px', letterSpacing: 1 }}>Coste total ingredientes</p>
               <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 22, color: '#3d3834', margin: 0 }}>{eur(costeTotal)}</p>
@@ -340,7 +340,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
             {margen != null && (
               <div>
                 <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 4px', letterSpacing: 1 }}>Margen bruto</p>
-                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 22, color: margen >= 0 ? '#16a34a' : '#dc2626', margin: 0 }}>
+                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 22, color: margen >= 0 ? '#0fa651' : '#a83e1e', margin: 0 }}>
                   {eur(margen)} {margenPct != null ? `(${margenPct.toFixed(1)}%)` : ''}
                 </p>
               </div>

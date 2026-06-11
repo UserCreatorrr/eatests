@@ -19,14 +19,15 @@ function eur(v: number | null | undefined) {
   if (v == null) return '0 €'
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
 }
-const PIE_COLORS = ['#19f973', '#3d3834', '#a8e6cf', '#88d4b0', '#5bc4a0', '#38b48e', '#1a9478', '#0a7460']
+// Brand-consistent categorical palette: apple + iron tints + warm semantics
+const PIE_COLORS = ['#19f973', '#3d3834', '#0fa651', '#9a8f82', '#c97b3d', '#6c635a', '#a83e1e', '#c4b8a8']
 
 const MOTIVOS = ['caducidad', 'sobreproducción', 'rotura', 'pérdida', 'otro']
 const MOTIVO_COLORS: Record<string, string> = {
-  caducidad: '#ef4444', sobreproducción: '#f97316', rotura: '#eab308', pérdida: '#8b5cf6', otro: '#6b7280',
+  caducidad: '#a83e1e', sobreproducción: '#c97b3d', rotura: '#6c635a', pérdida: '#3d3834', otro: '#9a8f82',
 }
 
-const card: React.CSSProperties = { backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 16, padding: 24 }
+const card: React.CSSProperties = { backgroundColor: '#faf6ec', border: '1.5px solid #3d3834', borderRadius: 0, padding: 24 }
 const mono = (size = 11): React.CSSProperties => ({ fontFamily: 'DM Mono, monospace', fontSize: size })
 const chillax = (size = 14, weight = 700): React.CSSProperties => ({ fontFamily: 'Chillax, sans-serif', fontWeight: weight, fontSize: size })
 const label: React.CSSProperties = { ...mono(10), textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 8px', letterSpacing: 1 }
@@ -63,7 +64,7 @@ function TabResumen() {
           <p style={label}>Gasto este mes</p>
           <p style={{ ...chillax(28), color: '#3d3834', margin: '0 0 8px' }}>{eur(kpis.gasto_este_mes)}</p>
           {variacionPct !== null && (
-            <Badge color={variacionPct > 0 ? '#dc2626' : '#16a34a'}>
+            <Badge color={variacionPct > 0 ? '#a83e1e' : '#0fa651'}>
               {variacionPct > 0 ? '▲' : '▼'} {Math.abs(variacionPct)}% vs mes anterior
             </Badge>
           )}
@@ -72,7 +73,7 @@ function TabResumen() {
           <p style={label}>Facturas pendientes</p>
           <p style={{ ...chillax(28), color: '#3d3834', margin: '0 0 8px' }}>{facturaStats.pendientes ?? 0}</p>
           {(facturaStats.importe_pendiente ?? 0) > 0 && (
-            <p style={{ ...mono(10), color: '#dc2626', margin: 0 }}>por valor de {eur(facturaStats.importe_pendiente)}</p>
+            <p style={{ ...mono(10), color: '#a83e1e', margin: 0 }}>por valor de {eur(facturaStats.importe_pendiente)}</p>
           )}
         </div>
         <div style={card}>
@@ -201,7 +202,7 @@ function TabDesviaciones() {
           >
             {t.label}
             {t.count !== undefined && t.count > 0 && (
-              <span style={{ marginLeft: 5, backgroundColor: subTab === t.key ? '#19f97322' : '#f0ece8', color: subTab === t.key ? '#16a34a' : '#3d3834', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>
+              <span style={{ marginLeft: 5, backgroundColor: subTab === t.key ? '#19f97322' : '#e8e2db', color: subTab === t.key ? '#0fa651' : '#3d3834', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>
                 {t.count}
               </span>
             )}
@@ -233,7 +234,7 @@ function TabDesviaciones() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {filteredDesv.map((d: any, i: number) => {
               const isUp = d.variacion_pct > 0
-              const color = isUp ? '#dc2626' : '#16a34a'
+              const color = isUp ? '#a83e1e' : '#0fa651'
               const isExpanded = expanded === d.nombre
               return (
                 <div key={d.nombre}>
@@ -241,12 +242,12 @@ function TabDesviaciones() {
                     onClick={() => toggleDetail(d.nombre)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12, padding: '12px 10px',
-                      borderBottom: !isExpanded && i < filteredDesv.length - 1 ? '1px solid #f0ebe4' : 'none',
+                      borderBottom: !isExpanded && i < filteredDesv.length - 1 ? '1px solid #e8e2db' : 'none',
                       cursor: 'pointer', borderRadius: isExpanded ? '8px 8px 0 0' : 8,
-                      backgroundColor: isExpanded ? (isUp ? '#fef2f220' : '#f0fdf420') : 'transparent',
+                      backgroundColor: isExpanded ? (isUp ? '#fbeae220' : '#d6f9e020') : 'transparent',
                       transition: 'background-color 0.15s',
                     }}
-                    onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLDivElement).style.backgroundColor = '#faf9f7' }}
+                    onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLDivElement).style.backgroundColor = '#faf6ec' }}
                     onMouseLeave={e => { if (!isExpanded) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent' }}
                   >
                     {/* Arrow */}
@@ -275,7 +276,7 @@ function TabDesviaciones() {
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         <Badge color={color}>{isUp ? '+' : ''}{d.variacion_pct}%</Badge>
                         {d.impacto_mensual != null && (
-                          <Badge color={isUp ? '#f97316' : '#16a34a'}>
+                          <Badge color={isUp ? '#c97b3d' : '#0fa651'}>
                             {isUp ? '+' : ''}{eur(d.impacto_mensual)}/mes
                           </Badge>
                         )}
@@ -289,7 +290,7 @@ function TabDesviaciones() {
                   {/* Inline detail */}
                   {isExpanded && (
                     <div style={{
-                      backgroundColor: '#faf9f7', borderRadius: '0 0 8px 8px',
+                      backgroundColor: '#faf6ec', borderRadius: '0 0 8px 8px',
                       border: `1px solid ${color}22`, borderTop: 'none',
                       padding: '14px 16px', marginBottom: i < filteredDesv.length - 1 ? 1 : 0,
                     }}>
@@ -298,7 +299,7 @@ function TabDesviaciones() {
                         <div>
                           <p style={{ ...label, marginBottom: 10 }}>Historial de precios</p>
                           {(historialByIng[d.nombre] ?? []).map((h: any, j: number) => (
-                            <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: j < (historialByIng[d.nombre]?.length - 1) ? '1px solid #f0ebe4' : 'none' }}>
+                            <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: j < (historialByIng[d.nombre]?.length - 1) ? '1px solid #e8e2db' : 'none' }}>
                               <span style={{ ...mono(10), color: '#3d3834', opacity: 0.6 }}>{h.fecha}</span>
                               <span style={{ ...mono(11), fontWeight: 700, color: '#3d3834' }}>{h.precio}€/{h.unidad || 'ud'}</span>
                             </div>
@@ -311,7 +312,7 @@ function TabDesviaciones() {
                           {(lineasByIng[d.nombre] ?? []).length === 0 ? (
                             <p style={{ ...mono(10), color: '#3d3834', opacity: 0.4 }}>Sin registros de compra</p>
                           ) : (lineasByIng[d.nombre] ?? []).slice(0, 6).map((l: any, j: number) => (
-                            <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: j < 5 ? '1px solid #f0ebe4' : 'none' }}>
+                            <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: j < 5 ? '1px solid #e8e2db' : 'none' }}>
                               <span style={{ ...mono(10), color: '#3d3834', opacity: 0.6 }}>{l.fecha} · {l.vendor || '-'}</span>
                               <span style={{ ...mono(11), fontWeight: 700, color: '#3d3834' }}>
                                 {l.cantidad ? `${l.cantidad}${l.unidad || ''} · ` : ''}{l.precio_unitario}€/ud
@@ -348,7 +349,7 @@ function TabDesviaciones() {
             <p style={label}>Variación de gasto por proveedor — mes actual vs anterior</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {vendorTrend.map((v: any, i: number) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < vendorTrend.length - 1 ? '1px solid #f0ebe4' : 'none' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < vendorTrend.length - 1 ? '1px solid #e8e2db' : 'none' }}>
                   <div style={{ flex: 1 }}>
                     <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: '0 0 2px' }}>{v.vendor}</p>
                     <p style={{ ...mono(10), color: '#3d3834', opacity: 0.5, margin: 0 }}>
@@ -356,10 +357,10 @@ function TabDesviaciones() {
                     </p>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                    <Badge color={v.variacion_pct > 0 ? '#dc2626' : '#16a34a'}>
+                    <Badge color={v.variacion_pct > 0 ? '#a83e1e' : '#0fa651'}>
                       {v.variacion_pct > 0 ? '▲ +' : '▼ '}{Math.abs(v.variacion_pct)}%
                     </Badge>
-                    <span style={{ ...mono(11), color: v.variacion_eur > 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
+                    <span style={{ ...mono(11), color: v.variacion_eur > 0 ? '#a83e1e' : '#0fa651', fontWeight: 700 }}>
                       {v.variacion_eur > 0 ? '+' : ''}{eur(v.variacion_eur)}
                     </span>
                   </div>
@@ -381,12 +382,12 @@ function TabDesviaciones() {
             <p style={label}>Mismo producto, precios distintos entre proveedores</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {inconsistencias.map((inc: any, i: number) => (
-                <div key={i} style={{ padding: 16, backgroundColor: '#fff9f0', borderRadius: 10, border: '1px solid #fde68a' }}>
+                <div key={i} style={{ padding: 16, backgroundColor: '#fff9f0', borderRadius: 10, border: '1px solid #fcf2e8' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                     <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: 0 }}>{inc.nombre}</p>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <Badge color='#f97316'>Δ {inc.diff_pct}%</Badge>
-                      {inc.ahorro_potencial > 0 && <Badge color='#16a34a'>Ahorro {eur(inc.ahorro_potencial)}/ud</Badge>}
+                      <Badge color='#c97b3d'>Δ {inc.diff_pct}%</Badge>
+                      {inc.ahorro_potencial > 0 && <Badge color='#0fa651'>Ahorro {eur(inc.ahorro_potencial)}/ud</Badge>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -438,7 +439,7 @@ function TabMerma() {
 
   if (loading) return <div style={{ ...mono(), color: '#3d3834', opacity: 0.4, padding: 40, textAlign: 'center' }}>Cargando…</div>
 
-  const inputStyle: React.CSSProperties = { ...mono(12), width: '100%', padding: '8px 12px', border: '1px solid #e8e2db', borderRadius: 8, outline: 'none', backgroundColor: '#faf9f7', color: '#3d3834', boxSizing: 'border-box' }
+  const inputStyle: React.CSSProperties = { ...mono(12), width: '100%', padding: '8px 12px', border: '1px solid #e8e2db', borderRadius: 8, outline: 'none', backgroundColor: '#faf6ec', color: '#3d3834', boxSizing: 'border-box' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -446,7 +447,7 @@ function TabMerma() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
         <div style={card}>
           <p style={label}>Merma este mes</p>
-          <p style={{ ...chillax(28), color: '#dc2626', margin: '0 0 4px' }}>{eur(data?.totalMes?.t)}</p>
+          <p style={{ ...chillax(28), color: '#a83e1e', margin: '0 0 4px' }}>{eur(data?.totalMes?.t)}</p>
           <p style={{ ...mono(10), color: '#3d3834', opacity: 0.5, margin: 0 }}>{data?.totalMes?.n ?? 0} eventos registrados</p>
         </div>
         <div style={card}>
@@ -457,7 +458,7 @@ function TabMerma() {
           <div style={card}>
             <p style={label}>Mayor pérdida este mes</p>
             <p style={{ ...chillax(16), color: '#3d3834', margin: '0 0 4px' }}>{data.topProductos[0].nombre}</p>
-            <p style={{ ...mono(10), color: '#dc2626', margin: 0, fontWeight: 700 }}>{eur(data.topProductos[0].coste_total)}</p>
+            <p style={{ ...mono(10), color: '#a83e1e', margin: 0, fontWeight: 700 }}>{eur(data.topProductos[0].coste_total)}</p>
           </div>
         )}
       </div>
@@ -488,7 +489,7 @@ function TabMerma() {
           <p style={label}>Distribución por motivo (este mes)</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {data.statsMes.map((s: any) => {
-              const color = MOTIVO_COLORS[s.motivo] ?? '#6b7280'
+              const color = MOTIVO_COLORS[s.motivo] ?? '#6c635a'
               const pct = data.totalMes.t > 0 ? Math.round((s.coste_total / data.totalMes.t) * 100) : 0
               return (
                 <div key={s.motivo}>
@@ -496,7 +497,7 @@ function TabMerma() {
                     <span style={{ ...mono(11), fontWeight: 700, color }}>{s.motivo}</span>
                     <span style={{ ...mono(11), color: '#3d3834' }}>{eur(s.coste_total)} · {s.n} eventos</span>
                   </div>
-                  <div style={{ height: 6, borderRadius: 3, backgroundColor: '#f0ebe4' }}>
+                  <div style={{ height: 6, borderRadius: 3, backgroundColor: '#e8e2db' }}>
                     <div style={{ height: '100%', borderRadius: 3, backgroundColor: color, width: `${pct}%` }} />
                   </div>
                 </div>
@@ -512,7 +513,7 @@ function TabMerma() {
           <p style={label}>Últimos registros</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {data.registros.map((r: any, i: number) => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < data.registros.length - 1 ? '1px solid #f0ebe4' : 'none' }}>
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < data.registros.length - 1 ? '1px solid #e8e2db' : 'none' }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: '0 0 2px' }}>{r.nombre}</p>
                   <p style={{ ...mono(10), color: '#3d3834', opacity: 0.5, margin: 0 }}>
@@ -520,9 +521,9 @@ function TabMerma() {
                     {r.notas ? ` · ${r.notas}` : ''}
                   </p>
                 </div>
-                <Badge color={MOTIVO_COLORS[r.motivo] ?? '#6b7280'}>{r.motivo || 'otro'}</Badge>
+                <Badge color={MOTIVO_COLORS[r.motivo] ?? '#6c635a'}>{r.motivo || 'otro'}</Badge>
                 {r.coste_estimado != null && (
-                  <span style={{ ...mono(12), fontWeight: 700, color: '#dc2626' }}>{eur(r.coste_estimado)}</span>
+                  <span style={{ ...mono(12), fontWeight: 700, color: '#a83e1e' }}>{eur(r.coste_estimado)}</span>
                 )}
                 <button onClick={() => eliminar(r.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.3, fontSize: 16, padding: '0 4px' }}>×</button>
               </div>
@@ -562,13 +563,13 @@ function TabConsumo() {
 
   if (loading) return <div style={{ ...mono(), color: '#3d3834', opacity: 0.4, padding: 40, textAlign: 'center' }}>Calculando consumos…</div>
 
-  const inputStyle: React.CSSProperties = { ...mono(12), padding: '8px 12px', border: '1px solid #e8e2db', borderRadius: 8, outline: 'none', backgroundColor: '#faf9f7', color: '#3d3834' }
+  const inputStyle: React.CSSProperties = { ...mono(12), padding: '8px 12px', border: '1px solid #e8e2db', borderRadius: 8, outline: 'none', backgroundColor: '#faf6ec', color: '#3d3834' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Explanation */}
-      <div style={{ ...card, backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
-        <p style={{ ...mono(11), color: '#16a34a', margin: 0 }}>
+      <div style={{ ...card, backgroundColor: '#d6f9e0', borderColor: '#d6f9e0' }}>
+        <p style={{ ...mono(11), color: '#0fa651', margin: 0 }}>
           <strong>Cómo funciona:</strong> Registra las raciones producidas de cada receta. La app calcula el consumo teórico de ingredientes
           y lo compara con tus compras reales para detectar fugas de margen.
         </p>
@@ -598,7 +599,7 @@ function TabConsumo() {
           <p style={label}>Food cost por receta</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {data.recetas.filter((r: any) => r.lineas.length > 0).map((r: any, i: number, arr: any[]) => (
-              <div key={r.id} style={{ padding: '12px 0', borderBottom: i < arr.length - 1 ? '1px solid #f0ebe4' : 'none' }}>
+              <div key={r.id} style={{ padding: '12px 0', borderBottom: i < arr.length - 1 ? '1px solid #e8e2db' : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <p style={{ ...mono(12), fontWeight: 700, color: '#3d3834', margin: '0 0 2px' }}>{r.nombre}</p>
@@ -608,7 +609,7 @@ function TabConsumo() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {r.food_cost_pct !== null && (
-                      <Badge color={r.food_cost_pct > 35 ? '#dc2626' : r.food_cost_pct > 28 ? '#f97316' : '#16a34a'}>
+                      <Badge color={r.food_cost_pct > 35 ? '#a83e1e' : r.food_cost_pct > 28 ? '#c97b3d' : '#0fa651'}>
                         FC {r.food_cost_pct}%
                       </Badge>
                     )}
@@ -644,17 +645,17 @@ function TabConsumo() {
               <thead>
                 <tr>
                   {['Ingrediente', 'Teórico', 'Real comprado', 'Diferencia'].map(h => (
-                    <th key={h} style={{ ...mono(10), textAlign: 'left', padding: '8px 12px', color: '#3d3834', opacity: 0.5, borderBottom: '1px solid #f0ebe4' }}>{h}</th>
+                    <th key={h} style={{ ...mono(10), textAlign: 'left', padding: '8px 12px', color: '#3d3834', opacity: 0.5, borderBottom: '1px solid #e8e2db' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {data.comparativa.map((c: any, i: number) => (
-                  <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#faf9f7' : '#fff' }}>
+                  <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#faf6ec' : '#fff' }}>
                     <td style={{ ...mono(12), padding: '8px 12px', color: '#3d3834', fontWeight: 700 }}>{c.ingrediente}</td>
                     <td style={{ ...mono(11), padding: '8px 12px', color: '#3d3834' }}>{c.consumo_teorico}</td>
                     <td style={{ ...mono(11), padding: '8px 12px', color: '#3d3834' }}>{c.consumo_real ?? '—'}</td>
-                    <td style={{ ...mono(11), padding: '8px 12px', fontWeight: 700, color: c.diferencia > 0 ? '#dc2626' : '#16a34a' }}>
+                    <td style={{ ...mono(11), padding: '8px 12px', fontWeight: 700, color: c.diferencia > 0 ? '#a83e1e' : '#0fa651' }}>
                       {c.diferencia != null ? (c.diferencia > 0 ? '+' : '') + c.diferencia : '—'}
                     </td>
                   </tr>

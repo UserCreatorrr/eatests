@@ -159,9 +159,17 @@ export async function GET(req: NextRequest) {
     prioridades,
   }
 
-  // Guardar histórico
-  db.prepare(`INSERT INTO reports_briefs (user_id, scope, site_id, fecha, payload, data_quality) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(userId, scope, siteId, fecha, JSON.stringify(payload), data_quality)
+  // Guardar histórico — un único registro por (scope, site, fecha). Si ya existe, se actualiza.
+  const existing = db.prepare(
+    `SELECT id FROM reports_briefs WHERE user_id=? AND scope=? AND fecha=? AND (site_id IS ? OR site_id = ?) LIMIT 1`
+  ).get(userId, scope, fecha, siteId, siteId) as any
+  if (existing) {
+    db.prepare(`UPDATE reports_briefs SET payload=?, data_quality=?, created_at=datetime('now') WHERE id=?`)
+      .run(JSON.stringify(payload), data_quality, existing.id)
+  } else {
+    db.prepare(`INSERT INTO reports_briefs (user_id, scope, site_id, fecha, payload, data_quality) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(userId, scope, siteId, fecha, JSON.stringify(payload), data_quality)
+  }
 
   return NextResponse.json(payload)
 }

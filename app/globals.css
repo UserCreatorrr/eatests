@@ -19,14 +19,14 @@
 }
 @font-face {
   font-family: 'DM Mono';
-  src: url('/fonts/DMMono-Regular.ttf') format('truetype');
+  src: url('/fonts/DMMono-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'DM Mono';
-  src: url('/fonts/DMMono-Italic.ttf') format('truetype');
+  src: url('/fonts/DMMono-Italic.woff2') format('woff2');
   font-weight: 400;
   font-style: italic;
   font-display: swap;
@@ -190,9 +190,9 @@ h1, h2, h3, h4, h5, h6 {
   text-transform: uppercase;
 }
 .badge-green  { background: rgba(25,249,115,0.12); color: #0fcc5e; }
-.badge-red    { background: rgba(239,68,68,0.08);  color: #dc2626; }
-.badge-yellow { background: rgba(245,158,11,0.1);  color: #b45309; }
-.badge-blue   { background: rgba(59,130,246,0.08); color: #1d4ed8; }
+.badge-red    { background: rgba(239,68,68,0.08);  color: #a83e1e; }
+.badge-yellow { background: rgba(245,158,11,0.1);  color: #c97b3d; }
+.badge-blue   { background: rgba(59,130,246,0.08); color: #3d3834; }
 .badge-gray   { background: rgba(61,56,52,0.07);   color: rgba(61,56,52,0.6); }
 .badge-dark   { background: var(--dark); color: var(--cream); }
 

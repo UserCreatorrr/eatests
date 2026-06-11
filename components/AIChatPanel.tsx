@@ -175,7 +175,7 @@ export default function AIChatPanel() {
             <div className="px-4 pb-2 flex-shrink-0">
               <div className="relative inline-block">
                 <img src={pendingImage} alt="" className="h-16 rounded-lg object-cover" />
-                <button onClick={() => setPendingImage(null)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: '#dc2626', color: 'white' }}>x</button>
+                <button onClick={() => setPendingImage(null)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: '#a83e1e', color: 'white' }}>x</button>
               </div>
             </div>
           )}

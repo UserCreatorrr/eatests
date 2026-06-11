@@ -16,7 +16,7 @@ type MigrateStatus = 'idle' | 'loading' | 'success' | 'error'
 const S: Record<string, React.CSSProperties> = {
   section: { backgroundColor: '#fff', borderRadius: 20, padding: '28px 32px', border: '1px solid #e8e2db', marginBottom: 20 },
   label: { fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.55, display: 'block', marginBottom: 6 },
-  input: { width: '100%', padding: '11px 14px', borderRadius: 12, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', boxSizing: 'border-box' as const, backgroundColor: '#fafaf9' },
+  input: { width: '100%', padding: '11px 14px', borderRadius: 12, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', boxSizing: 'border-box' as const, backgroundColor: '#faf6ec' },
   btn: { padding: '11px 22px', borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 600 },
 }
 
@@ -212,7 +212,7 @@ export default function PerfilPage() {
             </button>
           </div>
           {nameMsg && (
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: nameMsg === 'Guardado' ? '#16a34a' : '#dc2626', marginTop: 6 }}>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: nameMsg === 'Guardado' ? '#0fa651' : '#a83e1e', marginTop: 6 }}>
               {nameMsg}
             </p>
           )}
@@ -261,7 +261,7 @@ export default function PerfilPage() {
             disabled={migrateStatus === 'loading'}
             style={{
               ...S.btn,
-              backgroundColor: migrateStatus === 'success' ? '#16a34a' : migrateStatus === 'error' ? '#dc2626' : '#3d3834',
+              backgroundColor: migrateStatus === 'success' ? '#0fa651' : migrateStatus === 'error' ? '#a83e1e' : '#3d3834',
               color: '#dfd5c9',
               opacity: migrateStatus === 'loading' ? 0.7 : 1,
               display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center',
@@ -296,10 +296,10 @@ export default function PerfilPage() {
         {migrateMsg && (
           <div style={{
             marginTop: 16, borderRadius: 12, padding: '12px 16px',
-            backgroundColor: migrateStatus === 'error' ? '#fef2f2' : '#f0fdf4',
-            border: `1px solid ${migrateStatus === 'error' ? '#fecaca' : '#bbf7d0'}`,
+            backgroundColor: migrateStatus === 'error' ? '#fbeae2' : '#d6f9e0',
+            border: `1px solid ${migrateStatus === 'error' ? '#fbeae2' : '#d6f9e0'}`,
           }}>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: migrateStatus === 'error' ? '#dc2626' : '#166534', margin: 0 }}>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: migrateStatus === 'error' ? '#a83e1e' : '#0fa651', margin: 0 }}>
               {migrateMsg}
             </p>
           </div>
@@ -330,10 +330,10 @@ export default function PerfilPage() {
             router.push('/login')
           }}
           style={{
-            width: '100%', padding: '13px 22px', borderRadius: 14, border: '1.5px solid #fca5a5',
-            backgroundColor: '#fff1f2', cursor: 'pointer', display: 'flex', alignItems: 'center',
+            width: '100%', padding: '13px 22px', borderRadius: 14, border: '1.5px solid #a83e1e',
+            backgroundColor: '#fbeae2', cursor: 'pointer', display: 'flex', alignItems: 'center',
             justifyContent: 'center', gap: 10, fontFamily: 'DM Mono, monospace', fontSize: 13,
-            fontWeight: 600, color: '#dc2626',
+            fontWeight: 600, color: '#a83e1e',
           }}
         >
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

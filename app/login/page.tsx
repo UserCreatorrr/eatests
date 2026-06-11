@@ -91,11 +91,11 @@ function LoginForm() {
 
           {msg && (
             <div style={{
-              backgroundColor: isError ? '#fef2f2' : '#f0fdf4',
-              border: `1px solid ${isError ? '#fecaca' : '#bbf7d0'}`,
+              backgroundColor: isError ? '#fbeae2' : '#d6f9e0',
+              border: `1px solid ${isError ? '#a83e1e' : '#0fa651'}`,
               borderRadius: '10px', padding: '12px 16px', marginBottom: '20px',
             }}>
-              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '12px', color: isError ? '#dc2626' : '#166534', margin: 0 }}>
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '12px', color: isError ? '#a83e1e' : '#0fa651', margin: 0 }}>
                 {msg}
               </p>
             </div>
@@ -109,7 +109,7 @@ function LoginForm() {
               onChange={e => setEmail(e.target.value)}
               placeholder="tu@email.com"
               required
-              style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#fafaf9', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec', boxSizing: 'border-box' }}
               onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
               onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
             />
@@ -119,7 +119,7 @@ function LoginForm() {
               onChange={e => setPassword(e.target.value)}
               placeholder="Contrasena"
               required
-              style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#fafaf9', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec', boxSizing: 'border-box' }}
               onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
               onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
             />

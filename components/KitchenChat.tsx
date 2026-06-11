@@ -201,7 +201,7 @@ function MarkdownContent({ content }: { content: string }) {
       if (dataRows.length < 1) continue
       const parseCells = (l: string) => l.split('|').slice(1, -1).map(c => c.trim())
       elements.push(
-        <div key={i} style={{ overflowX: 'auto', margin: '10px 0', borderRadius: 10, border: '1px solid #e8e2db' }}>
+        <div key={i} style={{ overflowX: 'auto', margin: '10px 0', borderRadius: 0, border: '1px solid #e8e2db' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'DM Mono, monospace', fontSize: 12 }}>
             <thead>
               <tr>{parseCells(dataRows[0]).map((cell, j) => (
@@ -386,7 +386,7 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
 
   if (sentInfo) {
     return (
-      <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 16, padding: '14px 18px', maxWidth: '90%' }}>
+      <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 0, padding: '14px 18px', maxWidth: '90%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#0fa651" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#0fa651' }}>
@@ -403,7 +403,7 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
   }
 
   return (
-    <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 16, padding: 18, maxWidth: '90%' }}>
+    <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 0, padding: 18, maxWidth: '90%' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#0fa651', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -450,7 +450,7 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
         <button
           onClick={handleSend}
           disabled={sending}
-          style={{ flex: 1, padding: '10px 16px', backgroundColor: '#0fa651', border: 'none', borderRadius: 10, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#fff', opacity: sending ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          style={{ flex: 1, padding: '10px 16px', backgroundColor: '#0fa651', border: 'none', borderRadius: 0, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#fff', opacity: sending ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
@@ -460,7 +460,7 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
         </button>
         <button
           onClick={onDiscard}
-          style={{ padding: '10px 16px', backgroundColor: '#d6f9e0', border: '1px solid #0fa651', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#0fa651', opacity: 0.7 }}
+          style={{ padding: '10px 16px', backgroundColor: '#d6f9e0', border: '1px solid #0fa651', borderRadius: 0, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#0fa651', opacity: 0.7 }}
         >
           Descartar
         </button>
@@ -537,7 +537,7 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
 
       {/* === MAIN: proveedores con ingredientes asignados === */}
       {data.pedidosPorProveedor.length > 0 ? (
-        <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 14, overflow: 'hidden', marginBottom: 10 }}>
+        <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 0, overflow: 'hidden', marginBottom: 10 }}>
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, fontWeight: 600, margin: 0, padding: '8px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e8e2db' }}>
             Tus proveedores · {data.pedidosPorProveedor.length} con productos asignados
           </p>
@@ -593,7 +593,7 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
           })}
         </div>
       ) : (
-        <div style={{ backgroundColor: '#fcf2e8', border: '1.5px solid #c97b3d', borderRadius: 12, padding: '12px 16px', marginBottom: 10 }}>
+        <div style={{ backgroundColor: '#fcf2e8', border: '1.5px solid #c97b3d', borderRadius: 0, padding: '12px 16px', marginBottom: 10 }}>
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#c97b3d', margin: 0, lineHeight: 1.6 }}>
             Ningún ingrediente tiene proveedor asignado aún.<br />
             Ve a <strong>Ingredientes</strong> y asigna proveedores a tus productos para que el sistema sepa a quién pedir cada cosa.
@@ -603,7 +603,7 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
 
       {/* Listas de pedido pendientes */}
       {data.pendientes.length > 0 && (
-        <div style={{ backgroundColor: '#fcf2e8', border: '1.5px solid #c97b3d', borderRadius: 12, padding: '10px 14px', marginBottom: 10 }}>
+        <div style={{ backgroundColor: '#fcf2e8', border: '1.5px solid #c97b3d', borderRadius: 0, padding: '10px 14px', marginBottom: 10 }}>
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#c97b3d', fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Listas pendientes de enviar
           </p>
@@ -662,12 +662,12 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
       <div style={{ marginBottom: 8 }}>
         <button
           onClick={() => setShowAllProvs(s => !s)}
-          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #c4b8a8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.55, textAlign: 'center' }}
+          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #c4b8a8', borderRadius: 0, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.55, textAlign: 'center' }}
         >
           {showAllProvs ? '▲ Ocultar' : '+ Pedido suelto a cualquier proveedor'}
         </button>
         {showAllProvs && (
-          <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 12, overflow: 'hidden', marginTop: 6 }}>
+          <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 0, overflow: 'hidden', marginTop: 6 }}>
             <div style={{ maxHeight: 240, overflowY: 'auto' }}>
               {data.proveedores.map((p, i) => (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: i < data.proveedores.length - 1 ? '1px solid #e8e2db' : 'none' }}>
@@ -690,7 +690,7 @@ function PedidoSelectorCard({ data, onAction }: { data: PedidoSelectorData; onAc
       {!showOtro ? (
         <button
           onClick={() => setShowOtro(true)}
-          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #c4b8a8', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.4, textAlign: 'center' }}
+          style={{ width: '100%', padding: '8px 14px', backgroundColor: 'transparent', border: '1.5px dashed #c4b8a8', borderRadius: 0, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.4, textAlign: 'center' }}
         >
           + Especificar proveedor manualmente
         </button>
@@ -1357,7 +1357,7 @@ function MiniLineChart({ data }: { data: ChartData }) {
 
 function MiniChart({ data }: { data: ChartData }) {
   return (
-    <div style={{ backgroundColor: '#faf6ec', border: '1px solid #e8e2db', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
+    <div style={{ backgroundColor: '#faf6ec', border: '1px solid #e8e2db', borderRadius: 0, padding: '12px 14px', marginBottom: 10 }}>
       {data.tipo === 'bar' ? <MiniBarChart data={data} /> : <MiniLineChart data={data} />}
     </div>
   )
@@ -1427,7 +1427,7 @@ function NecesidadesPedidoCard({
 
   if (active.length === 0) {
     return (
-      <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 14, padding: '14px 18px', maxWidth: 580 }}>
+      <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 0, padding: '14px 18px', maxWidth: 580 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#0fa651" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#0fa651' }}>Todos los pedidos gestionados</span>
@@ -1455,7 +1455,7 @@ function NecesidadesPedidoCard({
           if (dismissed[i]) return null
           const isExp = expanded[i]
           return (
-            <div key={i} style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 14, overflow: 'hidden' }}>
+            <div key={i} style={{ backgroundColor: '#fff', border: '1.5px solid #e8e2db', borderRadius: 0, overflow: 'hidden' }}>
               {/* Supplier header row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', cursor: 'pointer' }} onClick={() => toggleExpand(i)}>
                 <span style={{ fontSize: 10, color: '#3d3834', opacity: 0.35, flexShrink: 0, transform: isExp ? 'rotate(90deg)' : 'none', display: 'inline-block', transition: 'transform 0.15s' }}>▶</span>
@@ -1547,7 +1547,7 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
 
   if (sentInfo) {
     return (
-      <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #19f973', borderRadius: 16, padding: '14px 18px', maxWidth: '90%' }}>
+      <div style={{ backgroundColor: '#d6f9e0', border: '1.5px solid #19f973', borderRadius: 0, padding: '14px 18px', maxWidth: '90%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: sentInfo.num_order ? 6 : 0 }}>
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#0fa651" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#0fa651' }}>Email enviado a {sentInfo.to}</span>
@@ -1562,7 +1562,7 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
   }
 
   return (
-    <div style={{ backgroundColor: '#faf6ec', border: '1.5px solid #19f973', borderRadius: 16, padding: 18, maxWidth: '90%' }}>
+    <div style={{ backgroundColor: '#faf6ec', border: '1.5px solid #19f973', borderRadius: 0, padding: 18, maxWidth: '90%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#19f973', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#2a2522" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
@@ -1598,14 +1598,14 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
         <button
           onClick={handleSend}
           disabled={sending}
-          style={{ flex: 1, padding: '10px 16px', backgroundColor: '#19f973', border: 'none', borderRadius: 10, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#2a2522', opacity: sending ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          style={{ flex: 1, padding: '10px 16px', backgroundColor: '#19f973', border: 'none', borderRadius: 0, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 13, color: '#2a2522', opacity: sending ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
           <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
           {sending ? 'Enviando...' : 'Enviar email'}
         </button>
         <button
           onClick={onDiscard}
-          style={{ padding: '10px 16px', backgroundColor: '#f5f2ee', border: '1px solid #e8e2db', borderRadius: 10, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.6 }}
+          style={{ padding: '10px 16px', backgroundColor: '#f5f2ee', border: '1px solid #e8e2db', borderRadius: 0, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.6 }}
         >
           Descartar
         </button>
@@ -1725,7 +1725,7 @@ function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
     window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`)
   }
 
-  const metricStyle: React.CSSProperties = { backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 12, padding: '12px 14px' }
+  const metricStyle: React.CSSProperties = { backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 0, padding: '12px 14px' }
   const metricLabel: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#3d3834', opacity: 0.45, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }
   const metricValue: React.CSSProperties = { fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 20, color: '#3d3834', margin: 0 }
 
@@ -1784,7 +1784,7 @@ function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
 
         {/* Top proveedores */}
         {data.gasto.top.length > 0 && (
-          <div style={{ backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
+          <div style={{ backgroundColor: '#fff', border: '1px solid #e8e2db', borderRadius: 0, padding: '10px 14px', marginBottom: 8 }}>
             <p style={metricLabel}>Top proveedores</p>
             {data.gasto.top.map((v, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
@@ -1797,7 +1797,7 @@ function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
 
         {/* Subidas de precio */}
         {data.precios_subida.length > 0 && (
-          <div style={{ backgroundColor: '#fcf2e8', border: '1px solid #c97b3d', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
+          <div style={{ backgroundColor: '#fcf2e8', border: '1px solid #c97b3d', borderRadius: 0, padding: '10px 14px', marginBottom: 8 }}>
             <p style={{ ...metricLabel, color: '#c97b3d' }}>Subidas de precio esta semana</p>
             {data.precios_subida.map((p, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
@@ -1810,7 +1810,7 @@ function InformeSemanalCard({ data }: { data: InformeSemanalData }) {
 
         {/* Food cost crítico */}
         {data.food_cost_critico.length > 0 && (
-          <div style={{ backgroundColor: '#fbeae2', border: '1px solid #a83e1e', borderRadius: 12, padding: '10px 14px' }}>
+          <div style={{ backgroundColor: '#fbeae2', border: '1px solid #a83e1e', borderRadius: 0, padding: '10px 14px' }}>
             <p style={{ ...metricLabel, color: '#a83e1e' }}>Food cost crítico (&gt;35%)</p>
             {data.food_cost_critico.map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>

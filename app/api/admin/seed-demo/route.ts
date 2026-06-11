@@ -29,8 +29,9 @@ export async function POST(req: NextRequest) {
 
   const counts: Record<string, number> = {}
   for (const t of ['ingredientes','proveedores','pedidos_compra','albaranes_compra','facturas_compra',
-    'albaranes_venta','facturas_venta','precio_historial','merma_registro','escandallo_receta','ventas_produccion']) {
-    counts[t] = (db.prepare(`SELECT COUNT(*) as c FROM ${t} WHERE user_id=?`).get(uid) as any).c
+    'albaranes_venta','facturas_venta','precio_historial','merma_registro','escandallo_receta','ventas_produccion',
+    'locations','empleados','turnos','ventas_franja','targets_productividad','reports_recipients']) {
+    try { counts[t] = (db.prepare(`SELECT COUNT(*) as c FROM ${t} WHERE user_id=?`).get(uid) as any).c } catch {}
   }
 
   return NextResponse.json({ ok: true, uid, counts })

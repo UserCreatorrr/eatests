@@ -9,8 +9,12 @@ export function seedDemoData(db: Database.Database, uid: string) {
   const tables = ['ingredientes','herramientas','proveedores','proveedores_detalle','lista_pedidos',
     'pedidos_compra','albaranes_compra','facturas_compra','albaranes_venta','facturas_venta',
     'escandallo_receta','escandallo_lineas','precio_historial','merma_registro',
-    'lineas_albaran_compra','ventas_produccion']
-  for (const t of tables) db.prepare(`DELETE FROM ${t} WHERE user_id=?`).run(uid)
+    'lineas_albaran_compra','ventas_produccion',
+    // Labor + Productivity + Reports
+    'locations','empleados','turnos','ventas_franja','targets_productividad','reports_briefs','reports_recipients']
+  for (const t of tables) {
+    try { db.prepare(`DELETE FROM ${t} WHERE user_id=?`).run(uid) } catch {}
+  }
 
   // ── PROVEEDORES ───────────────────────────────────────────────────────────
   const proveedores = [
@@ -749,4 +753,286 @@ export function seedDemoData(db: Database.Database, uid: string) {
     db.prepare(`INSERT INTO ventas_produccion (user_id,receta_id,nombre,raciones,fecha) VALUES (?,?,?,?,?)`)
       .run(uid,rid,p.nombre,p.raciones,p.fecha)
   }
+
+  // ── LABOR + PRODUCTIVITY + REPORTS ────────────────────────────────────────
+  seedLaborData(db, uid)
 }
+
+// Seed de Labor Cost / Productivity / Reports.
+// Se puede ejecutar de forma independiente para cuentas existentes sin perder
+// los datos de Food Cost. Si ya hay turnos, no hace nada.
+export function seedLaborData(db: Database.Database, uid: string) {
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  const today = new Date()
+  const dAgo = (n: number) => { const d = new Date(today); d.setDate(d.getDate() - n); return fmt(d) }
+
+  // Idempotente: si ya hay turnos no re-sembramos
+  const existing = (db.prepare('SELECT COUNT(*) as c FROM turnos WHERE user_id=?').get(uid) as any)?.c ?? 0
+  if (existing > 0) return
+
+  // ── LOCATIONS ─────────────────────────────────────────────────────────────
+  const locations = [
+    { site_id: 'MADNUM', nombre: 'Madrid · Núñez de Balboa', ciudad: 'Madrid' },
+    { site_id: 'BCNGR',  nombre: 'Barcelona · Gracia (dark)',  ciudad: 'Barcelona' },
+  ]
+  for (const l of locations) {
+    db.prepare(`INSERT INTO locations (user_id, site_id, nombre, ciudad, activo) VALUES (?, ?, ?, ?, 1)`)
+      .run(uid, l.site_id, l.nombre, l.ciudad)
+  }
+
+  // ── EMPLEADOS ─────────────────────────────────────────────────────────────
+  // Salarios brutos típicos en hostelería España (€/h):
+  //   Manager: 18-20, Jefe cocina: 16-18, Cocinero: 11-13, Ayudante cocina: 9-11
+  //   Camarero/Sala: 10-12, Runner: 9-10, Reparto: 9-11
+  const empleados = [
+    // MADNUM · Cocina
+    { employee_id: 'E-1001', nombre: 'Lucía Vega',      site: 'MADNUM', rol: 'Manager',         contrato: 'Indefinido', coste: 19.50, cse: 25.50, h: 40 },
+    { employee_id: 'E-1002', nombre: 'Javier Ortega',   site: 'MADNUM', rol: 'Jefe cocina',     contrato: 'Indefinido', coste: 17.20, cse: 22.50, h: 40 },
+    { employee_id: 'E-1003', nombre: 'Ana Pérez',       site: 'MADNUM', rol: 'Cocina',          contrato: 'Indefinido', coste: 12.40, cse: 16.20, h: 40 },
+    { employee_id: 'E-1004', nombre: 'Diego Romero',    site: 'MADNUM', rol: 'Cocina',          contrato: 'Indefinido', coste: 12.10, cse: 15.80, h: 40 },
+    { employee_id: 'E-1005', nombre: 'Sofía Martín',    site: 'MADNUM', rol: 'Ayudante cocina', contrato: 'Temporal',   coste: 10.20, cse: 13.30, h: 30 },
+    { employee_id: 'E-1006', nombre: 'Pablo Núñez',     site: 'MADNUM', rol: 'Prep',            contrato: 'Indefinido', coste: 11.80, cse: 15.40, h: 25 },
+    // MADNUM · Sala
+    { employee_id: 'E-1007', nombre: 'Carlos Ruiz',     site: 'MADNUM', rol: 'Sala',            contrato: 'Indefinido', coste: 11.50, cse: 15.00, h: 40 },
+    { employee_id: 'E-1008', nombre: 'Marta Iglesias',  site: 'MADNUM', rol: 'Sala',            contrato: 'Indefinido', coste: 11.20, cse: 14.60, h: 40 },
+    { employee_id: 'E-1009', nombre: 'Mario Bermejo',   site: 'MADNUM', rol: 'Sala',            contrato: 'Temporal',   coste: 10.40, cse: 13.50, h: 25 },
+    { employee_id: 'E-1010', nombre: 'Elena Castro',    site: 'MADNUM', rol: 'Runner',          contrato: 'Extra',      coste: 9.80,  cse: 12.80, h: 20 },
+    // BCNGR · dark kitchen (más pequeño)
+    { employee_id: 'E-2001', nombre: 'Marc Puig',       site: 'BCNGR',  rol: 'Manager',         contrato: 'Indefinido', coste: 18.20, cse: 23.70, h: 40 },
+    { employee_id: 'E-2002', nombre: 'Núria Sala',      site: 'BCNGR',  rol: 'Cocina',          contrato: 'Indefinido', coste: 12.00, cse: 15.60, h: 40 },
+    { employee_id: 'E-2003', nombre: 'Joan Vidal',      site: 'BCNGR',  rol: 'Cocina',          contrato: 'Indefinido', coste: 11.80, cse: 15.40, h: 40 },
+    { employee_id: 'E-2004', nombre: 'Aina Roca',       site: 'BCNGR',  rol: 'Reparto',         contrato: 'Temporal',   coste: 10.50, cse: 13.70, h: 30 },
+    { employee_id: 'E-2005', nombre: 'Pau Mestre',      site: 'BCNGR',  rol: 'Reparto',         contrato: 'Extra',      coste: 9.90,  cse: 12.90, h: 20 },
+  ]
+  const empIdByCode: Record<string, number> = {}
+  for (const e of empleados) {
+    const r = db.prepare(`
+      INSERT INTO empleados (user_id, employee_id, nombre, site_id, rol, tipo_contrato, coste_hora, coste_empresa, contract_hours_week, activo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).run(uid, e.employee_id, e.nombre, e.site, e.rol, e.contrato, e.coste, e.cse, e.h)
+    empIdByCode[e.employee_id] = r.lastInsertRowid as number
+  }
+
+  // ── TURNOS (últimos 21 días) ──────────────────────────────────────────────
+  // Patrón realista: Mar–Sáb operación normal, Dom turno reducido, Lun cerrado
+  // Servicios:
+  //   Comida: 11:30 – 16:30 (cocina) / 12:30 – 16:30 (sala)
+  //   Cena:   18:30 – 00:00 (cocina) / 19:30 – 00:30 (sala)
+  //   Prep:   09:00 – 14:00 (solo prep)
+  //   Manager: 10:00 – 18:00 / 16:00 – 00:00 alternando
+  // BCNGR (dark): 11:00 – 16:00 + 18:00 – 23:30 reparto + 1 cocinero por servicio
+
+  type ShiftPlan = { emp_code: string; start: string; end: string; brk: number; servicio: string }
+  const turno_madnum_normal: ShiftPlan[] = [
+    // Manager (alterna)
+    { emp_code: 'E-1001', start: '10:00', end: '18:00', brk: 30, servicio: 'All day' },
+    // Cocina · comida
+    { emp_code: 'E-1002', start: '11:00', end: '16:30', brk: 30, servicio: 'Comida' },
+    { emp_code: 'E-1003', start: '11:30', end: '16:30', brk: 30, servicio: 'Comida' },
+    { emp_code: 'E-1005', start: '11:30', end: '16:00', brk: 30, servicio: 'Comida' },
+    // Sala · comida
+    { emp_code: 'E-1007', start: '12:30', end: '16:30', brk: 30, servicio: 'Comida' },
+    { emp_code: 'E-1008', start: '12:30', end: '16:30', brk: 30, servicio: 'Comida' },
+    // Prep
+    { emp_code: 'E-1006', start: '09:00', end: '14:00', brk: 30, servicio: 'Prep' },
+    // Cocina · cena
+    { emp_code: 'E-1002', start: '19:00', end: '23:30', brk: 30, servicio: 'Cena' },
+    { emp_code: 'E-1004', start: '18:30', end: '00:00', brk: 30, servicio: 'Cena' },
+    { emp_code: 'E-1003', start: '19:00', end: '00:00', brk: 30, servicio: 'Cena' },
+    // Sala · cena
+    { emp_code: 'E-1007', start: '19:30', end: '00:30', brk: 30, servicio: 'Cena' },
+    { emp_code: 'E-1009', start: '19:30', end: '00:30', brk: 30, servicio: 'Cena' },
+    { emp_code: 'E-1010', start: '20:00', end: '00:00', brk: 0,  servicio: 'Cena' },
+  ]
+  const turno_madnum_domingo: ShiftPlan[] = [
+    { emp_code: 'E-1001', start: '12:00', end: '17:00', brk: 30, servicio: 'Comida' },
+    { emp_code: 'E-1002', start: '12:00', end: '17:00', brk: 30, servicio: 'Comida' },
+    { emp_code: 'E-1003', start: '12:00', end: '17:00', brk: 30, servicio: 'Comida' },
+    { emp_code: 'E-1007', start: '12:30', end: '17:00', brk: 30, servicio: 'Comida' },
+    { emp_code: 'E-1008', start: '12:30', end: '17:00', brk: 30, servicio: 'Comida' },
+  ]
+  const turno_bcngr_normal: ShiftPlan[] = [
+    { emp_code: 'E-2001', start: '11:00', end: '19:00', brk: 30, servicio: 'All day' },
+    { emp_code: 'E-2002', start: '11:00', end: '16:00', brk: 30, servicio: 'Comida' },
+    { emp_code: 'E-2003', start: '18:30', end: '23:30', brk: 30, servicio: 'Cena' },
+    { emp_code: 'E-2004', start: '12:00', end: '15:00', brk: 0,  servicio: 'Comida' },
+    { emp_code: 'E-2004', start: '19:00', end: '23:00', brk: 0,  servicio: 'Cena' },
+    { emp_code: 'E-2005', start: '20:00', end: '23:30', brk: 0,  servicio: 'Cena' },
+  ]
+
+  function netHrs(start: string, end: string, brk: number): number {
+    const [sh, sm] = start.split(':').map(Number)
+    const [eh, em] = end.split(':').map(Number)
+    const sMin = sh * 60 + sm
+    let eMin = eh * 60 + em
+    const overnight = eMin <= sMin
+    if (overnight) eMin += 24 * 60
+    return Math.max(0, (eMin - sMin - brk)) / 60
+  }
+
+  const insertTurno = db.prepare(`
+    INSERT INTO turnos (user_id, site_id, employee_id, employee_name, rol, servicio, fecha, start_time, end_time, break_minutes, horas_plan, coste_hora, source, overnight)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+
+  for (let i = 0; i < 21; i++) {
+    const fecha = dAgo(i)
+    const dow = new Date(fecha).getDay() // 0 dom, 1 lun, ..., 6 sáb
+    if (dow === 1) continue // lunes cerrado
+
+    const planMadnum = dow === 0 ? turno_madnum_domingo : turno_madnum_normal
+    for (const t of planMadnum) {
+      const emp = empleados.find(e => e.employee_id === t.emp_code)!
+      const overnight = parseInt(t.end.split(':')[0]) < parseInt(t.start.split(':')[0]) ? 1 : 0
+      const h = netHrs(t.start, t.end, t.brk)
+      insertTurno.run(uid, 'MADNUM', empIdByCode[t.emp_code], emp.nombre, emp.rol, t.servicio, fecha, t.start, t.end, t.brk, h, emp.coste, 'manual', overnight)
+    }
+    // BCNGR opera Mar–Dom incluyendo domingos
+    if (dow !== 1) {
+      for (const t of turno_bcngr_normal) {
+        const emp = empleados.find(e => e.employee_id === t.emp_code)!
+        const overnight = parseInt(t.end.split(':')[0]) < parseInt(t.start.split(':')[0]) ? 1 : 0
+        const h = netHrs(t.start, t.end, t.brk)
+        insertTurno.run(uid, 'BCNGR', empIdByCode[t.emp_code], emp.nombre, emp.rol, t.servicio, fecha, t.start, t.end, t.brk, h, emp.coste, 'manual', overnight)
+      }
+    }
+  }
+
+  // ── VENTAS POR FRANJA (últimos 21 días) ───────────────────────────────────
+  // Hourly distribution patterns from typical Madrid mid/high-end restaurant.
+  // Slots de 30 min: 12:30-13:00, 13:00-13:30 … hasta 16:30; 19:30-20:00 … 23:30
+  // BCNGR: solo delivery (más reparto a partir 13:00 y 20:30)
+
+  const slotsComida = [
+    ['12:30', '13:00'], ['13:00', '13:30'], ['13:30', '14:00'],
+    ['14:00', '14:30'], ['14:30', '15:00'], ['15:00', '15:30'],
+    ['15:30', '16:00'], ['16:00', '16:30'],
+  ] as const
+
+  const slotsCena = [
+    ['20:00', '20:30'], ['20:30', '21:00'], ['21:00', '21:30'],
+    ['21:30', '22:00'], ['22:00', '22:30'], ['22:30', '23:00'],
+    ['23:00', '23:30'],
+  ] as const
+
+  // Distribution multipliers (proporción del servicio en cada slot)
+  const distComida: Record<string, number> = {
+    '12:30-13:00': 0.05, '13:00-13:30': 0.08, '13:30-14:00': 0.14,
+    '14:00-14:30': 0.22, '14:30-15:00': 0.20, '15:00-15:30': 0.15,
+    '15:30-16:00': 0.10, '16:00-16:30': 0.06,
+  }
+  const distCena: Record<string, number> = {
+    '20:00-20:30': 0.06, '20:30-21:00': 0.12, '21:00-21:30': 0.18,
+    '21:30-22:00': 0.22, '22:00-22:30': 0.18, '22:30-23:00': 0.14,
+    '23:00-23:30': 0.10,
+  }
+
+  // Base diaria por día de la semana (€ ventas/servicio):
+  //   Mar: 1400 / 1700  · Mié: 1500 / 2000 · Jue: 1900 / 2600 · Vie: 2400 / 3400
+  //   Sáb: 2800 / 3600  · Dom: 1700 (solo comida)
+  const madnumBaseByDow: Record<number, { comida: number; cena: number }> = {
+    0: { comida: 1700, cena: 0 },     // Domingo
+    2: { comida: 1400, cena: 1700 },  // Martes
+    3: { comida: 1500, cena: 2000 },  // Miércoles
+    4: { comida: 1900, cena: 2600 },  // Jueves
+    5: { comida: 2400, cena: 3400 },  // Viernes
+    6: { comida: 2800, cena: 3600 },  // Sábado
+  }
+
+  // Dark kitchen BCNGR: solo delivery. Comida más baja, cena equivalente
+  const bcngrBaseByDow: Record<number, { comida: number; cena: number }> = {
+    0: { comida: 280, cena: 380 },
+    2: { comida: 220, cena: 320 },
+    3: { comida: 260, cena: 360 },
+    4: { comida: 340, cena: 440 },
+    5: { comida: 420, cena: 580 },
+    6: { comida: 480, cena: 620 },
+  }
+
+  // Pseudo-random consistente
+  const rand = (seed: number) => {
+    const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453
+    return x - Math.floor(x)
+  }
+
+  const insertVenta = db.prepare(`
+    INSERT INTO ventas_franja (user_id, site_id, fecha, timeslot_start, timeslot_end, channel, sales_net, covers, orders, tickets, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+
+  for (let i = 0; i < 21; i++) {
+    const fecha = dAgo(i)
+    const dow = new Date(fecha).getDay()
+    if (dow === 1) continue // lunes cerrado
+
+    const noise = 0.85 + rand(i + 1) * 0.30  // ±15% diario
+
+    // MADNUM
+    const baseM = madnumBaseByDow[dow] || { comida: 1200, cena: 1500 }
+    for (const [s, e] of slotsComida) {
+      const frac = distComida[`${s}-${e}`] || 0
+      const ventas = baseM.comida * frac * noise
+      const covers = Math.round((baseM.comida * frac * noise) / 35)  // ticket medio ~35€
+      const tickets = Math.max(1, Math.round(covers / 1.8))           // 1.8 covers/ticket
+      if (ventas > 0) insertVenta.run(uid, 'MADNUM', fecha, s, e, 'Sala', round2(ventas), covers, null, tickets, 'manual')
+    }
+    if (baseM.cena > 0) {
+      const noiseC = 0.85 + rand(i * 7 + 13) * 0.30
+      for (const [s, e] of slotsCena) {
+        const frac = distCena[`${s}-${e}`] || 0
+        const ventas = baseM.cena * frac * noiseC
+        const covers = Math.round(ventas / 42)
+        const tickets = Math.max(1, Math.round(covers / 1.9))
+        if (ventas > 0) insertVenta.run(uid, 'MADNUM', fecha, s, e, 'Sala', round2(ventas), covers, null, tickets, 'manual')
+      }
+    }
+
+    // BCNGR (dark kitchen) — delivery only
+    const baseB = bcngrBaseByDow[dow] || { comida: 200, cena: 300 }
+    const noiseB = 0.80 + rand(i * 11 + 5) * 0.40
+    for (const [s, e] of slotsComida) {
+      const frac = distComida[`${s}-${e}`] || 0
+      const ventas = baseB.comida * frac * noiseB
+      const orders = Math.round(ventas / 22)  // ticket medio delivery ~22€
+      if (ventas > 0) insertVenta.run(uid, 'BCNGR', fecha, s, e, 'Delivery', round2(ventas), null, orders, orders, 'manual')
+    }
+    for (const [s, e] of slotsCena) {
+      const frac = distCena[`${s}-${e}`] || 0
+      const ventas = baseB.cena * frac * noiseB
+      const orders = Math.round(ventas / 22)
+      if (ventas > 0) insertVenta.run(uid, 'BCNGR', fecha, s, e, 'Delivery', round2(ventas), null, orders, orders, 'manual')
+    }
+  }
+
+  // ── TARGETS ───────────────────────────────────────────────────────────────
+  const targetsRows = [
+    // Generales por servicio
+    { site_id: null,     servicio: 'All day',  rol: null, splh: 65, labor: 22 },
+    { site_id: 'MADNUM', servicio: 'Comida',   rol: null, splh: 75, labor: 20 },
+    { site_id: 'MADNUM', servicio: 'Cena',     rol: null, splh: 85, labor: 18 },
+    { site_id: 'BCNGR',  servicio: 'All day',  rol: null, splh: 55, labor: 24 },
+    { site_id: 'BCNGR',  servicio: 'Comida',   rol: null, splh: 50, labor: 26 },
+    { site_id: 'BCNGR',  servicio: 'Cena',     rol: null, splh: 60, labor: 22 },
+  ]
+  for (const t of targetsRows) {
+    db.prepare(`
+      INSERT INTO targets_productividad (user_id, site_id, servicio, rol, target_labor_pct, target_splh)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(uid, t.site_id, t.servicio, t.rol, t.labor, t.splh)
+  }
+
+  // ── REPORTS RECIPIENTS ────────────────────────────────────────────────────
+  const recipients = [
+    { email: 'steven@myway.es',  nombre: 'Steven Moreno',  role_org: 'CEO',  scope: 'grupo', site_id: null },
+    { email: 'lucia@myway.es',   nombre: 'Lucía Vega',     role_org: 'KM',   scope: 'local', site_id: 'MADNUM' },
+    { email: 'marc@myway.es',    nombre: 'Marc Puig',      role_org: 'KM',   scope: 'local', site_id: 'BCNGR' },
+  ]
+  for (const r of recipients) {
+    db.prepare(`
+      INSERT INTO reports_recipients (user_id, email, nombre, role_in_org, scope, site_id, activo)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+    `).run(uid, r.email, r.nombre, r.role_org, r.scope, r.site_id)
+  }
+}
+
+function round2(n: number): number { return Math.round(n * 100) / 100 }

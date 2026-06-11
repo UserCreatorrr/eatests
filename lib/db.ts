@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import bcrypt from 'bcryptjs'
 import path from 'path'
 import fs from 'fs'
-import { seedDemoData } from './seedData'
+import { seedDemoData, seedLaborData } from './seedData'
 
 const DB_PATH =
   process.env.DB_PATH ||
@@ -434,6 +434,14 @@ function initSchema(db: Database.Database) {
   const ingCount = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=?').get('pablo-admin') as any).c
   if (ingCount === 0) {
     seedDemoData(db, 'pablo-admin')
+  }
+
+  // Idempotent labor seed — runs only if labor tables empty for the admin user.
+  // Esto cubre cuentas existentes que ya tenían Food Cost pero no Labor/Productivity.
+  try {
+    seedLaborData(db, 'pablo-admin')
+  } catch (e) {
+    console.warn('[seed] Labor data seed failed:', (e as Error).message)
   }
 }
 

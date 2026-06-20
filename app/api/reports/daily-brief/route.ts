@@ -143,10 +143,17 @@ export async function GET(req: NextRequest) {
   const hasFC = fc7d > 0
   const data_quality = hasVentas && hasTurnos && hasFC ? 'OK' : 'PARCIAL'
 
+  // Lista concreta de qué falta y dónde cargarlo (para el banner del brief)
+  const missing: { dato: string; detalle: string; link: string }[] = []
+  if (!hasVentas) missing.push({ dato: 'Ventas por franja (ayer)', detalle: 'Sin ventas → forecast, SPLH y productividad salen como —', link: '/dashboard/labor/turnos' })
+  if (!hasTurnos) missing.push({ dato: 'Turnos plan (ayer)', detalle: 'Sin turnos → Labor Cost y horas plan salen como —', link: '/dashboard/labor/turnos' })
+  if (!hasFC) missing.push({ dato: 'Compras / escandallos (7d)', detalle: 'Sin gasto de compras → Food Cost% sale como —', link: '/dashboard/compras/facturas' })
+
   const payload = {
     scope, site_id: siteId, fecha,
     generado: new Date().toISOString(),
     data_quality,
+    missing,
     kpis: {
       ventas: { ayer: ventas_ayer, hoy_forecast: ventas_hoy_forecast },
       food_cost: { pct: fc_pct, gasto_7d: fc7d, ventas_7d: ventasUlt7?.t || 0 },

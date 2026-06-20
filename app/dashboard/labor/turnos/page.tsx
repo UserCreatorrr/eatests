@@ -108,13 +108,45 @@ export default function TurnosPage() {
     if (csvText) parseCsv(csvText)
   }, [tab])
 
+  const [parsingFile, setParsingFile] = useState(false)
+
+  // Carga SheetJS desde CDN solo cuando se necesita (no añade dependencia al build)
+  function loadXLSX(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if ((window as any).XLSX) return resolve((window as any).XLSX)
+      const s = document.createElement('script')
+      s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'
+      s.onload = () => (window as any).XLSX ? resolve((window as any).XLSX) : reject(new Error('XLSX no disponible'))
+      s.onerror = () => reject(new Error('No se pudo cargar el lector de Excel (sin conexión). Exporta el archivo como CSV.'))
+      document.head.appendChild(s)
+    })
+  }
+
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    const text = await f.text()
-    setCsvText(text)
-    parseCsv(text)
-    e.target.value = ''
+    const isExcel = /\.(xlsx|xls)$/i.test(f.name)
+    try {
+      let text: string
+      if (isExcel) {
+        setParsingFile(true)
+        const XLSX = await loadXLSX()
+        const buf = await f.arrayBuffer()
+        const wb = XLSX.read(buf, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        // Convertimos a CSV y reutilizamos todo el pipeline (separador, alias, mapping)
+        text = XLSX.utils.sheet_to_csv(ws, { FS: ',', blankrows: false })
+      } else {
+        text = await f.text()
+      }
+      setCsvText(text)
+      parseCsv(text)
+    } catch (err: any) {
+      setResult({ error: err?.message || 'No se pudo leer el archivo' })
+    } finally {
+      setParsingFile(false)
+      e.target.value = ''
+    }
   }
 
   async function commit() {
@@ -172,9 +204,9 @@ export default function TurnosPage() {
       {/* Upload area */}
       <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}`, padding: 24, marginBottom: 18 }}>
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-          <button onClick={() => fileRef.current?.click()} style={btnPrimary}>SUBIR CSV/EXCEL</button>
+          <button onClick={() => fileRef.current?.click()} disabled={parsingFile} style={btnPrimary}>{parsingFile ? 'LEYENDO EXCEL…' : 'SUBIR CSV/EXCEL'}</button>
           <button onClick={loadSample} style={btnGhost}>Probar con plantilla de ejemplo</button>
-          <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={onFile} />
+          <input ref={fileRef} type="file" accept=".csv,.txt,.xlsx,.xls" style={{ display: 'none' }} onChange={onFile} />
         </div>
         <p style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, margin: '0 0 8px' }}>
           Campos esperados: {availableFields.join(', ')}
@@ -253,7 +285,13 @@ export default function TurnosPage() {
         </div>
       )}
 
-      {result && (
+      {result && result.error && (
+        <div style={{ background: tk.terraSoft, border: `1.5px solid ${tk.terra}`, padding: '14px 18px' }}>
+          <p style={{ fontFamily: ff.mono, fontSize: 12, margin: 0, color: tk.terra }}>{result.error}</p>
+        </div>
+      )}
+
+      {result && !result.error && (
         <div style={{
           background: result.errors?.length ? tk.claySoft : tk.appleSoft,
           border: `1.5px solid ${result.errors?.length ? tk.clay : tk.appleDeep}`,

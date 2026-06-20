@@ -12,6 +12,7 @@ interface Brief {
   fecha: string
   generado: string
   data_quality: 'OK' | 'PARCIAL'
+  missing?: { dato: string; detalle: string; link: string }[]
   kpis: {
     ventas: { ayer: number; hoy_forecast: number }
     food_cost: { pct: number | null; gasto_7d: number; ventas_7d: number }
@@ -83,11 +84,26 @@ export default function DailyBriefPage() {
 
       {/* DATA QUALITY banner */}
       {brief.data_quality === 'PARCIAL' && (
-        <div style={{ background: tk.claySoft, border: `1.5px solid ${tk.clay}`, padding: '10px 14px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ width: 6, height: 6, background: tk.clay, flexShrink: 0 }} />
-          <p style={{ fontFamily: ff.mono, fontSize: 11, color: tk.clay, margin: 0, letterSpacing: '0.04em' }}>
-            <strong>DATA PARCIAL</strong> · faltan ventas, turnos o facturas para una vista completa. Algunos KPIs aparecen como —.
-          </p>
+        <div style={{ background: tk.claySoft, border: `1.5px solid ${tk.clay}`, padding: '12px 14px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: brief.missing?.length ? 10 : 0 }}>
+            <span style={{ width: 6, height: 6, background: tk.clay, flexShrink: 0 }} />
+            <p style={{ fontFamily: ff.mono, fontSize: 11, color: tk.clay, margin: 0, letterSpacing: '0.04em' }}>
+              <strong>DATA PARCIAL</strong> · {brief.missing?.length ? `falta${brief.missing.length !== 1 ? 'n' : ''} ${brief.missing.length} fuente${brief.missing.length !== 1 ? 's' : ''} de datos. Algunos KPIs aparecen como —.` : 'faltan datos para una vista completa.'}
+            </p>
+          </div>
+          {brief.missing?.map((m, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0 8px 16px', borderTop: `1px solid ${tk.clay}30` }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: ff.mono, fontSize: 11.5, fontWeight: 700, color: tk.iron }}>{m.dato}</div>
+                <div style={{ fontFamily: ff.mono, fontSize: 10.5, color: tk.iron60, marginTop: 1 }}>{m.detalle}</div>
+              </div>
+              <Link href={m.link} style={{
+                padding: '5px 11px', background: tk.paper, border: `1.5px solid ${tk.clay}`,
+                fontFamily: ff.mono, fontSize: 10, fontWeight: 600, color: tk.clay, textDecoration: 'none',
+                letterSpacing: '0.08em', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const,
+              }}>Cargar →</Link>
+            </div>
+          ))}
         </div>
       )}
 

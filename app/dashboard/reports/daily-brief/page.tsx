@@ -31,8 +31,18 @@ const fmtN = (v: number, d = 1) => new Intl.NumberFormat('es-ES', { minimumFract
 export default function DailyBriefPage() {
   const [scope, setScope] = useState<'grupo' | 'local'>('grupo')
   const [siteId, setSiteId] = useState('')
+  const [sites, setSites] = useState<string[]>([])
   const [brief, setBrief] = useState<Brief | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Carga la lista de centros para el selector de Scope Local
+  useEffect(() => {
+    fetch('/api/sites').then(r => r.json()).then(d => {
+      const list: string[] = d.sites || []
+      setSites(list)
+      if (!siteId && list.length > 0) setSiteId(list[0])
+    }).catch(() => {})
+  }, [])
 
   function fetchBrief() {
     setLoading(true)
@@ -40,7 +50,7 @@ export default function DailyBriefPage() {
     fetch(url).then(r => r.json()).then(setBrief).finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchBrief() }, [scope])
+  useEffect(() => { fetchBrief() }, [scope, siteId])
 
   if (loading || !brief) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.iron60 }}>Cargando…</div>
 
@@ -76,8 +86,16 @@ export default function DailyBriefPage() {
           ))}
         </div>
         {scope === 'local' && (
-          <input type="text" value={siteId} onChange={e => setSiteId(e.target.value)} placeholder="Centro (site_id)"
-            style={{ padding: '7px 12px', fontFamily: ff.mono, fontSize: 11.5, border: `1.5px solid ${tk.iron}`, background: tk.paper, color: tk.iron, outline: 'none' }} />
+          sites.length > 0 ? (
+            <select value={siteId} onChange={e => setSiteId(e.target.value)}
+              style={{ padding: '7px 12px', fontFamily: ff.mono, fontSize: 11.5, border: `1.5px solid ${tk.iron}`, background: tk.paper, color: tk.iron, outline: 'none', cursor: 'pointer' }}>
+              {sites.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          ) : (
+            <span style={{ padding: '7px 12px', fontFamily: ff.mono, fontSize: 11, color: tk.iron60, border: `1.5px dashed ${tk.iron20}` }}>
+              Sin centros — carga turnos o ventas con site_id
+            </span>
+          )
         )}
         <button onClick={fetchBrief} style={btnGhost}>Regenerar</button>
       </div>

@@ -2037,6 +2037,45 @@ function saveCurrent(messages: Message[]) {
   } catch {}
 }
 
+// ── Helpers de historial ───────────────────────────────────────────────
+function convoTitle(c: StoredConvo): string {
+  const u = c.messages.find(m => m.role === 'user')?.content
+  if (u && u.trim()) return u.trim()
+  const a = c.messages.find(m => m.role === 'assistant')?.content
+  return a && a.trim() ? a.trim() : 'Conversación'
+}
+function convoSnippet(c: StoredConvo): string {
+  const lastA = [...c.messages].reverse().find(m => m.role === 'assistant')?.content
+  if (lastA && lastA.trim()) return lastA.replace(/[#*`>_]/g, '').replace(/\n+/g, ' ').trim()
+  const n = c.messages.length
+  return `${n} mensaje${n !== 1 ? 's' : ''}`
+}
+function relTime(ts: number): string {
+  const diff = Date.now() - ts
+  const min = 60000, hr = 3600000, day = 86400000
+  if (diff < min) return 'ahora'
+  if (diff < hr) return `hace ${Math.floor(diff / min)} min`
+  if (diff < day) return `hace ${Math.floor(diff / hr)} h`
+  const d = new Date(ts)
+  const yest = new Date(); yest.setDate(yest.getDate() - 1)
+  if (d.toDateString() === yest.toDateString()) return 'ayer'
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+}
+function groupConvos(items: { c: StoredConvo; i: number }[]): { label: string; items: { c: StoredConvo; i: number }[] }[] {
+  const today = new Date().toDateString()
+  const y = new Date(); y.setDate(y.getDate() - 1); const yest = y.toDateString()
+  const weekAgo = Date.now() - 7 * 86400000
+  const g: Record<string, { c: StoredConvo; i: number }[]> = { Hoy: [], Ayer: [], 'Esta semana': [], Anteriores: [] }
+  items.forEach(({ c, i }) => {
+    const ds = new Date(c.lastUsed).toDateString()
+    if (ds === today) g['Hoy'].push({ c, i })
+    else if (ds === yest) g['Ayer'].push({ c, i })
+    else if (c.lastUsed > weekAgo) g['Esta semana'].push({ c, i })
+    else g['Anteriores'].push({ c, i })
+  })
+  return Object.entries(g).filter(([, v]) => v.length > 0).map(([label, items]) => ({ label, items }))
+}
+
 export default function KitchenChat() {
   const [greeting, setGreeting] = useState('')
   const [momento, setMomento] = useState<MomentoData | null>(null)
@@ -2045,6 +2084,7 @@ export default function KitchenChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [history, setHistory] = useState<StoredConvo[]>([])
   const [showHistory, setShowHistory] = useState(false)
+  const [historyQuery, setHistoryQuery] = useState('')
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
@@ -2083,6 +2123,14 @@ export default function KitchenChat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Cerrar historial con Escape
+  useEffect(() => {
+    if (!showHistory) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowHistory(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showHistory])
 
   function newConversation() {
     if (messages.length > 0) {
@@ -2265,51 +2313,143 @@ export default function KitchenChat() {
     send(`${saludo}, dame el brief completo del día: pedidos pendientes, facturas que vencen, merma reciente, alertas de precio, cómo vamos en general y qué debería priorizar ahora mismo.`)
   }
 
-  return (
-    <div style={{ display: 'flex', height: '100%', backgroundColor: '#f5f2ee' }}>
+  // Historial filtrado por búsqueda, conservando el índice original (para borrar)
+  const filteredHistory = history
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => {
+      const q = historyQuery.trim().toLowerCase()
+      if (!q) return true
+      return convoTitle(c).toLowerCase().includes(q) ||
+        c.messages.some(m => (m.content || '').toLowerCase().includes(q))
+    })
+  const historyGroups = groupConvos(filteredHistory)
 
-      {/* History panel */}
-      {showHistory && (
-        <div style={{ width: 280, flexShrink: 0, backgroundColor: '#fff', borderRight: '1px solid #e8e2db', display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid #e8e2db', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-            <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 14, color: '#3d3834' }}>Conversaciones</span>
-            <button onClick={() => setShowHistory(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.4, fontSize: 18, lineHeight: 1 }}>x</button>
+  return (
+    <div style={{ display: 'flex', height: '100%', backgroundColor: '#f5f2ee', position: 'relative', overflow: 'hidden' }}>
+
+      {/* ── History drawer (overlay) ──────────────────────────── */}
+      {/* Backdrop */}
+      <div
+        onClick={() => setShowHistory(false)}
+        style={{
+          position: 'absolute', inset: 0, background: 'rgba(61,56,52,0.32)', zIndex: 40,
+          opacity: showHistory ? 1 : 0, pointerEvents: showHistory ? 'auto' : 'none',
+          transition: 'opacity 0.22s ease', backdropFilter: showHistory ? 'blur(1.5px)' : 'none',
+        }}
+      />
+      {/* Drawer */}
+      <div
+        style={{
+          position: 'absolute', top: 0, left: 0, bottom: 0, width: 340, maxWidth: '85%', zIndex: 41,
+          background: '#faf6ec', borderRight: '1.5px solid #3d3834',
+          boxShadow: showHistory ? '6px 0 30px rgba(61,56,52,0.16)' : 'none',
+          transform: showHistory ? 'translateX(0)' : 'translateX(-101%)',
+          transition: 'transform 0.26s cubic-bezier(0.32,0.72,0,1), box-shadow 0.26s ease',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '18px 18px 14px', borderBottom: '1.5px solid #e8e2db', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 16, color: '#3d3834', letterSpacing: '-0.01em' }}>Conversaciones</span>
+            <button onClick={() => setShowHistory(false)} aria-label="Cerrar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.45, display: 'flex', padding: 2 }}>
+              <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
           </div>
-          {history.length === 0 ? (
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', opacity: 0.4, padding: 16 }}>Sin conversaciones guardadas.</p>
-          ) : (
-            <div style={{ overflowY: 'auto', flex: 1 }}>
-              {history.map((convo, i) => {
-                const preview = convo.messages.find(m => m.role === 'user')?.content || '...'
-                const date = new Date(convo.lastUsed)
-                return (
-                  <div key={i} onClick={() => loadConversation(convo)} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f5f2ee', cursor: 'pointer' }}>
-                    <div style={{ flex: 1, padding: '12px 16px' }}>
-                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {preview.slice(0, 50)}
-                      </p>
-                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.4, margin: '3px 0 0' }}>
-                        {convo.messages.length} mensajes · {date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                      </p>
-                    </div>
-                    <button onClick={(e) => deleteConversation(i, e)} style={{ padding: '0 12px', background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.25, fontSize: 16 }}>x</button>
-                  </div>
-                )
-              })}
+          <button
+            onClick={() => { newConversation(); setShowHistory(false) }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px', background: '#19f973', color: '#13361f', border: '1.5px solid #3d3834', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, letterSpacing: '0.02em' }}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+            Nueva conversación
+          </button>
+          {history.length > 4 && (
+            <div style={{ position: 'relative', marginTop: 12 }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#3d3834" strokeWidth={1.6} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: 0.4, pointerEvents: 'none' }}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" /></svg>
+              <input
+                value={historyQuery}
+                onChange={e => setHistoryQuery(e.target.value)}
+                placeholder="Buscar en conversaciones…"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px 8px 32px', border: '1.5px solid #e8e2db', background: '#fff', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', outline: 'none' }}
+                onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
+                onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
+              />
             </div>
           )}
         </div>
-      )}
+
+        {/* List / empty state */}
+        {history.length === 0 ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 28 }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#ece4d8', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#6c635a" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.3-3.5C3.48 15.27 3 13.69 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+            </div>
+            <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 15, color: '#3d3834', margin: '0 0 5px' }}>Aún no hay conversaciones</p>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11.5, color: '#6c635a', margin: 0, lineHeight: 1.5 }}>Tus chats con Cocina se guardarán aquí automáticamente.</p>
+          </div>
+        ) : filteredHistory.length === 0 ? (
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#6c635a', padding: 20, textAlign: 'center' }}>Sin resultados para «{historyQuery}».</p>
+        ) : (
+          <div className="mb-scroll-subtle" style={{ overflowY: 'auto', flex: 1, padding: '8px 10px 16px' }}>
+            {historyGroups.map(group => (
+              <div key={group.label} style={{ marginBottom: 10 }}>
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#9a8f82', margin: '8px 8px 4px' }}>{group.label}</p>
+                {group.items.map(({ c, i }) => {
+                  const active = c.messages === messages
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => loadConversation(c)}
+                      className="mb-convo-item"
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 8, padding: '9px 10px', cursor: 'pointer',
+                        background: active ? 'rgba(25,249,115,0.12)' : 'transparent',
+                        borderLeft: `2px solid ${active ? '#0fa651' : 'transparent'}`,
+                        transition: 'background 0.12s',
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 600, color: '#3d3834', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {convoTitle(c)}
+                        </p>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, color: '#6c635a', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {convoSnippet(c)}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#9a8f82', whiteSpace: 'nowrap' }}>{relTime(c.lastUsed)}</span>
+                        <button
+                          onClick={(e) => deleteConversation(i, e)}
+                          className="mb-convo-del"
+                          aria-label="Eliminar"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a83e1e', padding: 0, display: 'flex' }}
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.87 12.14A2 2 0 0116.14 21H7.86a2 2 0 01-2-1.86L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Main chat */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%' }}>
         <div style={{ flexShrink: 0, padding: '16px 40px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button onClick={() => setShowHistory(s => !s)} style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4, background: 'none', border: 'none', cursor: 'pointer' }}>
-            {showHistory ? 'Ocultar historial' : `Historial (${history.length})`}
+          <button onClick={() => setShowHistory(true)} className="mb-chat-toolbtn" style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'DM Mono, monospace', fontSize: 11.5, color: '#3d3834', background: 'none', border: '1.5px solid #e0d8cb', padding: '6px 12px', cursor: 'pointer', letterSpacing: '0.02em' }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Historial
+            {history.length > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 700, background: '#3d3834', color: '#dfd5c9', borderRadius: 999, padding: '1px 6px', lineHeight: 1.5 }}>{history.length}</span>
+            )}
           </button>
           {messages.length > 0 && (
-            <button onClick={newConversation} style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4, background: 'none', border: 'none', cursor: 'pointer' }}>
-              Nueva conversacion
+            <button onClick={newConversation} className="mb-chat-toolbtn" style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'DM Mono, monospace', fontSize: 11.5, color: '#3d3834', background: 'none', border: '1.5px solid #e0d8cb', padding: '6px 12px', cursor: 'pointer', letterSpacing: '0.02em' }}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              Nueva conversación
             </button>
           )}
         </div>

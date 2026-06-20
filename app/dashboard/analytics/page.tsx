@@ -651,7 +651,7 @@ function TabConsumo() {
               </thead>
               <tbody>
                 {data.comparativa.map((c: any, i: number) => (
-                  <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#faf6ec' : '#fff' }}>
+                  <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#faf6ec' : '#f2e9d9' }}>
                     <td style={{ ...mono(12), padding: '8px 12px', color: '#3d3834', fontWeight: 700 }}>{c.ingrediente}</td>
                     <td style={{ ...mono(11), padding: '8px 12px', color: '#3d3834' }}>{c.consumo_teorico}</td>
                     <td style={{ ...mono(11), padding: '8px 12px', color: '#3d3834' }}>{c.consumo_real ?? '—'}</td>

@@ -90,7 +90,7 @@ export default function AlmacenesPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar ingrediente, tipo, proveedor o almacén..."
-          style={{ width: '100%', maxWidth: 480, padding: '10px 14px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }}
+          style={{ width: '100%', maxWidth: 480, padding: '10px 14px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: 'var(--paper)', boxSizing: 'border-box' }}
           onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
           onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
         />
@@ -99,7 +99,7 @@ export default function AlmacenesPage() {
       {loading ? (
         <p className="page-subtitle">Cargando...</p>
       ) : ordenados.length === 0 ? (
-        <div style={{ backgroundColor: '#fff', border: '1px solid #e8e2db', padding: 40, textAlign: 'center' }}>
+        <div style={{ backgroundColor: 'var(--paper)', border: '1px solid #e8e2db', padding: 40, textAlign: 'center' }}>
           <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 16, color: '#3d3834', margin: '0 0 6px' }}>Sin ingredientes</p>
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#6c635a', margin: 0 }}>Añade ingredientes y asígnales un almacén para verlos agrupados aquí.</p>
         </div>
@@ -109,7 +109,7 @@ export default function AlmacenesPage() {
             const color = ALMACEN_COLOR[almacen] ?? '#6c635a'
             const total = items.reduce((s, i) => s + (i.cost || 0), 0)
             return (
-              <div key={almacen} style={{ backgroundColor: '#fff', border: '1px solid #e8e2db', overflow: 'hidden' }}>
+              <div key={almacen} style={{ backgroundColor: 'var(--paper)', border: '1px solid #e8e2db', overflow: 'hidden' }}>
                 {/* Cabecera del almacén */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', backgroundColor: '#faf6ec', borderBottom: '1px solid #e8e2db' }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, flexShrink: 0 }} />

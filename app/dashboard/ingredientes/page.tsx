@@ -127,7 +127,7 @@ export default function IngredientesPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar ingrediente, tipo, proveedor..."
-          style={{ width: '100%', maxWidth: 480, padding: '10px 14px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }}
+          style={{ width: '100%', maxWidth: 480, padding: '10px 14px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: 'var(--paper)', boxSizing: 'border-box' }}
           onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
           onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
         />
@@ -136,7 +136,7 @@ export default function IngredientesPage() {
       {loading ? (
         <p className="page-subtitle">Cargando...</p>
       ) : (
-        <div style={{ backgroundColor: '#fff', borderRadius: 0, border: '1px solid #e8e2db', overflow: 'hidden' }}>
+        <div style={{ backgroundColor: 'var(--paper)', borderRadius: 0, border: '1px solid #e8e2db', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#ece4d8' }}>
@@ -173,7 +173,7 @@ export default function IngredientesPage() {
                           assignProveedor(ing, prov)
                         }}
                         onBlur={() => setAssigningId(null)}
-                        style={{ width: '100%', padding: '5px 8px', borderRadius: 7, border: '1.5px solid #19f973', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', backgroundColor: '#fff', outline: 'none', cursor: 'pointer' }}
+                        style={{ width: '100%', padding: '5px 8px', borderRadius: 0, border: '1.5px solid #19f973', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', backgroundColor: 'var(--paper)', outline: 'none', cursor: 'pointer' }}
                       >
                         <option value="">Sin proveedor</option>
                         {proveedores.map(p => (

@@ -48,7 +48,7 @@ export default function SangradoPage() {
       render: r => (
         <button
           onClick={e => { e.stopPropagation(); openCalc({ id: r.id, nombre: r.nombre, precio_venta: r.precio_venta }) }}
-          style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, backgroundColor: '#19f973', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: '#2a2522', fontWeight: 700 }}
+          style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, backgroundColor: '#19f973', border: '1.5px solid #3d3834', borderRadius: 0, padding: '4px 10px', cursor: 'pointer', color: '#2a2522', fontWeight: 700 }}
         >
           Calcular
         </button>

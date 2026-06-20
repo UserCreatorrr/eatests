@@ -47,7 +47,7 @@ export default function LaborOverviewPage() {
   const dqParcial = data?.dq?.data_quality === 'PARCIAL'
 
   return (
-    <div style={{ padding: '32px 36px 60px', maxWidth: 1280 }}>
+    <div style={{ padding: '32px 36px 60px' }}>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <p style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.2em', color: tk.appleDeep, textTransform: 'uppercase', margin: '0 0 8px' }}>

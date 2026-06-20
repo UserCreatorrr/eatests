@@ -81,7 +81,7 @@ export default function TurnoIdealPage() {
   const statusBg = (s: Slot['status']) => s === 'sobredotacion' ? tk.terraSoft : s === 'subdotacion' ? tk.claySoft : tk.appleSoft
 
   return (
-    <div style={{ padding: '32px 36px 60px', maxWidth: 1280 }}>
+    <div style={{ padding: '32px 36px 60px' }}>
       <div style={{ marginBottom: 28 }}>
         <p style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.2em', color: tk.appleDeep, textTransform: 'uppercase', margin: '0 0 8px' }}>
           LABOR COST · TURNO IDEAL

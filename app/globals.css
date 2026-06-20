@@ -108,6 +108,20 @@ h1, h2, h3, h4, h5, h6 {
   color: #19f973;
 }
 
+/* ─── Subtle scrollbar (sidebar, drawers) ─────────────────────── */
+.mb-scroll-subtle {
+  scrollbar-width: thin;                       /* Firefox */
+  scrollbar-color: rgba(223,213,201,0.18) transparent;
+}
+.mb-scroll-subtle::-webkit-scrollbar { width: 6px; height: 6px; }
+.mb-scroll-subtle::-webkit-scrollbar-track { background: transparent; }
+.mb-scroll-subtle::-webkit-scrollbar-thumb {
+  background: rgba(223,213,201,0.14);
+  border-radius: 999px;
+}
+.mb-scroll-subtle:hover::-webkit-scrollbar-thumb { background: rgba(223,213,201,0.28); }
+.mb-scroll-subtle::-webkit-scrollbar-thumb:hover { background: rgba(25,249,115,0.45); }
+
 /* ─── Page sections ───────────────────────────────────────────── */
 .page-header {
   @apply mb-8 pb-6 border-b;

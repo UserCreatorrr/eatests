@@ -119,7 +119,7 @@ export default function Sidebar() {
         </p>
       </div>
 
-      <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 6px' }}>
+      <nav className="mb-scroll-subtle" style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 6px' }}>
         {sidebarGroups.map((group, gi) => (
           <div key={gi} style={{ marginBottom: 12 }}>
             <div style={{

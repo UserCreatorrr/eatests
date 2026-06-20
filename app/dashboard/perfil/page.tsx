@@ -138,7 +138,7 @@ export default function PerfilPage() {
   }
 
   return (
-    <div className="p-8" style={{ maxWidth: 680 }}>
+    <div className="p-8" style={{ maxWidth: 680, margin: '0 auto' }}>
       <div className="page-header">
         <h1 className="page-title">Perfil y Ajustes</h1>
         <p className="page-subtitle">{user.email}</p>

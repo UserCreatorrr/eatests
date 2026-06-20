@@ -48,43 +48,96 @@ function LoginForm() {
     window.location.href = '/api/auth/google'
   }
 
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f2ee', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-      <div style={{ width: '100%', maxWidth: '400px' }}>
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '13px 16px', borderRadius: 10, border: '1.5px solid #e3dccf',
+    fontFamily: 'DM Mono, monospace', fontSize: 13.5, color: '#3d3834', outline: 'none',
+    backgroundColor: '#ffffff', boxSizing: 'border-box', transition: 'border-color 0.15s',
+  }
 
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <Image
-            src="/logos/COMPLETE_BICOLOR_NEGATIVE.svg"
-            alt="MarginBites"
-            width={160}
-            height={42}
-            style={{ margin: '0 auto 16px', display: 'block' }}
-          />
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#3d3834', opacity: 0.4 }}>
-            Suite de gestión para cocinas profesionales
+  return (
+    <div className="mb-login">
+      <style>{`
+        .mb-login { min-height: 100vh; display: flex; background: #f1ece2; }
+        .mb-login__hero {
+          position: relative; flex: 1.15; overflow: hidden;
+          background: #3d3834; color: #dfd5c9;
+          display: flex; flex-direction: column; justify-content: space-between;
+          padding: 48px 56px;
+        }
+        .mb-login__grid {
+          position: absolute; inset: 0; pointer-events: none;
+          background-image:
+            linear-gradient(to right, rgba(223,213,201,0.05) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(223,213,201,0.05) 1px, transparent 1px);
+          background-size: 26px 26px;
+          mask-image: radial-gradient(ellipse 90% 80% at 30% 40%, #000 40%, transparent 100%);
+          -webkit-mask-image: radial-gradient(ellipse 90% 80% at 30% 40%, #000 40%, transparent 100%);
+        }
+        .mb-login__glow {
+          position: absolute; width: 420px; height: 420px; left: -120px; bottom: -140px;
+          background: radial-gradient(circle, rgba(25,249,115,0.16), transparent 70%);
+          pointer-events: none;
+        }
+        .mb-login__form { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 32px; }
+        .mb-login__formInner { width: 100%; max-width: 380px; }
+        @media (max-width: 880px) {
+          .mb-login__hero { display: none; }
+          .mb-login { background: #f1ece2; }
+        }
+      `}</style>
+
+      {/* ── LEFT: brand hero ─────────────────────────────────── */}
+      <div className="mb-login__hero">
+        <div className="mb-login__grid" />
+        <div className="mb-login__glow" />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Image src="/logos/COMPLETE_BICOLOR_NEGATIVE.svg" alt="MarginBite" width={168} height={44} priority />
+        </div>
+
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 520 }}>
+          <h1 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 46, lineHeight: 1.04, letterSpacing: '-0.02em', margin: 0, color: '#f3ede3' }}>
+            Controla tu cocina<br />con inteligencia<span style={{ color: '#19f973' }}>.</span>
+          </h1>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, lineHeight: 1.9, color: '#dfd5c9', opacity: 0.55, margin: '22px 0 0', letterSpacing: '0.02em' }}>
+            Ingredientes · Pedidos · Albaranes<br />
+            Proveedores · Escandallos · IA de cocina
           </p>
         </div>
 
-        {/* Card */}
-        <div style={{ backgroundColor: '#faf6ec', borderRadius: 0, padding: '32px', border: '1.5px solid #3d3834', boxShadow: '0 4px 24px rgba(61,56,52,0.06)' }}>
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, color: '#dfd5c9', opacity: 0.35, margin: 0, letterSpacing: '0.08em' }}>
+            © 2026 MarginBite · Kitchen OS
+          </p>
+        </div>
+      </div>
+
+      {/* ── RIGHT: form ──────────────────────────────────────── */}
+      <div className="mb-login__form">
+        <div className="mb-login__formInner">
+          <div style={{ marginBottom: 28 }}>
+            <Image src="/logos/COMPLETE_BICOLOR_POSITIVE.svg" alt="MarginBite" width={150} height={39} />
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11.5, color: '#3d3834', opacity: 0.45, margin: '12px 0 0', letterSpacing: '0.04em' }}>
+              Suite para cocinas profesionales
+            </p>
+          </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: '4px', backgroundColor: '#f5f2ee', borderRadius: 0, padding: '4px', marginBottom: '28px' }}>
+          <div style={{ display: 'flex', gap: 4, backgroundColor: '#e7e0d4', borderRadius: 12, padding: 4, marginBottom: 22 }}>
             {(['login', 'signup'] as const).map(m => (
               <button
                 key={m}
                 onClick={() => { setMode(m); setMsg(''); setIsError(false) }}
                 style={{
-                  flex: 1, padding: '8px', borderRadius: 0, border: 'none', cursor: 'pointer',
-                  fontFamily: 'DM Mono, monospace', fontSize: '12px',
+                  flex: 1, padding: '9px', borderRadius: 9, border: 'none', cursor: 'pointer',
+                  fontFamily: 'DM Mono, monospace', fontSize: 12.5, fontWeight: mode === m ? 600 : 400,
                   backgroundColor: mode === m ? '#ffffff' : 'transparent',
                   color: '#3d3834',
-                  boxShadow: mode === m ? '0 1px 4px rgba(61,56,52,0.1)' : 'none',
+                  boxShadow: mode === m ? '0 1px 3px rgba(61,56,52,0.12)' : 'none',
                   transition: 'all 0.15s',
                 }}
               >
-                {m === 'login' ? 'Iniciar sesión' : 'Registrarse'}
+                {m === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
               </button>
             ))}
           </div>
@@ -93,43 +146,34 @@ function LoginForm() {
             <div style={{
               backgroundColor: isError ? '#fbeae2' : '#d6f9e0',
               border: `1px solid ${isError ? '#a83e1e' : '#0fa651'}`,
-              borderRadius: 0, padding: '12px 16px', marginBottom: '20px',
+              borderRadius: 10, padding: '11px 15px', marginBottom: 16,
             }}>
-              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '12px', color: isError ? '#a83e1e' : '#0fa651', margin: 0 }}>
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: isError ? '#a83e1e' : '#0a8f47', margin: 0 }}>
                 {msg}
               </p>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 11, marginBottom: 18 }}>
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="tu@email.com"
-              required
-              style={{ width: '100%', padding: '12px 16px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec', boxSizing: 'border-box' }}
+              type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="tu@email.com" required style={inputStyle}
               onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
+              onBlur={e => e.currentTarget.style.borderColor = '#e3dccf'}
             />
             <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Contraseña"
-              required
-              style={{ width: '100%', padding: '12px 16px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: '13px', color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec', boxSizing: 'border-box' }}
+              type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="Contraseña" required style={inputStyle}
               onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
+              onBlur={e => e.currentTarget.style.borderColor = '#e3dccf'}
             />
             <button
-              type="submit"
-              disabled={loading}
+              type="submit" disabled={loading}
               style={{
-                width: '100%', padding: '13px', borderRadius: 0, border: 'none', cursor: 'pointer',
-                backgroundColor: '#19f973', color: '#2a2522', fontFamily: 'DM Mono, monospace',
-                fontSize: '13px', fontWeight: 600, opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s',
+                width: '100%', padding: '14px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                backgroundColor: '#19f973', color: '#13361f', fontFamily: 'DM Mono, monospace',
+                fontSize: 13.5, fontWeight: 700, opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s', marginTop: 3,
               }}
             >
               {loading ? 'Cargando…' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
@@ -137,22 +181,22 @@ function LoginForm() {
           </form>
 
           {/* Divider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#e8e2db' }} />
-            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#3d3834', opacity: 0.4 }}>o</span>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#e8e2db' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ flex: 1, height: 1, backgroundColor: '#e3dccf' }} />
+            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.35 }}>o</span>
+            <div style={{ flex: 1, height: 1, backgroundColor: '#e3dccf' }} />
           </div>
 
           {/* Google */}
           <button
             onClick={signInWithGoogle}
             style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
-              backgroundColor: '#3d3834', color: '#dfd5c9', border: 'none', borderRadius: 0,
-              padding: '13px 20px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: '13px',
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 11,
+              backgroundColor: '#3d3834', color: '#dfd5c9', border: 'none', borderRadius: 10,
+              padding: '13px 20px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 13,
               transition: 'opacity 0.15s',
             }}
-            onMouseOver={e => (e.currentTarget.style.opacity = '0.85')}
+            onMouseOver={e => (e.currentTarget.style.opacity = '0.88')}
             onMouseOut={e => (e.currentTarget.style.opacity = '1')}
           >
             <svg width="17" height="17" viewBox="0 0 24 24">
@@ -163,11 +207,11 @@ function LoginForm() {
             </svg>
             Continuar con Google
           </button>
-        </div>
 
-        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: '10px', color: '#3d3834', opacity: 0.3, textAlign: 'center', marginTop: '20px' }}>
-          Tus datos estan aislados y son solo tuyos
-        </p>
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, color: '#3d3834', opacity: 0.3, textAlign: 'center', marginTop: 18 }}>
+            Tus datos están aislados y son solo tuyos
+          </p>
+        </div>
       </div>
     </div>
   )

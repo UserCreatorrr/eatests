@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import db from '@/lib/db'
 import { signJwt, setSessionCookie } from '@/lib/auth'
+import { rateLimit, getClientIp } from '@/lib/security'
 
 export async function POST(req: NextRequest) {
   try {
+    // Anti fuerza bruta: 10 intentos/min por IP.
+    if (!rateLimit(`login:${getClientIp(req)}`, 10, 60_000)) {
+      return NextResponse.json({ error: 'Demasiados intentos. Espera un minuto.' }, { status: 429 })
+    }
     const { email, password } = await req.json()
 
     if (!email || !password) {

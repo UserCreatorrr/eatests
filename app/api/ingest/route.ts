@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { pickValidColumns } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,13 +31,16 @@ function bulkInsert(table: string, userId: string, rows: Record<string, unknown>
   let inserted = 0
   for (const row of rows) {
     // Keep only scalar fields (skip arrays, objects, blacklisted keys)
-    const fields: Record<string, unknown> = {}
+    const raw: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(row)) {
       if (k === 'user_id') continue
       if (SKIP_FIELDS.has(k)) continue
       if (!isScalar(v)) continue
-      fields[k] = v
+      raw[k] = v
     }
+    // Solo columnas reales de la tabla (anti-inyección por identificador)
+    const fields = pickValidColumns(table, raw)
+    if (Object.keys(fields).length === 0) continue
 
     const columns = ['user_id', ...Object.keys(fields)]
     const values = [userId, ...Object.values(fields)]
@@ -69,12 +73,15 @@ type IngestPayload = {
 }
 
 export async function POST(req: NextRequest) {
+  // Fail-closed: sin INGEST_SECRET configurado, el endpoint queda deshabilitado
+  // (si no, sería un endpoint público que borra/reemplaza datos de cualquier usuario).
   const ingestSecret = process.env.INGEST_SECRET
-  if (ingestSecret) {
-    const token = req.headers.get('authorization')?.replace('Bearer ', '')
-    if (token !== ingestSecret) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (!ingestSecret) {
+    return NextResponse.json({ error: 'Ingest deshabilitado' }, { status: 403 })
+  }
+  const token = req.headers.get('authorization')?.replace('Bearer ', '')
+  if (token !== ingestSecret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   let payload: IngestPayload

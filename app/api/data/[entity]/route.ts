@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
+import { pickValidColumns, idIsText } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,10 +84,15 @@ export async function POST(
   }
 
   const body = await req.json()
-  const { user_id: _skip, ...fields } = body
+  // Solo columnas reales de la tabla (descarta user_id y claves maliciosas)
+  const fields: Record<string, unknown> = pickValidColumns(table, body)
 
-  // Generate a UUID if no id provided (user-created records)
-  if (!fields.id) fields.id = randomUUID()
+  // UUID solo para tablas con id TEXT; las de id INTEGER usan autoincrement.
+  if (!fields.id && idIsText(table)) fields.id = randomUUID()
+
+  if (Object.keys(fields).length === 0) {
+    return NextResponse.json({ error: 'Sin datos válidos' }, { status: 400 })
+  }
 
   const columns = ['user_id', ...Object.keys(fields)]
   const values = [user.id, ...Object.values(fields)]

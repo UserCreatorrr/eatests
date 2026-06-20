@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
+import { pickValidColumns } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,9 @@ export async function PUT(
   if (!table) return NextResponse.json({ error: 'Entidad no valida' }, { status: 400 })
 
   const body = await req.json()
-  const { user_id: _u, id: _id, ...fields } = body
+  const { id: _id, ...rest } = body
+  // Solo columnas reales (descarta user_id, id y claves maliciosas)
+  const fields: Record<string, unknown> = pickValidColumns(table, rest)
   if (Object.keys(fields).length === 0) return NextResponse.json({ error: 'Sin datos' }, { status: 400 })
 
   const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ')

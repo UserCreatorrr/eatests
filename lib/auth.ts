@@ -6,8 +6,18 @@ import { NextRequest } from 'next/server'
 const COOKIE_NAME = 'mb_session'
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30 days
 
+const DEV_FALLBACK_SECRET = 'dev-secret-change-me-in-production'
+
 function getSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || 'dev-secret-change-me-in-production'
+  const secret = process.env.JWT_SECRET
+  // Fail-closed: en producción NUNCA usar el secreto por defecto. Si no hay
+  // JWT_SECRET (o es el de dev), cualquiera podría falsificar sesiones.
+  if (!secret || secret === DEV_FALLBACK_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET no configurado: define una variable de entorno JWT_SECRET fuerte en producción.')
+    }
+    return new TextEncoder().encode(DEV_FALLBACK_SECRET)
+  }
   return new TextEncoder().encode(secret)
 }
 

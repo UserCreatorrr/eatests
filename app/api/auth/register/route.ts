@@ -3,13 +3,23 @@ import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import db from '@/lib/db'
 import { signJwt, setSessionCookie } from '@/lib/auth'
+import { rateLimit, getClientIp } from '@/lib/security'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(req: NextRequest) {
   try {
+    // Anti spam de registro: 5 cuentas/10 min por IP.
+    if (!rateLimit(`register:${getClientIp(req)}`, 5, 600_000)) {
+      return NextResponse.json({ error: 'Demasiados registros. Inténtalo más tarde.' }, { status: 429 })
+    }
     const { email, password, name } = await req.json()
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email y contraseña requeridos' }, { status: 400 })
+    }
+    if (!EMAIL_RE.test(String(email).trim())) {
+      return NextResponse.json({ error: 'Email no válido' }, { status: 400 })
     }
     if (password.length < 8) {
       return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })

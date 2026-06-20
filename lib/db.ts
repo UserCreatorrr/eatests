@@ -419,11 +419,20 @@ function initSchema(db: Database.Database) {
     );
   `)
 
-  const hash = bcrypt.hashSync('Marginbites2026+', 10)
-  db.prepare(`
-    INSERT OR IGNORE INTO users (id, email, password_hash, name)
-    VALUES ('pablo-admin', 'pabloperez@visualandgrowth.es', ?, 'Pablo Perez')
-  `).run(hash)
+  // Usuario admin/demo — credenciales SOLO desde entorno. Sin backdoor hardcodeado.
+  // En producción NO se crea ningún admin a menos que se configuren ADMIN_SEED_EMAIL
+  // y ADMIN_SEED_PASSWORD. En desarrollo se usa un admin local para poder trabajar.
+  const isProd = process.env.NODE_ENV === 'production'
+  const adminEmail = process.env.ADMIN_SEED_EMAIL || (isProd ? null : 'admin@local.dev')
+  const adminPassword = process.env.ADMIN_SEED_PASSWORD || (isProd ? null : 'devpassword123')
+  const adminSeeded = !!(adminEmail && adminPassword)
+  if (adminSeeded) {
+    const hash = bcrypt.hashSync(adminPassword as string, 10)
+    db.prepare(`
+      INSERT OR IGNORE INTO users (id, email, password_hash, name)
+      VALUES ('pablo-admin', ?, ?, 'Pablo Perez')
+    `).run((adminEmail as string).toLowerCase().trim(), hash)
+  }
 
   // Safe column additions (ALTER TABLE IF NOT EXIST equivalent via try/catch)
   try { db.exec(`ALTER TABLE proveedores ADD COLUMN canal_preferido TEXT`) } catch {}
@@ -438,18 +447,18 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN almacen TEXT`) } catch {}
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN tipo TEXT`) } catch {}        // 'ingrediente' | 'receta'
 
-  // Auto-seed demo data if DB is empty (new installation or after data loss)
-  const ingCount = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=?').get('pablo-admin') as any).c
-  if (ingCount === 0) {
-    seedDemoData(db, 'pablo-admin')
-  }
-
-  // Idempotent labor seed — runs only if labor tables empty for the admin user.
-  // Esto cubre cuentas existentes que ya tenían Food Cost pero no Labor/Productivity.
-  try {
-    seedLaborData(db, 'pablo-admin')
-  } catch (e) {
-    console.warn('[seed] Labor data seed failed:', (e as Error).message)
+  // Datos demo SOLO para el admin de desarrollo/configurado. Las cuentas reales
+  // (registros de clientes) arrancan vacías. Sin admin → no se siembra nada.
+  if (adminSeeded) {
+    const ingCount = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=?').get('pablo-admin') as any).c
+    if (ingCount === 0) {
+      seedDemoData(db, 'pablo-admin')
+    }
+    try {
+      seedLaborData(db, 'pablo-admin')
+    } catch (e) {
+      console.warn('[seed] Labor data seed failed:', (e as Error).message)
+    }
   }
 }
 

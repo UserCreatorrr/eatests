@@ -3,8 +3,16 @@ import { jwtVerify } from 'jose'
 
 const PUBLIC_PATHS = ['/login', '/api/auth', '/api/ingest', '/api/health', '/api/admin/seed-demo']
 
+const DEV_FALLBACK_SECRET = 'dev-secret-change-me-in-production'
+
 function getSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || 'dev-secret-change-me-in-production'
+  const secret = process.env.JWT_SECRET
+  if (!secret || secret === DEV_FALLBACK_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET no configurado en producción.')
+    }
+    return new TextEncoder().encode(DEV_FALLBACK_SECRET)
+  }
   return new TextEncoder().encode(secret)
 }
 

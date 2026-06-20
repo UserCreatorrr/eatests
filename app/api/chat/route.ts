@@ -3,6 +3,7 @@ import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { COSTE_LINEA_SQL, foodCost, unitFactor } from '@/lib/foodcost'
+import { pickValidColumns, rateLimit } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -653,10 +654,12 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
   }
   if (insertMap[name]) {
     try {
-      const { id: _id, user_id: _uid, ...fields } = args
+      const table = insertMap[name]
+      const fields = pickValidColumns(table, args)
+      if (Object.keys(fields).length === 0) return 'Error: sin datos válidos.'
       const columns = ['user_id', ...Object.keys(fields)]
       const values = [userId, ...Object.values(fields)]
-      const r = db.prepare(`INSERT INTO ${insertMap[name]} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`).run(...values)
+      const r = db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`).run(...values)
       return `Creado con id ${r.lastInsertRowid}`
     } catch (e: any) { return `Error: ${e.message}` }
   }
@@ -733,7 +736,8 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
   // ── GUARDAR ALBARÁN COMPRA ─────────────────────────────
   if (name === 'guardar_albaran_compra') {
     try {
-      const { id: _id, user_id: _uid, ...fields } = args
+      const fields = pickValidColumns('albaranes_compra', args)
+      if (Object.keys(fields).length === 0) return 'Error: sin datos válidos.'
       const columns = ['user_id', ...Object.keys(fields)]
       const values = [userId, ...Object.values(fields)]
       const r = db.prepare(`INSERT INTO albaranes_compra (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`).run(...values)
@@ -744,7 +748,8 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
   // ── GUARDAR FACTURA COMPRA ─────────────────────────────
   if (name === 'guardar_factura_compra') {
     try {
-      const { id: _id, user_id: _uid, ...fields } = args
+      const fields = pickValidColumns('facturas_compra', args)
+      if (Object.keys(fields).length === 0) return 'Error: sin datos válidos.'
       const columns = ['user_id', ...Object.keys(fields)]
       const values = [userId, ...Object.values(fields)]
       const r = db.prepare(`INSERT INTO facturas_compra (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`).run(...values)
@@ -1758,8 +1763,13 @@ Equipo MarginBites`
 
 export async function POST(req: NextRequest) {
   const user = await getUserFromRequest(req)
+  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  // Límite anti-abuso de coste: 30 mensajes/min por usuario.
+  if (!rateLimit(`chat:${user.id}`, 30, 60_000)) {
+    return NextResponse.json({ reply: 'Vas muy rápido 🙂 Espera unos segundos e inténtalo de nuevo.' }, { status: 429 })
+  }
   const { messages, image } = await req.json()
-  const ctx = getKitchenContext(user?.id ?? '')
+  const ctx = getKitchenContext(user.id)
 
   // ── Lean system prompt — no data dumps, AI uses tools to query ──────────
   const recentStr = (ctx.recentOrders as any[]).map(o =>
@@ -1857,7 +1867,7 @@ REGLAS:
 
   for (const tc of toolCalls) {
     const args = JSON.parse(tc.function.arguments)
-    const result = await executeTool(tc.function.name, args, user?.id ?? '')
+    const result = await executeTool(tc.function.name, args, user.id)
     if (result.startsWith('__EMAIL_PROPOSAL__')) {
       emailProposal = JSON.parse(result.slice('__EMAIL_PROPOSAL__'.length))
       results.push('Propuesta de email generada.')

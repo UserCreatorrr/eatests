@@ -3,8 +3,11 @@ import fs from 'fs'
 import path from 'path'
 
 export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get('secret')
-  if (secret !== process.env.INGEST_SECRET) {
+  // Volcado COMPLETO de la DB (multi-tenant). Deshabilitado salvo que
+  // INGEST_SECRET esté configurado; preferir cabecera a query (no se registra).
+  const expected = process.env.INGEST_SECRET
+  const secret = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || req.nextUrl.searchParams.get('secret')
+  if (!expected || secret !== expected) {
     return new NextResponse('Forbidden', { status: 403 })
   }
 

@@ -436,7 +436,7 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN site_id TEXT`) } catch {}
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN servicio TEXT`) } catch {}
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN almacen TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE merma_registro ADD COLUMN tipo TEXT`) } catch {}        -- 'ingrediente' | 'receta'
+  try { db.exec(`ALTER TABLE merma_registro ADD COLUMN tipo TEXT`) } catch {}        // 'ingrediente' | 'receta'
 
   // Auto-seed demo data if DB is empty (new installation or after data loss)
   const ingCount = (db.prepare('SELECT COUNT(*) as c FROM ingredientes WHERE user_id=?').get('pablo-admin') as any).c

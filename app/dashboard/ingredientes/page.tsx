@@ -10,7 +10,11 @@ type Ingrediente = {
   cost: number | null
   proveedor_id: number | null
   proveedor_nombre: string | null
+  almacen_principal: string | null
+  almacen_secundario: string | null
 }
+
+const ALMACENES = ['Nevera', 'Congelador', 'Seco / Despensa', 'Barra', 'Cocina caliente', 'Cocina fría', 'Bodega']
 
 type Proveedor = {
   id: number
@@ -78,7 +82,7 @@ export default function IngredientesPage() {
 
   function openEdit(r: Ingrediente) {
     setEditingId(r.id)
-    setForm({ codi: r.codi || '', descr: r.descr || '', type: r.type || '', unit: r.unit || '', cost: r.cost ?? undefined })
+    setForm({ codi: r.codi || '', descr: r.descr || '', type: r.type || '', unit: r.unit || '', cost: r.cost ?? undefined, almacen_principal: r.almacen_principal || '', almacen_secundario: r.almacen_secundario || '' })
     setMsg('')
     setModalOpen(true)
   }
@@ -136,7 +140,7 @@ export default function IngredientesPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#ece4d8' }}>
-                {['Código', 'Nombre', 'Tipo', 'Unidad', 'Coste', 'Proveedor', ''].map(h => (
+                {['Código', 'Nombre', 'Tipo', 'Unidad', 'Coste', 'Almacén', 'Proveedor', ''].map(h => (
                   <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, fontWeight: 600, borderBottom: '1px solid #e8e2db', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -149,6 +153,13 @@ export default function IngredientesPage() {
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45 }}>{ing.type || '-'}</td>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834' }}>{ing.unit || '-'}</td>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', whiteSpace: 'nowrap' }}>{fmt(ing.cost)}</td>
+                  <td style={{ padding: '8px 14px', whiteSpace: 'nowrap' }}>
+                    {ing.almacen_principal ? (
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, padding: '2px 8px', backgroundColor: '#ece4d8', color: '#6c635a', border: '1px solid #c4b8a8' }}>{ing.almacen_principal}</span>
+                    ) : (
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, color: '#a83e1e', opacity: 0.7 }}>sin asignar</span>
+                    )}
+                  </td>
 
                   {/* Proveedor selector */}
                   <td style={{ padding: '6px 14px', minWidth: 200 }}>
@@ -204,17 +215,22 @@ export default function IngredientesPage() {
 
       {/* Modal */}
       {modalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: 0, padding: '28px 32px', width: 480, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 16, color: '#3d3834', margin: '0 0 24px' }}>
-              {editingId ? 'Editar ingrediente' : 'Nuevo ingrediente'}
-            </h2>
+        <div onMouseDown={e => { if (e.target === e.currentTarget) setModalOpen(false) }} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(61,56,52,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor: '#faf6ec', border: '1.5px solid #3d3834', padding: '28px 32px', width: 480, maxWidth: '90vw' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 24px' }}>
+              <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 16, color: '#3d3834', margin: 0 }}>
+                {editingId ? 'Editar ingrediente' : 'Nuevo ingrediente'}
+              </h2>
+              <button onClick={() => setModalOpen(false)} aria-label="Cerrar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.5, display: 'flex' }}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {[
                 { key: 'codi', label: 'Código' },
                 { key: 'descr', label: 'Nombre' },
-                { key: 'type', label: 'Tipo' },
-                { key: 'unit', label: 'Unidad' },
+                { key: 'type', label: 'Familia / categoría' },
+                { key: 'unit', label: 'Unidad base' },
                 { key: 'cost', label: 'Coste (EUR)', type: 'number' },
               ].map(f => (
                 <div key={f.key}>
@@ -223,10 +239,24 @@ export default function IngredientesPage() {
                     type={f.type || 'text'}
                     value={(form as any)[f.key] ?? ''}
                     onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#faf6ec' }}
-                    onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
-                    onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 0, border: '1.5px solid #c4b8a8', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#dfd5c9' }}
+                    onFocus={e => e.currentTarget.style.borderColor = '#3d3834'}
+                    onBlur={e => e.currentTarget.style.borderColor = '#c4b8a8'}
                   />
+                </div>
+              ))}
+              {/* Almacenes (feedback: ubicación operativa obligatoria) */}
+              {([['almacen_principal', 'Almacén principal'], ['almacen_secundario', 'Almacén secundario (opcional)']] as const).map(([key, label]) => (
+                <div key={key}>
+                  <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, display: 'block', marginBottom: 5 }}>{label}</label>
+                  <select
+                    value={(form as any)[key] ?? ''}
+                    onChange={e => setForm(prev => ({ ...prev, [key]: e.target.value }))}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 0, border: '1.5px solid #c4b8a8', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#dfd5c9', cursor: 'pointer' }}
+                  >
+                    <option value="">— sin asignar —</option>
+                    {ALMACENES.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
                 </div>
               ))}
             </div>

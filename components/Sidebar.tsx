@@ -22,6 +22,7 @@ const I = {
   clock:   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>,
   gauge:   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path d="M3 12a9 9 0 1118 0M12 12l4-4"/></svg>,
   report:  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>,
+  merma:   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path d="M19 7l-.87 12.14A2 2 0 0116.14 21H7.86a2 2 0 01-2-1.86L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>,
 }
 
 type NavItem = { href: string; label: string; icon: JSX.Element; children?: { href: string; label: string }[] }
@@ -55,7 +56,8 @@ const sidebarGroups: NavGroup[] = [
           { href: '/dashboard/proveedores/detalles', label: 'Detalles' },
         ],
       },
-      { href: '/dashboard/sangrado', label: 'Sangrado', icon: I.recipe },
+      { href: '/dashboard/sangrado', label: 'Escandallo / Sangrado', icon: I.recipe },
+      { href: '/dashboard/merma', label: 'Merma / Desperdicio', icon: I.merma },
     ],
   },
   {

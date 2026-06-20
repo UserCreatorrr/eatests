@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
+import { lineCost } from '@/lib/foodcost'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,15 +60,31 @@ export async function POST(req: NextRequest) {
   const uid = user?.id ?? ''
   const body = await req.json()
 
-  const { nombre, ingrediente_id, cantidad, unidad, motivo, coste_estimado, fecha, notas } = body
+  const { nombre, ingrediente_id, cantidad, unidad, motivo, coste_estimado, fecha, notas,
+          site_id, servicio, almacen, tipo } = body
   if (!nombre) return NextResponse.json({ error: 'nombre requerido' }, { status: 400 })
 
-  const r = db.prepare(`
-    INSERT INTO merma_registro (user_id, nombre, ingrediente_id, cantidad, unidad, motivo, coste_estimado, fecha, notas)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(uid, nombre, ingrediente_id ?? null, cantidad ?? null, unidad ?? null, motivo ?? null, coste_estimado ?? null, fecha ?? new Date().toISOString().split('T')[0], notas ?? null)
+  // Coste automático: si no viene dado, derivarlo del ingrediente conectado
+  // normalizando la unidad (g de un ingrediente a €/kg, etc.)
+  let coste = coste_estimado ?? null
+  if (coste == null && cantidad != null) {
+    if (ingrediente_id) {
+      const ing = db.prepare('SELECT cost, unit FROM ingredientes WHERE id=? AND user_id=?').get(ingrediente_id, uid) as any
+      if (ing?.cost) coste = Math.round(lineCost(cantidad, unidad, ing.cost, ing.unit) * 100) / 100
+    } else {
+      const ing = db.prepare('SELECT cost, unit FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(uid, '%' + nombre + '%') as any
+      if (ing?.cost) coste = Math.round(lineCost(cantidad, unidad, ing.cost, ing.unit) * 100) / 100
+    }
+  }
 
-  return NextResponse.json({ id: r.lastInsertRowid })
+  const r = db.prepare(`
+    INSERT INTO merma_registro (user_id, nombre, ingrediente_id, cantidad, unidad, motivo, coste_estimado, fecha, notas, site_id, servicio, almacen, tipo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(uid, nombre, ingrediente_id ?? null, cantidad ?? null, unidad ?? null, motivo ?? null,
+         coste ?? null, fecha ?? new Date().toISOString().split('T')[0], notas ?? null,
+         site_id ?? null, servicio ?? null, almacen ?? null, tipo ?? 'ingrediente')
+
+  return NextResponse.json({ id: r.lastInsertRowid, coste_estimado: coste })
 }
 
 export async function DELETE(req: NextRequest) {

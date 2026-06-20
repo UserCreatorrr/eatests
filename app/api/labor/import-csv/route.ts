@@ -15,6 +15,26 @@ interface ImportPayload {
 const FIELDS_TURNOS = ['site_id', 'date', 'employee_id', 'employee_name', 'role', 'area', 'start_time', 'end_time', 'break_minutes', 'hourly_cost', 'contract_hours_week', 'source']
 const FIELDS_VENTAS = ['site_id', 'date', 'timeslot_start', 'timeslot_end', 'channel', 'sales_net', 'covers', 'orders', 'tickets', 'source']
 
+// Parsea números tolerando formato europeo: "1.450,80" → 1450.80, "11,50" → 11.5
+function numEU(v: string | undefined | null): number | null {
+  if (v == null) return null
+  let s = String(v).trim().replace(/[€\s]/g, '')
+  if (!s) return null
+  if (s.includes(',') && s.includes('.')) {
+    // el último separador es el decimal
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.')
+    else s = s.replace(/,/g, '')
+  } else if (s.includes(',')) {
+    s = s.replace(',', '.')
+  }
+  const n = parseFloat(s)
+  return isNaN(n) ? null : n
+}
+function intEU(v: string | undefined | null): number | null {
+  const n = numEU(v)
+  return n == null ? null : Math.round(n)
+}
+
 export async function POST(req: NextRequest) {
   const user = await getUserFromRequest(req)
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -53,17 +73,18 @@ export async function POST(req: NextRequest) {
       try {
         if (type === 'turnos') {
           if (!row.date || !row.start_time || !row.end_time) {
-            errors.push({ row: idx + 1, reason: 'Faltan date/start_time/end_time' })
+            const faltan = [!row.date && 'fecha', !row.start_time && 'hora de inicio', !row.end_time && 'hora de fin'].filter(Boolean).join(', ')
+            errors.push({ row: idx + 1, reason: `Faltan campos obligatorios: ${faltan}` })
             return
           }
           const ext = row.employee_id ? empByExtId[row.employee_id] : null
           const byName = row.employee_name ? empByName[row.employee_name.toLowerCase().trim()] : null
           const emp = ext || byName
-          const costeHora = row.hourly_cost ? parseFloat(row.hourly_cost) : (emp?.coste_hora || null)
+          const costeHora = numEU(row.hourly_cost) ?? (emp?.coste_hora || null)
           const overnight = parseHM(row.end_time) <= parseHM(row.start_time) ? 1 : 0
           const horasPlan = netHours({
             fecha: row.date, start_time: row.start_time, end_time: row.end_time,
-            break_minutes: row.break_minutes ? parseInt(row.break_minutes) : 0,
+            break_minutes: intEU(row.break_minutes) ?? 0,
             coste_hora: costeHora, rol: row.role || null, site_id: row.site_id || null,
           })
           insertTurno.run(
@@ -76,7 +97,7 @@ export async function POST(req: NextRequest) {
             row.date,
             row.start_time,
             row.end_time,
-            row.break_minutes ? parseInt(row.break_minutes) : 0,
+            intEU(row.break_minutes) ?? 0,
             horasPlan,
             costeHora,
             row.source || 'csv',
@@ -85,7 +106,8 @@ export async function POST(req: NextRequest) {
           inserted++
         } else if (type === 'ventas_franja') {
           if (!row.date || !row.timeslot_start || !row.timeslot_end) {
-            errors.push({ row: idx + 1, reason: 'Faltan date/timeslot_start/timeslot_end' })
+            const faltan = [!row.date && 'fecha', !row.timeslot_start && 'inicio de franja', !row.timeslot_end && 'fin de franja'].filter(Boolean).join(', ')
+            errors.push({ row: idx + 1, reason: `Faltan campos obligatorios: ${faltan}` })
             return
           }
           insertVenta.run(
@@ -95,10 +117,10 @@ export async function POST(req: NextRequest) {
             row.timeslot_start,
             row.timeslot_end,
             row.channel || 'Sala',
-            row.sales_net ? parseFloat(row.sales_net) : 0,
-            row.covers ? parseInt(row.covers) : null,
-            row.orders ? parseInt(row.orders) : null,
-            row.tickets ? parseInt(row.tickets) : null,
+            numEU(row.sales_net) ?? 0,
+            intEU(row.covers),
+            intEU(row.orders),
+            intEU(row.tickets),
             row.source || 'csv',
           )
           inserted++

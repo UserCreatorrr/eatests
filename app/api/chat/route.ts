@@ -2,6 +2,7 @@ import { openai } from '@/lib/openai'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
+import { COSTE_LINEA_SQL, foodCost, unitFactor } from '@/lib/foodcost'
 
 export const dynamic = 'force-dynamic'
 
@@ -609,11 +610,7 @@ const tools: any[] = [
 function checkFoodCostImpact(userId: string, ingredienteName: string): string {
   const afectadas = db.prepare(`
     SELECT r.nombre, r.precio_venta,
-           ROUND(SUM(
-             CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
-                  WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
-                  ELSE 0 END
-           ), 4) AS coste_total
+           ROUND(SUM(${COSTE_LINEA_SQL}), 4) AS coste_total
     FROM escandallo_receta r
     JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
     LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
@@ -991,7 +988,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const fcProyectado: { receta: string; pct_actual: number; pct_30: number; pct_60: number; ingrediente_top: string | null }[] = []
     for (const r of recetas) {
       const lineas = db.prepare(`
-        SELECT l.ingrediente_id, l.cantidad, l.coste_unitario, i.cost
+        SELECT l.ingrediente_id, l.cantidad, l.unidad, l.coste_unitario, i.cost, i.unit AS ing_unit
         FROM escandallo_lineas l
         LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
         WHERE l.receta_id=? AND l.user_id=?
@@ -1001,7 +998,8 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       let topImpacto = { nombre: '', delta: 0 }
       for (const l of lineas) {
         const costoBase = (l.ingrediente_id && l.cost != null) ? l.cost : (l.coste_unitario ?? 0)
-        const cant = l.cantidad || 0
+        // Normalizar cantidad a la unidad del coste (g→kg, ml→l, etc.)
+        const cant = (l.cantidad || 0) * (l.ingrediente_id ? unitFactor(l.unidad, l.ing_unit) : 1)
         costeActual += costoBase * cant
         const trend = l.ingrediente_id ? ingrTrends[l.ingrediente_id] : null
         const c30 = trend ? Math.max(0, costoBase + trend.pendientePorDia * 30) : costoBase
@@ -1014,8 +1012,8 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       const pctActual = (costeActual / r.precio_venta) * 100
       const pct30 = (coste30 / r.precio_venta) * 100
       const pct60 = (coste60 / r.precio_venta) * 100
-      // Solo alertar si cruza umbral 33% en 60 días o ya está subiendo >3 puntos
-      if (pct60 >= 33 && pct60 - pctActual >= 2) {
+      // Solo alertar si cruza umbral 33% en 60 días, sube >2pts y la cifra es coherente (<=300%)
+      if (pct60 >= 33 && pct60 <= 300 && pct60 - pctActual >= 2) {
         fcProyectado.push({
           receta: r.nombre,
           pct_actual: Math.round(pctActual),
@@ -1259,7 +1257,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     }
     const subidas = Object.entries(precMap).filter(([, v]) => v.first > 0 && ((v.last - v.first) / v.first) > 0.05).sort((a, b) => ((b[1].last - b[1].first) / b[1].first) - ((a[1].last - a[1].first) / a[1].first)).slice(0, 4)
 
-    const recetasCrit = db.prepare(`SELECT r.nombre, r.precio_venta, ROUND(SUM(CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad*i.cost WHEN l.coste_unitario IS NOT NULL THEN l.cantidad*l.coste_unitario ELSE 0 END),4) AS coste FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id AND l.user_id=r.user_id LEFT JOIN ingredientes i ON i.id=l.ingrediente_id WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0 GROUP BY r.id HAVING CAST(coste AS REAL)/r.precio_venta>0.35 ORDER BY CAST(coste AS REAL)/r.precio_venta DESC LIMIT 4`).all(userId) as any[]
+    const recetasCrit = db.prepare(`SELECT r.nombre, r.precio_venta, ROUND(SUM(${COSTE_LINEA_SQL}),4) AS coste FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id AND l.user_id=r.user_id LEFT JOIN ingredientes i ON i.id=l.ingrediente_id WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0 GROUP BY r.id HAVING CAST(coste AS REAL)/r.precio_venta>0.35 AND CAST(coste AS REAL)/r.precio_venta<=3 ORDER BY CAST(coste AS REAL)/r.precio_venta DESC LIMIT 4`).all(userId) as any[]
 
     const semana = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
     return `__INFORME_SEMANAL__${JSON.stringify({
@@ -1380,11 +1378,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const umbral = (args.umbral_pct || 33) / 100
     const recetas = db.prepare(`
       SELECT r.id, r.nombre, r.precio_venta, r.raciones,
-             ROUND(SUM(
-               CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
-                    WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
-                    ELSE 0 END
-             ), 4) AS coste_total
+             ROUND(SUM(${COSTE_LINEA_SQL}), 4) AS coste_total
       FROM escandallo_receta r
       JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
       LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
@@ -1396,12 +1390,13 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     if (!recetas.length) return 'No hay recetas con precio de venta definido.'
 
     const enriched = recetas.map((r: any) => {
-      const pct = Math.round((r.coste_total / r.precio_venta) * 100)
-      const pvSugerido = r.coste_total > 0 ? Math.ceil((r.coste_total / 0.30) * 100) / 100 : null
+      const fc = foodCost(r.coste_total, r.precio_venta)
       const nivel: 'critico' | 'revisar' | 'aceptable' | 'excelente' =
-        pct > 40 ? 'critico' : pct > 33 ? 'revisar' : pct > 28 ? 'aceptable' : 'excelente'
-      return { id: r.id, nombre: r.nombre, coste: r.coste_total, pvp: r.precio_venta, pct, pvSugerido, nivel }
-    })
+        fc.nivel === 'critico' ? 'critico' : fc.nivel === 'revisar' ? 'revisar' : fc.nivel === 'saludable' ? 'aceptable' : 'excelente'
+      return { id: r.id, nombre: r.nombre, coste: fc.coste_total, pvp: r.precio_venta, pct: fc.food_cost_pct ?? 0, pvSugerido: fc.pvp_sugerido, nivel, valido: fc.valido }
+    }).filter((r: any) => r.valido)  // no mostrar recetas con cifras incoherentes
+
+    if (!enriched.length) return 'No hay recetas con datos de coste coherentes. Revisa unidades y costes de los ingredientes.'
 
     return `__FOOD_COST_CARDS__${JSON.stringify({ recetas: enriched, umbral_pct: Math.round(umbral * 100) })}`
   }

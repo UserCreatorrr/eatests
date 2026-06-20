@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
+import { COSTE_LINEA_SQL } from '@/lib/foodcost'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,17 +75,14 @@ export async function GET(req: NextRequest) {
   // ── FOOD COST CRÍTICO ─────────────────────────────────────
   const recetasCriticas = db.prepare(`
     SELECT r.nombre, r.precio_venta,
-           ROUND(SUM(
-             CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
-                  WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
-                  ELSE 0 END
-           ), 4) AS coste_total
+           ROUND(SUM(${COSTE_LINEA_SQL}), 4) AS coste_total
     FROM escandallo_receta r
     JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
     LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
     WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0
     GROUP BY r.id
     HAVING CAST(coste_total AS REAL) / r.precio_venta > 0.33
+       AND CAST(coste_total AS REAL) / r.precio_venta <= 3
     ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
     LIMIT 5
   `).all(uid) as any[]

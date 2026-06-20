@@ -30,23 +30,76 @@ export default function TurnosPage() {
 
   const availableFields = tab === 'turnos' ? FIELDS_TURNOS : FIELDS_VENTAS
 
+  const [sepDetectado, setSepDetectado] = useState<string>(',')
+
+  // Detecta el separador más probable (coma / punto y coma / tabulación)
+  // a partir de la línea de cabecera. Excel en español suele exportar con ';'.
+  function detectSeparator(headerLine: string): string {
+    const candidates = [',', ';', '\t', '|']
+    let best = ','; let bestCount = -1
+    for (const c of candidates) {
+      const count = headerLine.split(c).length - 1
+      if (count > bestCount) { bestCount = count; best = c }
+    }
+    return best
+  }
+
+  // Parser CSV simple con soporte de comillas (campos con el separador dentro)
+  function splitLine(line: string, sep: string): string[] {
+    const out: string[] = []
+    let cur = '', inQ = false
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++ } else inQ = !inQ }
+      else if (ch === sep && !inQ) { out.push(cur); cur = '' }
+      else cur += ch
+    }
+    out.push(cur)
+    return out.map(s => s.trim().replace(/^"|"$/g, ''))
+  }
+
   function parseCsv(text: string) {
     const lines = text.split(/\r?\n/).filter(l => l.trim())
-    if (lines.length === 0) return
-    const heads = lines[0].split(',').map(s => s.trim())
+    if (lines.length === 0) { setHeaders([]); setRows([]); return }
+    const sep = detectSeparator(lines[0])
+    setSepDetectado(sep)
+    // Normaliza decimales europeos: "1.450,80" → "1450.80" se hace en backend; aquí solo separamos columnas
+    const heads = splitLine(lines[0], sep)
     const dataRows = lines.slice(1).map(line => {
-      const cols = line.split(',').map(s => s.trim())
+      const cols = splitLine(line, sep)
       const obj: Record<string, string> = {}
       heads.forEach((h, i) => { obj[h] = cols[i] || '' })
       return obj
     })
     setHeaders(heads)
     setRows(dataRows)
-    // Auto-mapping: si el header coincide con un field, mapearlo
+    // Auto-mapping tolerante: normaliza acentos/espacios y reconoce alias comunes
+    const norm = (s: string) => s.toLowerCase().trim().replace(/[áà]/g, 'a').replace(/[éè]/g, 'e').replace(/[íì]/g, 'i').replace(/[óò]/g, 'o').replace(/[úù]/g, 'u').replace(/\s+/g, '_')
+    const ALIASES: Record<string, string> = {
+      'centro': 'site_id', 'local': 'site_id', 'site': 'site_id', 'site_id': 'site_id', 'codigo_local': 'site_id',
+      'fecha': 'date', 'date': 'date', 'dia': 'date',
+      'empleado': 'employee_name', 'nombre': 'employee_name', 'employee_name': 'employee_name', 'trabajador': 'employee_name',
+      'id_empleado': 'employee_id', 'employee_id': 'employee_id', 'codigo_empleado': 'employee_id',
+      'rol': 'role', 'role': 'role', 'puesto': 'role', 'categoria': 'role',
+      'servicio': 'area', 'area': 'area', 'turno': 'area',
+      'inicio': 'start_time', 'hora_inicio': 'start_time', 'entrada': 'start_time', 'start_time': 'start_time', 'start': 'start_time',
+      'fin': 'end_time', 'hora_fin': 'end_time', 'salida': 'end_time', 'end_time': 'end_time', 'end': 'end_time',
+      'descanso': 'break_minutes', 'break': 'break_minutes', 'break_minutes': 'break_minutes', 'pausa': 'break_minutes',
+      'coste_hora': 'hourly_cost', 'coste/hora': 'hourly_cost', 'hourly_cost': 'hourly_cost', 'precio_hora': 'hourly_cost',
+      'fuente': 'source', 'source': 'source', 'origen': 'source',
+      // ventas
+      'timeslot_start': 'timeslot_start', 'franja_inicio': 'timeslot_start',
+      'timeslot_end': 'timeslot_end', 'franja_fin': 'timeslot_end',
+      'canal': 'channel', 'channel': 'channel',
+      'ventas': 'sales_net', 'ventas_netas': 'sales_net', 'sales_net': 'sales_net', 'importe': 'sales_net', 'neto': 'sales_net',
+      'comensales': 'covers', 'covers': 'covers', 'cubiertos': 'covers',
+      'pedidos': 'orders', 'orders': 'orders',
+      'tickets': 'tickets',
+    }
     const autoMap: Record<string, string> = {}
     for (const h of heads) {
-      if (availableFields.includes(h)) autoMap[h] = h
-      else autoMap[h] = '__skip__'
+      const n = norm(h)
+      autoMap[h] = availableFields.includes(h) ? h : (ALIASES[n] && availableFields.includes(ALIASES[n]) ? ALIASES[n] : '__skip__')
     }
     setMapping(autoMap)
   }

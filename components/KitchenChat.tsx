@@ -804,7 +804,7 @@ function FacturasCard({ data }: { data: FacturasPagarData }) {
                 opacity: paying[f.id] ? 0.6 : 1,
               }}
             >
-              {paying[f.id] ? '…' : 'PAGADA'}
+              {paying[f.id] ? '…' : 'MARCAR PAGADA'}
             </button>
           </div>
         )

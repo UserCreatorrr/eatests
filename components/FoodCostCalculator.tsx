@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { unitFactor } from '@/lib/foodcost'
 
 type Linea = {
   id: number
@@ -44,6 +45,15 @@ function foodCostBadge(pct: number) {
 function effectiveCost(l: Linea): number | null {
   if (l.ingrediente_id != null) return l.ing_coste ?? l.coste_unitario
   return l.coste_unitario
+}
+
+// Subtotal de una línea normalizando la unidad de la línea contra la del ingrediente.
+// Ej: 180 g de salmón a 15,20 €/kg → 0,18 × 15,20 = 2,74 € (no 2.736 €).
+function lineSubtotal(l: Linea): number | null {
+  const cu = effectiveCost(l)
+  if (cu == null) return null
+  const factor = l.ingrediente_id != null ? unitFactor(l.unidad, l.ing_unidad) : 1
+  return l.cantidad * factor * cu
 }
 
 function priceDelta(l: Linea): number | null {
@@ -127,10 +137,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
     }))
   }
 
-  const costeTotal = lineas.reduce((sum, l) => {
-    const cu = effectiveCost(l) ?? 0
-    return sum + (l.cantidad * cu)
-  }, 0)
+  const costeTotal = lineas.reduce((sum, l) => sum + (lineSubtotal(l) ?? 0), 0)
 
   const foodCostPct = precioVenta && precioVenta > 0 ? (costeTotal / precioVenta) * 100 : null
   const margen = precioVenta != null ? precioVenta - costeTotal : null
@@ -209,7 +216,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
                 )}
                 {lineas.map(l => {
                   const cu = effectiveCost(l)
-                  const subtotal = cu != null ? l.cantidad * cu : null
+                  const subtotal = lineSubtotal(l)
                   const delta = priceDelta(l)
                   const isLive = l.ingrediente_id != null && l.ing_coste != null
                   return (

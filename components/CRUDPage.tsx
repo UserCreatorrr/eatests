@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { tk, ff } from '@/lib/design'
 
 export type FieldDef = {
@@ -30,6 +30,7 @@ const BTN: React.CSSProperties = {
 
 export default function CRUDPage({ title, entity, fields, columns }: Props) {
   const router = useRouter()
+  const pathname = usePathname()
   const [rows, setRows] = useState<any[]>([])
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -50,6 +51,17 @@ export default function CRUDPage({ title, entity, fields, columns }: Props) {
   }, [entity])
 
   useEffect(() => { load() }, [load])
+
+  // Cerrar modal con Escape (nunca deja la pantalla bloqueada)
+  useEffect(() => {
+    if (!modalOpen) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setModalOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [modalOpen])
+
+  // Cerrar modal automáticamente al cambiar de módulo/ruta
+  useEffect(() => { setModalOpen(false) }, [pathname])
 
   function openAdd() {
     setEditing(null)
@@ -157,12 +169,18 @@ export default function CRUDPage({ title, entity, fields, columns }: Props) {
       </div>
 
       {modalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(61,56,52,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }}>
+        <div
+          onMouseDown={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(61,56,52,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }}
+        >
           <div style={{ backgroundColor: tk.paper, border: `1.5px solid ${tk.iron}`, padding: 0, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ background: tk.iron, color: tk.cream, padding: '14px 24px' }}>
+            <div style={{ background: tk.iron, color: tk.cream, padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 16, color: tk.cream, margin: 0, letterSpacing: '-0.01em' }}>
                 {editing ? 'Editar registro' : `Nuevo ${title.toLowerCase().replace(/s$/, '').trim()}`}
               </h2>
+              <button onClick={() => setModalOpen(false)} aria-label="Cerrar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: tk.cream, opacity: 0.7, display: 'flex', alignItems: 'center', padding: 0 }}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
             <div style={{ padding: 28 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

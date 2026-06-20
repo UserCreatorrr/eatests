@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { openai } from '@/lib/openai'
 import { getUserFromRequest } from '@/lib/auth'
+import { lineCost } from '@/lib/foodcost'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -67,17 +68,21 @@ ${catalogoStr}
 PLATOS:
 ${platosStr}
 
-Para cada plato devuelve:
-- ingredientes con cantidad por 1 ración (en la unidad del catálogo)
-- confianza: "alta" si el ingrediente claramente forma parte del plato según su nombre, "media" si es probable, "baja" si es solo posible
-- raciones_estimadas: cuántas raciones rinde la receta base (típicamente 1)
+Para cada plato devuelve, por ingrediente:
+- "cantidad": número por 1 ración
+- "unidad": la unidad en la que expresas la cantidad. USA SIEMPRE unidades operativas de cocina:
+    · sólidos → "g" (gramos)   ej: 180 g de carne, 40 g de aceite, 5 g de sal
+    · líquidos → "ml" (mililitros)   ej: 50 ml de nata, 20 ml de vino
+    · piezas → "ud" (unidades)   ej: 1 ud de huevo, 2 ud de vieira
+- "confianza": "alta" si el ingrediente claramente forma parte del plato, "media" si es probable, "baja" si es solo posible
+Y por plato: "raciones_estimadas" (cuántas raciones rinde la receta base, típicamente 1)
 
 Reglas:
 - Solo usa ingredientes del catálogo. NO inventes.
-- Cantidades realistas en cocina profesional (ej: 180g de carne por ración, 40g aceite, 5g sal)
+- Cantidades realistas en cocina profesional. NUNCA pongas cantidades absurdas (ej: 180 kg de carne).
 - Si un plato no tiene ingredientes claros en el catálogo, devuelve "lineas": []
 
-Devuelve JSON: {"propuestas": [{"plato": "...", "lineas": [{"ingrediente": "nombre exacto del catálogo", "cantidad": número, "confianza": "alta"|"media"|"baja"}]}]}`
+Devuelve JSON: {"propuestas": [{"plato": "...", "lineas": [{"ingrediente": "nombre exacto del catálogo", "cantidad": número, "unidad": "g"|"ml"|"ud", "confianza": "alta"|"media"|"baja"}]}]}`
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -97,11 +102,13 @@ Devuelve JSON: {"propuestas": [{"plato": "...", "lineas": [{"ingrediente": "nomb
         const ing = ingredientes.find(i => i.nombre.toLowerCase() === (l.ingrediente || '').toLowerCase())
         if (!ing) return null
         const cantidad = Number(l.cantidad) || 0
-        const coste = cantidad * ing.precio_unitario
+        const unidadLinea = (l.unidad || ing.unidad || 'ud') as string
+        // Coste real normalizando la unidad de la línea (g/ml) contra la del coste (kg/l)
+        const coste = lineCost(cantidad, unidadLinea, ing.precio_unitario, ing.unidad)
         return {
           ingrediente: ing.nombre,
           cantidad,
-          unidad: ing.unidad || 'ud',
+          unidad: unidadLinea,
           precio_unitario: ing.precio_unitario,
           coste: Math.round(coste * 10000) / 10000,
           confianza: (l.confianza || 'media') as 'alta' | 'media' | 'baja',

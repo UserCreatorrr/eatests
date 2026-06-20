@@ -328,18 +328,31 @@ export function calcTurnoIdeal(input: TurnoIdealInput): IdealShiftSlot[] {
     const delta_horas = horas_plan - horas_ideales
     const delta_coste = coste_plan - coste_ideal
 
+    // Semántica clara (feedback): H Plan vs H Ideal.
+    //   H Plan = 0 y se necesitan horas        → falta cobertura (subdotación), NUNCA OK
+    //   H Plan < H Ideal (margen >0.5h)         → falta cobertura / reforzar
+    //   H Plan > H Ideal (margen >1h)           → exceso / sobreplantilla
+    //   resto                                   → cobertura correcta
     let status: IdealShiftSlot['status'] = 'ok'
-    let recomendacion = `Horas correctas para ${servicio.toLowerCase()}`
-    if (horas_plan > 0) {
-      if (delta_horas > 1) {
+    let recomendacion = `Cobertura correcta para ${servicio.toLowerCase()}`
+    if (horas_ideales <= 0.01) {
+      // No se prevén ventas → no hace falta plantilla
+      if (horas_plan > 0.5) {
         status = 'sobredotacion'
-        recomendacion = `Reduce ${round1(delta_horas)}h en ${f.slot} · ahorra ${round2(delta_coste)}€`
-      } else if (delta_horas < -0.5) {
-        status = 'subdotacion'
-        recomendacion = `Refuerza ${round1(Math.abs(delta_horas))}h en ${f.slot}`
+        recomendacion = `Sin ventas previstas: reduce ${round1(horas_plan)}h en ${f.slot} · ahorra ${round2(coste_plan)}€`
+      } else {
+        recomendacion = 'Sin actividad prevista en esta franja'
       }
-    } else {
-      recomendacion = `Planifica ${round1(horas_ideales)}h para esta franja`
+    } else if (horas_plan <= 0.01) {
+      // Hace falta plantilla pero no hay ninguna planificada → falta cobertura
+      status = 'subdotacion'
+      recomendacion = `Sin plantilla: planifica ${round1(horas_ideales)}h en ${f.slot}`
+    } else if (delta_horas > 1) {
+      status = 'sobredotacion'
+      recomendacion = `Exceso de plantilla: reduce ${round1(delta_horas)}h en ${f.slot} · ahorra ${round2(delta_coste)}€`
+    } else if (delta_horas < -0.5) {
+      status = 'subdotacion'
+      recomendacion = `Falta cobertura: refuerza ${round1(Math.abs(delta_horas))}h en ${f.slot}`
     }
 
     return {

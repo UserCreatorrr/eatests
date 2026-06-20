@@ -606,6 +606,24 @@ const tools: any[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'navegar',
+      description: 'Abre/navega a una pantalla concreta de la app cuando el usuario lo pide ("llévame a merma", "abre ingredientes", "quiero ver las facturas", "ir a turno ideal"). Solo para navegar, no para consultar datos.',
+      parameters: {
+        type: 'object',
+        properties: {
+          ruta: {
+            type: 'string',
+            description: 'Ruta destino, una de: inicio, ingredientes, almacenes, herramientas, lista-pedidos, compras, compras/pedidos, compras/albaranes, compras/facturas, proveedores, sangrado, merma, labor, labor/empleados, labor/turnos, labor/turno-ideal, productivity, productivity/franjas, analytics, alertas, ventas, reports/daily-brief, perfil',
+          },
+          etiqueta: { type: 'string', description: 'Nombre legible de la pantalla (p.ej. "Merma", "Facturas")' },
+        },
+        required: ['ruta'],
+      },
+    },
+  },
 ]
 
 function checkFoodCostImpact(userId: string, ingredienteName: string): string {
@@ -645,7 +663,42 @@ function checkFoodCostImpact(userId: string, ingredienteName: string): string {
   return lines.join('\n')
 }
 
+const NAV_ROUTES: Record<string, string> = {
+  'inicio': '/dashboard', 'dashboard': '/dashboard', 'cocina': '/dashboard',
+  'ingredientes': '/dashboard/ingredientes', 'almacenes': '/dashboard/almacenes',
+  'herramientas': '/dashboard/herramientas', 'lista-pedidos': '/dashboard/lista-pedidos',
+  'compras': '/dashboard/compras', 'compras/pedidos': '/dashboard/compras/pedidos',
+  'compras/albaranes': '/dashboard/compras/albaranes', 'compras/facturas': '/dashboard/compras/facturas',
+  'proveedores': '/dashboard/proveedores', 'sangrado': '/dashboard/sangrado', 'escandallo': '/dashboard/sangrado',
+  'merma': '/dashboard/merma', 'labor': '/dashboard/labor', 'labor/empleados': '/dashboard/labor/empleados',
+  'labor/turnos': '/dashboard/labor/turnos', 'labor/turno-ideal': '/dashboard/labor/turno-ideal',
+  'productivity': '/dashboard/productivity', 'productivity/franjas': '/dashboard/productivity/franjas',
+  'analytics': '/dashboard/analytics', 'alertas': '/dashboard/alertas', 'ventas': '/dashboard/ventas',
+  'reports/daily-brief': '/dashboard/reports/daily-brief', 'daily-brief': '/dashboard/reports/daily-brief',
+  'perfil': '/dashboard/perfil',
+}
+
+// Sugerencias de siguiente paso por acción ejecutada (proactividad)
+function suggestionsFor(actionNames: string): string[] {
+  const a = actionNames || ''
+  if (/registrar_merma/.test(a)) return ['Ver la merma del mes', '¿Qué platos usan ese ingrediente?']
+  if (/marcar_factura_pagada|listar_facturas/.test(a)) return ['¿Qué facturas vencen esta semana?', 'Resumen de gastos del mes']
+  if (/analizar_food_cost|food_cost/.test(a)) return ['¿Qué ingrediente sube el coste?', 'Compara precios entre proveedores']
+  if (/analizar_necesidades_pedido|sugerir_items|calcular_compra/.test(a)) return ['Enviar el pedido por WhatsApp', 'Ver pedidos pendientes de recibir']
+  if (/alertas_subida_precio|comparar_precios|historial_precio/.test(a)) return ['Buscar proveedor alternativo', 'Actualizar el coste del ingrediente']
+  if (/crear_ingrediente|buscar_ingrediente/.test(a)) return ['Asignar proveedor', 'Ver ingredientes más caros']
+  if (/informe_diario|informe_semanal/.test(a)) return ['¿Qué debo priorizar hoy?', 'Registrar la merma de cierre']
+  return ['Dame el brief del día', '¿Qué tengo que pedir?', '¿Qué facturas debo pagar?']
+}
+
 async function executeTool(name: string, args: any, userId: string): Promise<string> {
+  // ── NAVEGAR ────────────────────────────────────────────
+  if (name === 'navegar') {
+    const key = String(args.ruta || '').toLowerCase().trim().replace(/^\/+/, '').replace(/^dashboard\/?/, '')
+    const path = NAV_ROUTES[key] || '/dashboard'
+    return `__NAVIGATE__${JSON.stringify({ path, label: args.etiqueta || key || 'Inicio' })}`
+  }
+
   // ── INSERT helpers ─────────────────────────────────────
   const insertMap: Record<string, string> = {
     crear_ingrediente: 'ingredientes',
@@ -1808,7 +1861,10 @@ REGLAS:
 - Si el usuario YA especifica un proveedor concreto: salta a sugerir_items_pedido({proveedor_nombre}) y luego al proponer_pedido_*.
 - selector_pedido SOLO si el usuario pide explícitamente "muéstrame los proveedores" o "quiero elegir manualmente".
 - PROHIBIDO usar nombres genéricos ("carne", "pescado", "verduras", "fruta") en items de pedido. SIEMPRE nombres específicos del catálogo: "Salmón fresco (lomo)", "Solomillo de ternera", "Tomate rama madurado", etc.
-- WhatsApp INTEGRADO — SÍ PUEDES. Jamás digas que no puedes.`
+- WhatsApp INTEGRADO — SÍ PUEDES. Jamás digas que no puedes.
+- NAVEGACIÓN: si el usuario pide "llévame a / abre / ir a / muéstrame la pantalla de X", usa navegar con la ruta correcta. Para consultar datos NO navegues: usa la herramienta de consulta.
+- ENCADENA: puedes llamar a varias herramientas en secuencia para completar una tarea (consulta → actúa → confirma). Si una petición implica varios pasos, hazlos todos sin pedir permiso entre medias, y termina con un resumen breve de lo hecho.
+- Tras una acción, cierra siempre con una frase corta y útil en lenguaje natural (no dejes solo el resultado crudo).`
 
   const chatMessages: any[] = messages.map((m: any) => ({ role: m.role, content: m.content }))
 
@@ -1826,142 +1882,91 @@ REGLAS:
 
   const model = image ? 'gpt-4o' : 'gpt-4o-mini'
 
-  // ── Single API call — handles both tool detection and content ────────────
-  const response = await openai.chat.completions.create({
-    model,
-    messages: [{ role: 'system', content: systemPrompt }, ...chatMessages],
-    tools,
-    tool_choice: 'auto',
-    max_tokens: 1500,
-    temperature: 0.4,
-  })
-
-  const choice = response.choices[0]
-
-  // ── Non-tool response: return directly — no second API call ─────────────
-  if (choice.finish_reason !== 'tool_calls' || !choice.message.tool_calls) {
-    const reply = choice.message.content || ''
-    return NextResponse.json({ reply })
+  // ── Bucle agente: encadena varias herramientas hasta resolver la tarea ────
+  const TERMINAL_CARDS: Record<string, string> = {
+    '__BRIEF_CARDS__': 'briefCards', '__PEDIDO_SELECTOR__': 'pedidoSelector',
+    '__NECESIDADES_PEDIDO__': 'necesidadesPedido', '__COMPRA_SEMANAL__': 'compraSemanal',
+    '__FACTURAS_PAGAR__': 'facturasPagar', '__ALBARAN_GUARDADO__': 'albaranGuardado',
+    '__INFORME_SEMANAL__': 'informeSemanal', '__INGREDIENTES_CARDS__': 'ingredientesCards',
+    '__PROVEEDORES_CARDS__': 'proveedoresCards', '__PEDIDOS_RECIBIR_CARDS__': 'pedidosRecibirCards',
+    '__PRECIOS_ALERTA_CARDS__': 'preciosAlertaCards', '__FOOD_COST_CARDS__': 'foodCostCards',
+    '__ALERTAS_PREDICTIVAS_CARDS__': 'alertasPredictivasCards', '__WHATSAPP_PROPOSAL__': 'whatsappProposal',
+    '__NAVIGATE__': 'navigate',
   }
 
-  // ── Tool execution ───────────────────────────────────────────────────────
-  const toolCalls = choice.message.tool_calls
-  const toolNames = toolCalls.map((tc: any) => tc.function.name).join(', ')
-  const results: string[] = []
+  const convoMsgs: any[] = [{ role: 'system', content: systemPrompt }, ...chatMessages]
+  const MAX_STEPS = 5
   let emailProposal: any = null
-  let whatsappProposal: any = null
-  let briefCards: any = null
-  let pedidoSelector: any = null
-  let necesidadesPedido: any = null
-  let compraSemanal: any = null
-  let facturasPagar: any = null
   let chartData: any = null
-  let albaranGuardado: any = null
-  let informeSemanal: any = null
-  let ingredientesCards: any = null
-  let proveedoresCards: any = null
-  let pedidosRecibirCards: any = null
-  let preciosAlertaCards: any = null
-  let foodCostCards: any = null
-  let alertasPredictivasCards: any = null
+  let lastActions = ''
+  let finalReply = ''
 
-  for (const tc of toolCalls) {
-    const args = JSON.parse(tc.function.arguments)
-    const result = await executeTool(tc.function.name, args, user.id)
-    if (result.startsWith('__EMAIL_PROPOSAL__')) {
-      emailProposal = JSON.parse(result.slice('__EMAIL_PROPOSAL__'.length))
-      results.push('Propuesta de email generada.')
-    } else if (result.startsWith('__WHATSAPP_PROPOSAL__')) {
-      whatsappProposal = JSON.parse(result.slice('__WHATSAPP_PROPOSAL__'.length))
-      results.push('Propuesta de WhatsApp generada.')
-    } else if (result.startsWith('__BRIEF_CARDS__')) {
-      briefCards = JSON.parse(result.slice('__BRIEF_CARDS__'.length))
-      results.push('Brief generado.')
-    } else if (result.startsWith('__PEDIDO_SELECTOR__')) {
-      pedidoSelector = JSON.parse(result.slice('__PEDIDO_SELECTOR__'.length))
-      results.push('Selector de pedido generado.')
-    } else if (result.startsWith('__NECESIDADES_PEDIDO__')) {
-      necesidadesPedido = JSON.parse(result.slice('__NECESIDADES_PEDIDO__'.length))
-      results.push('Análisis de necesidades generado.')
-    } else if (result.startsWith('__FACTURAS_PAGAR__')) {
-      facturasPagar = JSON.parse(result.slice('__FACTURAS_PAGAR__'.length))
-      results.push('Lista de facturas pendientes generada.')
-    } else if (result.startsWith('__COMPRA_SEMANAL__')) {
-      compraSemanal = JSON.parse(result.slice('__COMPRA_SEMANAL__'.length))
-      results.push('Lista de la compra semanal generada.')
-    } else if (result.startsWith('__ALBARAN_GUARDADO__')) {
-      albaranGuardado = JSON.parse(result.slice('__ALBARAN_GUARDADO__'.length))
-      results.push('Albarán guardado.')
-    } else if (result.startsWith('__INFORME_SEMANAL__')) {
-      informeSemanal = JSON.parse(result.slice('__INFORME_SEMANAL__'.length))
-      results.push('Informe semanal generado.')
-    } else if (result.startsWith('__INGREDIENTES_CARDS__')) {
-      ingredientesCards = JSON.parse(result.slice('__INGREDIENTES_CARDS__'.length))
-      results.push('Lista de ingredientes generada.')
-    } else if (result.startsWith('__PROVEEDORES_CARDS__')) {
-      proveedoresCards = JSON.parse(result.slice('__PROVEEDORES_CARDS__'.length))
-      results.push('Lista de proveedores generada.')
-    } else if (result.startsWith('__PEDIDOS_RECIBIR_CARDS__')) {
-      pedidosRecibirCards = JSON.parse(result.slice('__PEDIDOS_RECIBIR_CARDS__'.length))
-      results.push('Pedidos pendientes generados.')
-    } else if (result.startsWith('__PRECIOS_ALERTA_CARDS__')) {
-      preciosAlertaCards = JSON.parse(result.slice('__PRECIOS_ALERTA_CARDS__'.length))
-      results.push('Alertas de precio generadas.')
-    } else if (result.startsWith('__FOOD_COST_CARDS__')) {
-      foodCostCards = JSON.parse(result.slice('__FOOD_COST_CARDS__'.length))
-      results.push('Análisis de food cost generado.')
-    } else if (result.startsWith('__ALERTAS_PREDICTIVAS_CARDS__')) {
-      alertasPredictivasCards = JSON.parse(result.slice('__ALERTAS_PREDICTIVAS_CARDS__'.length))
-      results.push('Alertas predictivas generadas.')
-    } else if (result.startsWith('__CHART__')) {
-      const parsed = JSON.parse(result.slice('__CHART__'.length))
-      chartData = parsed.chart
-      results.push(parsed.text)
-    } else {
-      results.push(result)
+  for (let step = 0; step < MAX_STEPS; step++) {
+    const resp = await openai.chat.completions.create({
+      model, messages: convoMsgs, tools, tool_choice: 'auto',
+      max_tokens: 1500, temperature: 0.4,
+    })
+    const choice = resp.choices[0]
+    const toolCalls = choice.message.tool_calls
+
+    // Sin más herramientas → respuesta final en lenguaje natural
+    if (choice.finish_reason !== 'tool_calls' || !toolCalls || toolCalls.length === 0) {
+      finalReply = choice.message.content || ''
+      break
+    }
+
+    convoMsgs.push(choice.message)
+    lastActions = toolCalls.map((tc: any) => tc.function.name).join(', ')
+
+    for (const tc of toolCalls) {
+      let result: string
+      try {
+        result = await executeTool(tc.function.name, JSON.parse(tc.function.arguments), user.id)
+      } catch (e: any) {
+        result = `Error: ${e?.message || 'fallo en la herramienta'}`
+      }
+
+      // Tarjeta/propuesta/navegación terminal → se devuelve al instante (UI interactiva)
+      const prefix = Object.keys(TERMINAL_CARDS).find(p => result.startsWith(p))
+      if (prefix) {
+        const data = JSON.parse(result.slice(prefix.length))
+        return NextResponse.json({
+          reply: '', action: lastActions, [TERMINAL_CARDS[prefix]]: data,
+          suggestions: suggestionsFor(tc.function.name),
+        })
+      }
+      // Gráfico y propuesta de email → se adjuntan a la respuesta final, no cortan el bucle
+      if (result.startsWith('__CHART__')) {
+        const parsed = JSON.parse(result.slice('__CHART__'.length))
+        chartData = parsed.chart
+        convoMsgs.push({ role: 'tool', tool_call_id: tc.id, content: parsed.text })
+        continue
+      }
+      if (result.startsWith('__EMAIL_PROPOSAL__')) {
+        emailProposal = JSON.parse(result.slice('__EMAIL_PROPOSAL__'.length))
+        convoMsgs.push({ role: 'tool', tool_call_id: tc.id, content: 'Propuesta de email generada y mostrada al usuario.' })
+        continue
+      }
+      // Resultado normal (consulta/CRUD) → se realimenta al modelo para que siga
+      convoMsgs.push({ role: 'tool', tool_call_id: tc.id, content: result })
     }
   }
 
-  // Visual cards → return immediately, no follow-up needed
-  if (briefCards)          return NextResponse.json({ reply: '', action: toolNames, briefCards })
-  if (pedidoSelector)      return NextResponse.json({ reply: '', action: toolNames, pedidoSelector })
-  if (necesidadesPedido)   return NextResponse.json({ reply: '', action: toolNames, necesidadesPedido })
-  if (compraSemanal)       return NextResponse.json({ reply: '', action: toolNames, compraSemanal })
-  if (facturasPagar)       return NextResponse.json({ reply: '', action: toolNames, facturasPagar })
-  if (albaranGuardado)     return NextResponse.json({ reply: '', action: toolNames, albaranGuardado })
-  if (informeSemanal)      return NextResponse.json({ reply: '', action: toolNames, informeSemanal })
-  if (ingredientesCards)   return NextResponse.json({ reply: '', action: toolNames, ingredientesCards })
-  if (proveedoresCards)    return NextResponse.json({ reply: '', action: toolNames, proveedoresCards })
-  if (pedidosRecibirCards) return NextResponse.json({ reply: '', action: toolNames, pedidosRecibirCards })
-  if (preciosAlertaCards)  return NextResponse.json({ reply: '', action: toolNames, preciosAlertaCards })
-  if (foodCostCards)       return NextResponse.json({ reply: '', action: toolNames, foodCostCards })
-  if (alertasPredictivasCards) return NextResponse.json({ reply: '', action: toolNames, alertasPredictivasCards })
-  if (whatsappProposal)    return NextResponse.json({ reply: '', action: toolNames, whatsappProposal })
-
-  // Simple CRUD tools → return result directly, no follow-up LLM call
-  const allSimple = toolCalls.every((tc: any) => SIMPLE_TOOLS.has(tc.function.name))
-  if (allSimple) {
-    const reply = results.join('\n')
-    return NextResponse.json({ reply, action: toolNames, emailProposal })
+  // Se agotaron los pasos sin cerrar → resumir lo hecho
+  if (!finalReply) {
+    const fin = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'system', content: FOLLOWUP_SYSTEM }, ...convoMsgs.slice(1)],
+      max_tokens: 500, temperature: 0.2,
+    })
+    finalReply = fin.choices[0]?.message?.content || 'Hecho.'
   }
 
-  // Analytical tools → follow-up with lean system prompt (not the full context)
-  const followUp = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: FOLLOWUP_SYSTEM },
-      ...chatMessages,
-      choice.message,
-      ...toolCalls.map((tc: any, i: number) => ({
-        role: 'tool' as const,
-        tool_call_id: tc.id,
-        content: results[i] || 'ok',
-      })),
-    ],
-    max_tokens: 500,
-    temperature: 0.2,
+  return NextResponse.json({
+    reply: finalReply,
+    action: lastActions || undefined,
+    emailProposal,
+    chartData: chartData || undefined,
+    suggestions: suggestionsFor(lastActions),
   })
-
-  const reply = followUp.choices[0]?.message?.content || results.join('\n')
-  return NextResponse.json({ reply, action: toolNames, emailProposal, chartData: chartData || undefined })
 }

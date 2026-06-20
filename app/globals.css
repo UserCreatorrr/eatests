@@ -129,6 +129,8 @@ h1, h2, h3, h4, h5, h6 {
 .mb-convo-del:hover { opacity: 1 !important; }
 .mb-chat-toolbtn { transition: border-color 0.12s, background 0.12s; }
 .mb-chat-toolbtn:hover { border-color: #3d3834 !important; background: rgba(61,56,52,0.04) !important; }
+.mb-suggest-chip { transition: border-color 0.12s, background 0.12s; }
+.mb-suggest-chip:hover { border-color: #3d3834 !important; background: rgba(25,249,115,0.10) !important; }
 
 /* ─── Page sections ───────────────────────────────────────────── */
 .page-header {

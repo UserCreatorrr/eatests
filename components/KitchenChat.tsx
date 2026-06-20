@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { tk, ff } from '@/lib/design'
 import { MbCard, MbRow, MbBadge, MbSparkline, MbBar, MbSection, MbTimeline } from '@/components/cards/MbCard'
 
@@ -2085,6 +2086,8 @@ export default function KitchenChat() {
   const [history, setHistory] = useState<StoredConvo[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [historyQuery, setHistoryQuery] = useState('')
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const router = useRouter()
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
@@ -2191,6 +2194,7 @@ export default function KitchenChat() {
     setMessages(history2)
     setInput('')
     setPendingImage(null)
+    setSuggestions([])
     setIsLoading(true)
     setActionMsg('')
     try {
@@ -2206,6 +2210,15 @@ export default function KitchenChat() {
 
       const json = await res.json()
       if (json.action) setActionMsg(json.action)
+      setSuggestions(Array.isArray(json.suggestions) ? json.suggestions : [])
+
+      // Navegación: la IA abre una pantalla de la app
+      if (json.navigate?.path) {
+        setMessages(prev => [...prev, { role: 'assistant', content: `Te llevo a **${json.navigate.label}** →` }])
+        setTimeout(() => router.push(json.navigate.path), 400)
+        return
+      }
+
       if (json.briefCards) {
         setMessages(prev => [...prev, { role: 'brief_cards', content: '', briefCards: json.briefCards }])
       } else if (json.pedidoSelector) {
@@ -2817,6 +2830,25 @@ export default function KitchenChat() {
                   <button onClick={() => setPendingImage(null)} style={{ position: 'absolute', top: -8, right: -8, width: 18, height: 18, background: tk.iron, color: tk.cream, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
                 </div>
                 <p style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, margin: 0, letterSpacing: '0.04em' }}>FOTO ADJUNTA</p>
+              </div>
+            )}
+            {suggestions.length > 0 && !isLoading && messages.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => send(s)}
+                    className="mb-suggest-chip"
+                    style={{
+                      fontFamily: ff.mono, fontSize: 11.5, color: tk.iron,
+                      background: tk.paper, border: `1.5px solid ${tk.iron20}`,
+                      padding: '6px 12px', cursor: 'pointer', letterSpacing: '0.01em',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    <span style={{ color: tk.appleDeep, fontWeight: 700 }}>↳</span>{s}
+                  </button>
+                ))}
               </div>
             )}
             <div style={{

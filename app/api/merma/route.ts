@@ -10,10 +10,11 @@ export async function GET(req: NextRequest) {
   const uid = user?.id ?? ''
 
   const registros = db.prepare(`
-    SELECT id, nombre, ingrediente_id, cantidad, unidad, motivo, coste_estimado, fecha, notas
+    SELECT id, nombre, ingrediente_id, cantidad, unidad, motivo, coste_estimado, fecha, notas,
+           site_id, servicio, almacen, tipo
     FROM merma_registro
     WHERE user_id = ?
-    ORDER BY fecha DESC
+    ORDER BY fecha DESC, id DESC
     LIMIT 100
   `).all(uid) as any[]
 

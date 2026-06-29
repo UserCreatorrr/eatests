@@ -26,6 +26,7 @@ const columns: ColDef[] = [
   { label: 'Fecha Recepción', render: r => r.date_reception || '-' },
   { label: 'Enviado por', render: r => r.sent_by || '-' },
   { label: 'Total', render: r => fmt(r.total), className: 'col-amount' },
+  { label: '', render: r => <a href={`/dashboard/compras/pedidos/${r.id}`} style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', color: '#0fa651', textDecoration: 'none', whiteSpace: 'nowrap' }}>Líneas →</a> },
 ]
 
 export default function PedidosCompraPage() {

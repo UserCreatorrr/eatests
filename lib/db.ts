@@ -417,6 +417,20 @@ function initSchema(db: Database.Database) {
       activo     INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    -- Líneas de producto de un pedido de compra (feedback P0: pedido sin líneas no es operativo)
+    CREATE TABLE IF NOT EXISTS pedidos_compra_lineas (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         TEXT NOT NULL REFERENCES users(id),
+      pedido_id       INTEGER NOT NULL,
+      ingrediente_id  INTEGER,
+      nombre          TEXT,                       -- denormalizado (libre o del catálogo)
+      cantidad        REAL,
+      unidad          TEXT,
+      coste_estimado  REAL,                       -- coste de la línea (cantidad normalizada × coste)
+      almacen_destino TEXT,
+      created_at      TEXT DEFAULT (datetime('now'))
+    );
   `)
 
   // Usuario admin/demo — credenciales SOLO desde entorno. Sin backdoor hardcodeado.

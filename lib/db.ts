@@ -456,6 +456,9 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE ingredientes ADD COLUMN almacen_principal TEXT`) } catch {}
   try { db.exec(`ALTER TABLE ingredientes ADD COLUMN almacen_secundario TEXT`) } catch {}
   try { db.exec(`ALTER TABLE ingredientes ADD COLUMN iva REAL`) } catch {}
+  // Subrecetas / preparaciones intermedias (feedback P1: salsas, fondos, masas, bases)
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN es_subreceta INTEGER DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_lineas ADD COLUMN subreceta_id INTEGER`) } catch {}
   // Merma: campos operativos adicionales (almacén, servicio, tipo, centro)
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN site_id TEXT`) } catch {}
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN servicio TEXT`) } catch {}

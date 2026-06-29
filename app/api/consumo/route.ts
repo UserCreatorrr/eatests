@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
+import { unitFactor } from '@/lib/foodcost'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,8 +27,12 @@ export async function GET(req: NextRequest) {
     `).all(r.id, uid) as any[]
 
     const coste_ingredientes = lineas.reduce((sum, l) => {
-      const cost = l.coste_unitario ?? l.ingrediente_cost ?? 0
-      return sum + (l.cantidad * cost)
+      // Coste conectado normalizando unidad de línea vs unidad del ingrediente (g→kg, ml→l)
+      const cost = l.ingrediente_id != null
+        ? (l.ingrediente_cost ?? l.coste_unitario ?? 0)
+        : (l.coste_unitario ?? 0)
+      const factor = l.ingrediente_id != null ? unitFactor(l.unidad, l.ingrediente_unit) : 1
+      return sum + (l.cantidad * factor * cost)
     }, 0)
 
     const merma_factor = r.merma_pct ? (1 + r.merma_pct / 100) : 1

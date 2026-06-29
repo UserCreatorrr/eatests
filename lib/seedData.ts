@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { categoriaEstandar, almacenPorCategoria, ivaPorCategoria } from './catalog'
 
 export function seedDemoData(db: Database.Database, uid: string) {
   const fmt = (d: Date) => d.toISOString().split('T')[0]
@@ -171,20 +172,13 @@ export function seedDemoData(db: Database.Database, uid: string) {
     { codi:'ING091', descr:'Tomillo fresco (manojo)',       type:'Hierba',      unit:'ud', cost:0.60  },
     { codi:'ING092', descr:'Albahaca fresca (maceta)',      type:'Hierba',      unit:'ud', cost:1.90  },
   ]
-  // Almacén operativo por familia de ingrediente
-  const almacenPorTipo: Record<string, string> = {
-    'Pescado': 'Nevera', 'Marisco': 'Nevera', 'Carne': 'Nevera', 'Charcutería': 'Nevera',
-    'Lácteo': 'Nevera', 'Verdura': 'Nevera', 'Fruta': 'Nevera', 'Hierba': 'Nevera', 'Hongo': 'Nevera', 'Huevo': 'Nevera',
-    'Congelado': 'Congelador',
-    'Seco': 'Seco / Despensa', 'Harina': 'Seco / Despensa', 'Cereal': 'Seco / Despensa', 'Legumbre': 'Seco / Despensa',
-    'Aceite': 'Seco / Despensa', 'Conserva': 'Seco / Despensa', 'Especia': 'Seco / Despensa', 'Pasta': 'Seco / Despensa',
-    'Bebida': 'Bodega', 'Vino': 'Bodega', 'Licor': 'Bodega',
-    'Repostería': 'Seco / Despensa', 'Pan': 'Seco / Despensa',
-  }
+  // Categoría estándar + almacén real + IVA por ingrediente (master data limpio)
   for (const i of ingredientes) {
-    const alm = almacenPorTipo[i.type] || (i.unit === 'l' ? 'Bodega' : 'Seco / Despensa')
-    db.prepare(`INSERT INTO ingredientes (user_id,codi,descr,type,unit,cost,has_data,almacen_principal) VALUES (?,?,?,?,?,?,1,?)`)
-      .run(uid,i.codi,i.descr,i.type,i.unit,i.cost,alm)
+    const categoria = categoriaEstandar(i.type)
+    const alm = almacenPorCategoria(categoria)
+    const iva = ivaPorCategoria(categoria)
+    db.prepare(`INSERT INTO ingredientes (user_id,codi,descr,type,unit,cost,has_data,almacen_principal,iva) VALUES (?,?,?,?,?,?,1,?,?)`)
+      .run(uid,i.codi,i.descr,categoria,i.unit,i.cost,alm,iva)
   }
 
   const ingProvMap: Record<string, string> = {

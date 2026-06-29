@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { tk, ff } from '@/lib/design'
+import { ALMACENES } from '@/lib/catalog'
 
 interface Ingrediente { id: number; descr: string; unit: string | null; cost: number | null }
 interface Registro {
@@ -14,7 +15,6 @@ interface Registro {
 
 const MOTIVOS = ['caducidad', 'sobreproducción', 'error cocina', 'devolución', 'mala recepción', 'rotura', 'staff meal', 'otro']
 const SERVICIOS = ['Desayuno', 'Comida', 'Cena', 'Entre servicios', 'Prep']
-const ALMACENES = ['Nevera', 'Congelador', 'Seco / Despensa', 'Barra', 'Cocina caliente', 'Cocina fría', 'Bodega']
 const UNIDADES = ['kg', 'g', 'l', 'ml', 'ud']
 
 const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)

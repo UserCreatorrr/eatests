@@ -441,6 +441,7 @@ function initSchema(db: Database.Database) {
   // Almacenes / ubicación operativa (feedback): cada ingrediente vive en un almacén
   try { db.exec(`ALTER TABLE ingredientes ADD COLUMN almacen_principal TEXT`) } catch {}
   try { db.exec(`ALTER TABLE ingredientes ADD COLUMN almacen_secundario TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE ingredientes ADD COLUMN iva REAL`) } catch {}
   // Merma: campos operativos adicionales (almacén, servicio, tipo, centro)
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN site_id TEXT`) } catch {}
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN servicio TEXT`) } catch {}

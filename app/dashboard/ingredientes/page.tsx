@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { CATEGORIAS_INGREDIENTE, ALMACENES, TIPOS_IVA, ivaPorCategoria, almacenPorCategoria } from '@/lib/catalog'
 
 type Ingrediente = {
   id: number
@@ -8,13 +9,12 @@ type Ingrediente = {
   type: string | null
   unit: string | null
   cost: number | null
+  iva: number | null
   proveedor_id: number | null
   proveedor_nombre: string | null
   almacen_principal: string | null
   almacen_secundario: string | null
 }
-
-const ALMACENES = ['Nevera', 'Congelador', 'Seco / Despensa', 'Barra', 'Cocina caliente', 'Cocina fría', 'Bodega']
 
 type Proveedor = {
   id: number
@@ -82,7 +82,7 @@ export default function IngredientesPage() {
 
   function openEdit(r: Ingrediente) {
     setEditingId(r.id)
-    setForm({ codi: r.codi || '', descr: r.descr || '', type: r.type || '', unit: r.unit || '', cost: r.cost ?? undefined, almacen_principal: r.almacen_principal || '', almacen_secundario: r.almacen_secundario || '' })
+    setForm({ codi: r.codi || '', descr: r.descr || '', type: r.type || '', unit: r.unit || '', cost: r.cost ?? undefined, iva: r.iva ?? undefined, almacen_principal: r.almacen_principal || '', almacen_secundario: r.almacen_secundario || '' })
     setMsg('')
     setModalOpen(true)
   }
@@ -90,7 +90,11 @@ export default function IngredientesPage() {
   async function save() {
     setSaving(true)
     setMsg('')
-    const body = { ...form, cost: form.cost !== undefined && form.cost !== null ? Number(form.cost) : null }
+    const body = {
+      ...form,
+      cost: form.cost !== undefined && form.cost !== null && (form.cost as any) !== '' ? Number(form.cost) : null,
+      iva: form.iva !== undefined && form.iva !== null && (form.iva as any) !== '' ? Number(form.iva) : null,
+    }
     const url = editingId ? `/api/data/ingredientes/${editingId}` : '/api/data/ingredientes'
     const method = editingId ? 'PUT' : 'POST'
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -140,7 +144,7 @@ export default function IngredientesPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#ece4d8' }}>
-                {['Código', 'Nombre', 'Tipo', 'Unidad', 'Coste', 'Almacén', 'Proveedor', ''].map(h => (
+                {['Código', 'Nombre', 'Categoría', 'Unidad', 'Coste', 'IVA', 'Almacén', 'Proveedor', ''].map(h => (
                   <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, fontWeight: 600, borderBottom: '1px solid #e8e2db', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -153,6 +157,7 @@ export default function IngredientesPage() {
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45 }}>{ing.type || '-'}</td>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834' }}>{ing.unit || '-'}</td>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', whiteSpace: 'nowrap' }}>{fmt(ing.cost)}</td>
+                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#6c635a', whiteSpace: 'nowrap' }}>{ing.iva != null ? `${ing.iva}%` : '-'}</td>
                   <td style={{ padding: '8px 14px', whiteSpace: 'nowrap' }}>
                     {ing.almacen_principal ? (
                       <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, padding: '2px 8px', backgroundColor: '#ece4d8', color: '#6c635a', border: '1px solid #c4b8a8' }}>{ing.almacen_principal}</span>
@@ -226,33 +231,75 @@ export default function IngredientesPage() {
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Texto: código, nombre */}
               {[
                 { key: 'codi', label: 'Código' },
                 { key: 'descr', label: 'Nombre' },
-                { key: 'type', label: 'Familia / categoría' },
-                { key: 'unit', label: 'Unidad base' },
-                { key: 'cost', label: 'Coste (EUR)', type: 'number' },
               ].map(f => (
                 <div key={f.key}>
-                  <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, display: 'block', marginBottom: 5 }}>{f.label}</label>
+                  <label style={labelStyle}>{f.label}</label>
                   <input
-                    type={f.type || 'text'}
+                    type="text"
                     value={(form as any)[f.key] ?? ''}
                     onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 0, border: '1.5px solid #c4b8a8', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#dfd5c9' }}
+                    style={fieldStyle}
                     onFocus={e => e.currentTarget.style.borderColor = '#3d3834'}
                     onBlur={e => e.currentTarget.style.borderColor = '#c4b8a8'}
                   />
                 </div>
               ))}
-              {/* Almacenes (feedback: ubicación operativa obligatoria) */}
+
+              {/* Categoría: desplegable estándar. Al elegir, autocompleta IVA y almacén si están vacíos. */}
+              <div>
+                <label style={labelStyle}>Categoría</label>
+                <select
+                  value={(form as any).type ?? ''}
+                  onChange={e => {
+                    const cat = e.target.value
+                    setForm(prev => ({
+                      ...prev,
+                      type: cat,
+                      iva: (prev as any).iva ?? (cat ? ivaPorCategoria(cat) : undefined),
+                      almacen_principal: (prev as any).almacen_principal || (cat ? almacenPorCategoria(cat) : ''),
+                    }))
+                  }}
+                  style={{ ...fieldStyle, cursor: 'pointer' }}
+                >
+                  <option value="">— seleccionar categoría —</option>
+                  {CATEGORIAS_INGREDIENTE.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              {/* Unidad + Coste + IVA en una fila */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={labelStyle}>Unidad base</label>
+                  <input type="text" value={(form as any).unit ?? ''} onChange={e => setForm(prev => ({ ...prev, unit: e.target.value }))}
+                    placeholder="kg, l, ud" style={fieldStyle} onFocus={e => e.currentTarget.style.borderColor = '#3d3834'} onBlur={e => e.currentTarget.style.borderColor = '#c4b8a8'} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Coste (€)</label>
+                  <input type="number" step="0.0001" value={(form as any).cost ?? ''} onChange={e => setForm(prev => ({ ...prev, cost: e.target.value as any }))}
+                    style={fieldStyle} onFocus={e => e.currentTarget.style.borderColor = '#3d3834'} onBlur={e => e.currentTarget.style.borderColor = '#c4b8a8'} />
+                </div>
+                <div>
+                  <label style={labelStyle}>IVA</label>
+                  <select value={(form as any).iva ?? ''} onChange={e => setForm(prev => ({ ...prev, iva: e.target.value === '' ? undefined : Number(e.target.value) as any }))}
+                    style={{ ...fieldStyle, cursor: 'pointer' }}>
+                    <option value="">—</option>
+                    {TIPOS_IVA.map(v => <option key={v} value={v}>{v}%</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Almacenes (ubicaciones reales) */}
               {([['almacen_principal', 'Almacén principal'], ['almacen_secundario', 'Almacén secundario (opcional)']] as const).map(([key, label]) => (
                 <div key={key}>
-                  <label style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, display: 'block', marginBottom: 5 }}>{label}</label>
+                  <label style={labelStyle}>{label}</label>
                   <select
                     value={(form as any)[key] ?? ''}
                     onChange={e => setForm(prev => ({ ...prev, [key]: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 0, border: '1.5px solid #c4b8a8', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#dfd5c9', cursor: 'pointer' }}
+                    style={{ ...fieldStyle, cursor: 'pointer' }}
                   >
                     <option value="">— sin asignar —</option>
                     {ALMACENES.map(a => <option key={a} value={a}>{a}</option>)}
@@ -275,3 +322,6 @@ export default function IngredientesPage() {
     </div>
   )
 }
+
+const labelStyle: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 9.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9a8f82', display: 'block', marginBottom: 5 }
+const fieldStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 0, border: '1.5px solid #c4b8a8', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#dfd5c9' }

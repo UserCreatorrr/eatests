@@ -45,6 +45,7 @@ const sidebarGroups: NavGroup[] = [
       {
         href: '/dashboard/compras', label: 'Compras', icon: I.cart,
         children: [
+          { href: '/dashboard/compras/escaneo', label: 'Escanear + validar' },
           { href: '/dashboard/compras/pedidos', label: 'Pedidos' },
           { href: '/dashboard/compras/albaranes', label: 'Albaranes' },
           { href: '/dashboard/compras/facturas', label: 'Facturas' },

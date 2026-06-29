@@ -1,30 +1,24 @@
 'use client'
 import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
 
+// Formulario lean (feedback): solo lo esencial. Campos técnicos (defecte,
+// has_other, email CC, contacto/teléfono/email aux) ocultos del MVP.
 const fields: FieldDef[] = [
-  { key: 'codi', label: 'Codigo' },
   { key: 'descr', label: 'Nombre' },
-  { key: 'descr_type', label: 'Tipo' },
-  { key: 'nif', label: 'NIF' },
-  { key: 'alt_descr', label: 'Nombre alternativo' },
-  { key: 'comment', label: 'Comentario' },
-  { key: 'address', label: 'Direccion' },
-  { key: 'city', label: 'Ciudad' },
-  { key: 'cp', label: 'CP' },
-  { key: 'contact', label: 'Contacto' },
+  { key: 'nif', label: 'NIF / CIF' },
+  { key: 'descr_type', label: 'Tipo / categoría' },
+  { key: 'contact', label: 'Contacto principal' },
   { key: 'phone', label: 'Teléfono' },
   { key: 'mail', label: 'Email' },
-  { key: 'contact_aux', label: 'Contacto aux.' },
-  { key: 'phone_aux', label: 'Teléfono aux.' },
-  { key: 'mail_aux', label: 'Email aux.' },
-  { key: 'mailcc', label: 'Email CC' },
-  { key: 'web', label: 'Web' },
-  { key: 'defecte', label: 'Por defecto (1=si)', type: 'number' },
-  { key: 'has_other', label: 'Tiene otros (1=si)', type: 'number' },
+  // Opcionales
+  { key: 'address', label: 'Dirección (opcional)' },
+  { key: 'city', label: 'Ciudad (opcional)' },
+  { key: 'cp', label: 'CP (opcional)' },
+  { key: 'web', label: 'Web (opcional)' },
+  { key: 'comment', label: 'Notas (opcional)' },
 ]
 
 const columns: ColDef[] = [
-  { label: 'Codigo', render: r => r.codi || '-', className: 'col-mono' },
   { label: 'Nombre', render: r => r.descr || '-', className: 'col-main' },
   { label: 'Tipo', render: r => r.descr_type || '-' },
   { label: 'NIF', render: r => r.nif || '-', className: 'col-mono' },
@@ -32,7 +26,6 @@ const columns: ColDef[] = [
   { label: 'Contacto', render: r => r.contact || '-' },
   { label: 'Teléfono', render: r => r.phone || '-' },
   { label: 'Email', render: r => r.mail || '-' },
-  { label: 'Por defecto', render: r => r.defecte ? <span className="badge badge-green">Sí</span> : <span className="badge badge-gray">No</span> },
 ]
 
 export default function ProveedoresPage() {

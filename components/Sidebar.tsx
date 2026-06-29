@@ -41,8 +41,7 @@ const sidebarGroups: NavGroup[] = [
     items: [
       { href: '/dashboard/ingredientes', label: 'Ingredientes', icon: I.ingr },
       { href: '/dashboard/almacenes', label: 'Almacenes', icon: I.almacen },
-      { href: '/dashboard/herramientas', label: 'Herramientas', icon: I.tools },
-      { href: '/dashboard/lista-pedidos', label: 'Lista Pedidos', icon: I.list },
+      { href: '/dashboard/lista-pedidos', label: 'Plantillas de pedido', icon: I.list },
       {
         href: '/dashboard/compras', label: 'Compras', icon: I.cart,
         children: [

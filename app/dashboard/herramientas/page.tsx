@@ -8,7 +8,7 @@ const fields: FieldDef[] = [
   { key: 'unit', label: 'Unidad' },
   { key: 'id_unit', label: 'ID Unidad', type: 'number' },
   { key: 'cost', label: 'Coste (EUR)', type: 'number' },
-  { key: 'has_data', label: 'Tiene datos (1=si)', type: 'number' },
+  
 ]
 
 function fmt(v: number | null) {

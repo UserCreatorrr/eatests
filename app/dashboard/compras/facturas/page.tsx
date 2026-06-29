@@ -16,8 +16,8 @@ const fields: FieldDef[] = [
   { key: 'base', label: 'Base (EUR)', type: 'number' },
   { key: 'taxes', label: 'IVA (EUR)', type: 'number' },
   { key: 'total', label: 'Total (EUR)', type: 'number' },
-  { key: 'paid', label: 'Pagada (1=sí)', type: 'number' },
-  { key: 'validated', label: 'Validada (1=sí)', type: 'number' },
+  { key: 'paid', label: 'Pagada (1=sí, 0=no)', type: 'number' },
+  { key: 'validated', label: 'Validada (1=sí, 0=no)', type: 'number' },
   { key: 'comment', label: 'Comentario' },
 ]
 

@@ -2,7 +2,7 @@
 import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
 
 const fields: FieldDef[] = [
-  { key: 'delivery_num', label: 'Nº Albaran' },
+  { key: 'delivery_num', label: 'Nº Albarán (vacío = automático)' },
   { key: 'vendor', label: 'Proveedor' },
   { key: 'code_vendor', label: 'Cod. Proveedor' },
   { key: 'nif', label: 'NIF' },

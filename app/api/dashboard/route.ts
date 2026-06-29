@@ -211,5 +211,26 @@ export async function GET(req: NextRequest) {
     })
   }
 
+  // ── DATA QUALITY · master data incompleto (feedback P0: pendientes visibles) ──
+  const sinProveedor  = (db.prepare(`SELECT COUNT(*) as c FROM ingredientes WHERE user_id=? AND (proveedor_id IS NULL)`).get(uid) as any)?.c ?? 0
+  const sinCategoria  = (db.prepare(`SELECT COUNT(*) as c FROM ingredientes WHERE user_id=? AND (type IS NULL OR type='')`).get(uid) as any)?.c ?? 0
+  const sinAlmacen    = (db.prepare(`SELECT COUNT(*) as c FROM ingredientes WHERE user_id=? AND (almacen_principal IS NULL OR almacen_principal='')`).get(uid) as any)?.c ?? 0
+  const pendientes: string[] = []
+  if (sinProveedor > 0) pendientes.push(`${sinProveedor} sin proveedor`)
+  if (sinCategoria > 0) pendientes.push(`${sinCategoria} sin categoría`)
+  if (sinAlmacen > 0)   pendientes.push(`${sinAlmacen} sin almacén`)
+  if (pendientes.length > 0) {
+    cards.push({
+      id: 'data_quality',
+      tipo: 'warning',
+      titulo: 'Datos de ingredientes incompletos',
+      detalle: 'Bloquean cálculos y pedidos automáticos',
+      items: pendientes,
+      mas: 0,
+      link: '/dashboard/ingredientes',
+      cta: 'Revisar ingredientes',
+    })
+  }
+
   return NextResponse.json({ cards, generado: new Date().toISOString() })
 }

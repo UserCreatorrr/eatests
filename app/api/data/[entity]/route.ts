@@ -90,6 +90,9 @@ export async function POST(
   // UUID solo para tablas con id TEXT; las de id INTEGER usan autoincrement.
   if (!fields.id && idIsText(table)) fields.id = randomUUID()
 
+  // Nº de pedido/albarán/factura autogenerado si el usuario no lo aporta (feedback P0)
+  autoGenerarNumero(table, fields, user.id)
+
   if (Object.keys(fields).length === 0) {
     return NextResponse.json({ error: 'Sin datos válidos' }, { status: 400 })
   }
@@ -102,4 +105,24 @@ export async function POST(
   stmt.run(...values)
 
   return NextResponse.json({ ok: true, id: fields.id })
+}
+
+// Autogenera el número de documento si el usuario no lo ha rellenado.
+// Formato: PREFIJO-YYYYMMDD-NNN (contador diario por usuario).
+function autoGenerarNumero(table: string, fields: Record<string, unknown>, userId: string) {
+  const config: Record<string, { col: string; prefix: string }> = {
+    pedidos_compra:   { col: 'num_order',    prefix: 'PED' },
+    albaranes_compra: { col: 'delivery_num', prefix: 'ALB' },
+    facturas_compra:  { col: 'invoice_num',  prefix: 'FAC' },
+  }
+  const cfg = config[table]
+  if (!cfg) return
+  const actual = fields[cfg.col]
+  if (actual != null && String(actual).trim() !== '') return  // respeta el valor manual
+
+  const hoy = new Date()
+  const ymd = `${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, '0')}${String(hoy.getDate()).padStart(2, '0')}`
+  const like = `${cfg.prefix}-${ymd}-%`
+  const n = (db.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE user_id=? AND ${cfg.col} LIKE ?`).get(userId, like) as any)?.c ?? 0
+  fields[cfg.col] = `${cfg.prefix}-${ymd}-${String(n + 1).padStart(3, '0')}`
 }

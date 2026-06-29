@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
 
 const fields: FieldDef[] = [
-  { key: 'invoice_num', label: 'Nº Factura' },
+  { key: 'invoice_num', label: 'Nº Factura (vacío = automático)' },
   { key: 'document_num', label: 'Nº Documento' },
   { key: 'vendor', label: 'Proveedor' },
   { key: 'code_vendor', label: 'Cód. Proveedor' },

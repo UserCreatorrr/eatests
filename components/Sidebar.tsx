@@ -54,7 +54,7 @@ const sidebarGroups: NavGroup[] = [
         href: '/dashboard/proveedores', label: 'Proveedores', icon: I.vendor,
         children: [
           { href: '/dashboard/proveedores', label: 'Lista' },
-          { href: '/dashboard/proveedores/detalles', label: 'Detalles' },
+          { href: '/dashboard/proveedores/detalles', label: 'Fichas' },
         ],
       },
       { href: '/dashboard/sangrado', label: 'Escandallo / Sangrado', icon: I.recipe },

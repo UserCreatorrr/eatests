@@ -26,6 +26,7 @@ const columns: ColDef[] = [
   { label: 'Contacto', render: r => r.contact || '-' },
   { label: 'Teléfono', render: r => r.phone || '-' },
   { label: 'Email', render: r => r.mail || '-' },
+  { label: '', render: r => <a href={`/dashboard/proveedores/${r.id}`} style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', color: '#0fa651', textDecoration: 'none', whiteSpace: 'nowrap' }}>Ver ficha →</a> },
 ]
 
 export default function ProveedoresPage() {

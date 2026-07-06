@@ -31,7 +31,7 @@ export default function DocumentoDetallePage() {
   const backHref = esFactura ? '/dashboard/compras/facturas' : '/dashboard/compras/albaranes'
 
   return (
-    <div style={{ padding: '32px 36px 60px', maxWidth: 1080 }}>
+    <div style={{ padding: '32px 36px 60px' }}>
       <Link href={backHref} style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, textDecoration: 'none' }}>
         ← {esFactura ? 'Facturas' : 'Albaranes'}
       </Link>

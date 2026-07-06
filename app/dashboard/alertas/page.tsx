@@ -156,7 +156,7 @@ export default function AlertasPage() {
       </div>
 
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 720 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[1, 2, 3].map(i => (
             <div key={i} style={{ height: 80, backgroundColor: '#f5f2ee', borderRadius: 0, opacity: 0.5 }} />
           ))}
@@ -164,7 +164,7 @@ export default function AlertasPage() {
       ) : alertas.length === 0 ? (
         <div style={{
           backgroundColor: '#d6f9e0', border: '1.5px solid #0fa651', borderRadius: 0,
-          padding: '24px 28px', maxWidth: 720, display: 'flex', gap: 14, alignItems: 'center',
+          padding: '24px 28px', display: 'flex', gap: 14, alignItems: 'center',
         }}>
           <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#0fa651', flexShrink: 0 }} />
           <div>
@@ -177,7 +177,7 @@ export default function AlertasPage() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {alertas.map((a, i) => (
             <div
               key={i}

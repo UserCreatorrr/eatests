@@ -30,7 +30,7 @@ export default function ProveedorFichaPage() {
   const t = data.totals
 
   return (
-    <div style={{ padding: '32px 36px 60px', maxWidth: 1100 }}>
+    <div style={{ padding: '32px 36px 60px' }}>
       {/* Volver */}
       <Link href="/dashboard/proveedores" style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, textDecoration: 'none', letterSpacing: '0.04em' }}>← Proveedores</Link>
 

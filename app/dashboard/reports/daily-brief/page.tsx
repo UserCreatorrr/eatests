@@ -60,7 +60,7 @@ export default function DailyBriefPage() {
   const urgenciaBg = (u: 'crit' | 'warn' | 'info') => u === 'crit' ? tk.terraSoft : u === 'warn' ? tk.claySoft : tk.creamSoft
 
   return (
-    <div style={{ padding: '32px 36px 60px', maxWidth: 980, margin: '0 auto' }}>
+    <div style={{ padding: '32px 36px 60px' }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <p style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.2em', color: tk.appleDeep, textTransform: 'uppercase', margin: '0 0 8px' }}>

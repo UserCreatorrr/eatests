@@ -34,7 +34,7 @@ export default function FichaIngredientePage() {
   const { ingrediente: ing, compras, precios, recetas, mermas, alertas } = data
 
   return (
-    <div style={{ padding: '32px 36px 60px', maxWidth: 1080 }}>
+    <div style={{ padding: '32px 36px 60px' }}>
       <Link href="/dashboard/ingredientes" style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, textDecoration: 'none' }}>← Ingredientes</Link>
 
       {/* Cabecera de la ficha */}

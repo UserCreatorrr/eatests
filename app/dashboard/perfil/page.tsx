@@ -138,11 +138,14 @@ export default function PerfilPage() {
   }
 
   return (
-    <div className="p-8" style={{ maxWidth: 680, margin: '0 auto' }}>
+    <div className="p-8">
       <div className="page-header">
         <h1 className="page-title">Perfil y Ajustes</h1>
         <p className="page-subtitle">{user.email}</p>
       </div>
+
+      {/* Secciones a pantalla completa: rejilla adaptativa */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '0 16px', alignItems: 'start' }}>
 
       {/* Avatar + Name */}
       <div style={S.section}>
@@ -341,6 +344,8 @@ export default function PerfilPage() {
           </svg>
           Cerrar sesión
         </button>
+      </div>
+
       </div>
     </div>
   )

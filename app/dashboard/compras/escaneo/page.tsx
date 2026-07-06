@@ -70,7 +70,7 @@ export default function EscaneoPage() {
   const c = data?.cabecera
 
   return (
-    <div style={{ padding: '32px 36px 60px', maxWidth: 1080 }}>
+    <div style={{ padding: '32px 36px 60px' }}>
       <Link href="/dashboard/compras" style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, textDecoration: 'none' }}>← Compras</Link>
       <div style={{ margin: '12px 0 22px' }}>
         <p style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.2em', color: tk.appleDeep, textTransform: 'uppercase', margin: '0 0 8px' }}>FOOD COST · ESCANEO + VALIDACIÓN</p>

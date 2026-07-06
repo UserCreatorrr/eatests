@@ -81,7 +81,7 @@ export default function PedidoDetallePage() {
   if (!pedido) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.terra }}>Pedido no encontrado</div>
 
   return (
-    <div style={{ padding: '32px 36px 60px', maxWidth: 920 }}>
+    <div style={{ padding: '32px 36px 60px' }}>
       <Link href="/dashboard/compras/pedidos" style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, textDecoration: 'none' }}>← Pedidos</Link>
 
       <div style={{ background: tk.iron, color: tk.cream, padding: '18px 24px', marginTop: 12, marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>

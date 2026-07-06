@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Si no se pasa coste_medio_hora, intentar derivarlo de empleados activos
-  let costeMedioHora = body.coste_medio_hora
+  let costeMedioHora: number = body.coste_medio_hora ?? 0
   if (!costeMedioHora) {
     const r = db.prepare('SELECT AVG(coste_hora) as avg FROM empleados WHERE user_id=? AND activo=1 AND coste_hora>0').get(user.id) as any
     costeMedioHora = r?.avg || 12  // fallback razonable

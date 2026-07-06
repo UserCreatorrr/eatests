@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
 
 const fields: FieldDef[] = [
@@ -24,7 +25,15 @@ function fmt(v: number | null) {
 }
 
 const columns: ColDef[] = [
-  { label: 'Nº Albaran', render: r => r.delivery_num || '-', className: 'col-mono' },
+  {
+    label: 'Nº Albaran',
+    render: r => (
+      <Link href={`/dashboard/compras/documentos/albaran/${r.id}`} style={{ color: '#0fa651', fontWeight: 600, textDecoration: 'none' }}>
+        {r.delivery_num || `#${r.id}`}
+      </Link>
+    ),
+    className: 'col-mono',
+  },
   { label: 'Proveedor', render: r => r.vendor || '-', className: 'col-main' },
   { label: 'NIF', render: r => r.nif || '-', className: 'col-mono' },
   { label: 'Para', render: r => r.delivery_for || '-' },

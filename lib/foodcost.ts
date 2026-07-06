@@ -16,6 +16,10 @@ export const COSTE_LINEA_SQL = `(
   END
 )`
 
+// Raciones de la receta para cálculos por ración (alias r = escandallo_receta).
+// El food cost % se calcula SIEMPRE por ración: (coste_total / raciones) / pvp.
+export const RACIONES_SQL = `COALESCE(NULLIF(r.raciones, 0), 1)`
+
 // Factor para convertir la cantidad de una línea a la unidad base del ingrediente.
 // Ej: línea en 'g', ingrediente en 'kg' → 0.001  (180 g → 0.18 kg)
 export function unitFactor(lineUnit: string | null | undefined, ingUnit: string | null | undefined): number {

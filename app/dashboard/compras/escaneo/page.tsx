@@ -61,7 +61,7 @@ export default function EscaneoPage() {
     setSaving(true)
     const res = await fetch('/api/compras/escaneo/commit', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo, cabecera: data.cabecera, lineas, actualizar_precios: actualizarPrecios, crear_proveedor: crearProveedor }),
+      body: JSON.stringify({ tipo, cabecera: data.cabecera, lineas, actualizar_precios: actualizarPrecios, crear_proveedor: crearProveedor, image }),
     })
     const d = await res.json()
     setResultado(d); setSaving(false)
@@ -160,8 +160,17 @@ export default function EscaneoPage() {
           </div>
 
           {resultado?.ok && (
-            <div style={{ marginTop: 16, background: tk.appleSoft, border: `1.5px solid ${tk.appleDeep}`, padding: '12px 16px', fontFamily: ff.mono, fontSize: 12, color: tk.iron }}>
-              ✓ Guardado <strong>{resultado.resumen.documento}</strong> · {resultado.resumen.lineas} líneas · {resultado.resumen.precios_actualizados} precios actualizados.
+            <div style={{ marginTop: 16, background: tk.appleSoft, border: `1.5px solid ${tk.appleDeep}`, padding: '12px 16px', fontFamily: ff.mono, fontSize: 12, color: tk.iron, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+              <span>
+                ✓ Guardado <strong>{resultado.resumen.documento}</strong> · {resultado.resumen.lineas} líneas · {resultado.resumen.precios_actualizados} precios actualizados
+                {resultado.resumen.recetas_afectadas > 0 ? ` · ${resultado.resumen.recetas_afectadas} escandallo(s) afectado(s)` : ''}.
+              </span>
+              <Link
+                href={`/dashboard/compras/documentos/${resultado.resumen.doc_tipo}/${resultado.resumen.doc_id}`}
+                style={{ fontFamily: ff.mono, fontSize: 11, fontWeight: 600, padding: '7px 14px', background: tk.apple, border: `1.5px solid ${tk.iron}`, color: tk.iron, textDecoration: 'none', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}
+              >
+                VER DOCUMENTO →
+              </Link>
             </div>
           )}
           {resultado?.error && <div style={{ marginTop: 16, background: tk.terraSoft, border: `1.5px solid ${tk.terra}`, padding: '12px 16px', fontFamily: ff.mono, fontSize: 12, color: tk.terra }}>{resultado.error}</div>}

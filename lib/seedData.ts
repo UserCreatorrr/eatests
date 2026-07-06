@@ -442,7 +442,7 @@ export function seedDemoData(db: Database.Database, uid: string) {
   ]
   for (const h of histPrecios) {
     for (const pp of h.precios) {
-      db.prepare(`INSERT INTO precio_historial (user_id,nombre,vendor,precio,unidad,fecha,fuente) VALUES (?,?,?,?,?,'kg','albaran')`)
+      db.prepare(`INSERT INTO precio_historial (user_id,nombre,vendor,precio,unidad,fecha,fuente) VALUES (?,?,?,?,'kg',?,'albaran')`)
         .run(uid,h.nombre,h.vendor,pp.precio,pp.fecha)
     }
   }

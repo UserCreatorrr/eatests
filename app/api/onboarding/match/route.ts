@@ -115,14 +115,16 @@ Devuelve JSON: {"propuestas": [{"plato": "...", "lineas": [{"ingrediente": "nomb
         }
       }).filter(Boolean)
       const costeTotal = lineas.reduce((s: number, l: any) => s + l.coste, 0)
+      const racionesEst = Number(p.raciones_estimadas) || 1
       propuestas.push({
         plato: p.plato,
         precio_venta: original.precio_venta,
-        raciones_estimadas: Number(p.raciones_estimadas) || 1,
+        raciones_estimadas: racionesEst,
         lineas,
         coste_total: Math.round(costeTotal * 100) / 100,
+        // Food cost por ración (PVP es por plato servido)
         food_cost_pct: original.precio_venta && original.precio_venta > 0
-          ? Math.round((costeTotal / original.precio_venta) * 100)
+          ? Math.round((costeTotal / racionesEst / original.precio_venta) * 100)
           : null,
       })
     }

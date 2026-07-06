@@ -465,6 +465,31 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN almacen TEXT`) } catch {}
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN tipo TEXT`) } catch {}        // 'ingrediente' | 'receta'
 
+  // ─── Trazabilidad de compras (diagnóstico tSpoonLab, P0) ─────────────────
+  // El documento escaneado persiste como transacción completa: imagen original,
+  // líneas vinculadas al documento con su mapeo a ingrediente, precio anterior
+  // y % de cambio, y el historial de precios enlaza con el documento origen.
+  try { db.exec(`ALTER TABLE albaranes_compra ADD COLUMN doc_image TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE albaranes_compra ADD COLUMN estado TEXT`) } catch {}       // 'validado' | 'pendiente'
+  try { db.exec(`ALTER TABLE albaranes_compra ADD COLUMN source TEXT`) } catch {}       // 'scanny' | 'manual'
+  try { db.exec(`ALTER TABLE facturas_compra ADD COLUMN doc_image TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE facturas_compra ADD COLUMN source TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN doc_tipo TEXT`) } catch {}          // 'albaran' | 'factura'
+  try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN doc_id INTEGER`) } catch {}
+  try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN ingrediente_id INTEGER`) } catch {}
+  try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN ingrediente_nombre TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN almacen_destino TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN precio_anterior REAL`) } catch {}
+  try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN cambio_pct REAL`) } catch {}
+  try { db.exec(`ALTER TABLE precio_historial ADD COLUMN ingrediente_id INTEGER`) } catch {}
+  try { db.exec(`ALTER TABLE precio_historial ADD COLUMN precio_anterior REAL`) } catch {}
+  try { db.exec(`ALTER TABLE precio_historial ADD COLUMN doc_tipo TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE precio_historial ADD COLUMN doc_id INTEGER`) } catch {}
+
+  // Data-fix: el seed antiguo intercambiaba unidad↔fecha en precio_historial
+  // (fecha quedaba como 'kg' y unidad contenía la fecha). Restaurar en su sitio.
+  try { db.exec(`UPDATE precio_historial SET fecha = unidad, unidad = 'kg' WHERE fecha = 'kg'`) } catch {}
+
   // Datos demo SOLO para el admin de desarrollo/configurado. Las cuentas reales
   // (registros de clientes) arrancan vacías. Sin admin → no se siembra nada.
   if (adminSeeded) {

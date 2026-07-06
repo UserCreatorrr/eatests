@@ -26,9 +26,15 @@ type Props = {
   recetaId: number
   recetaNombre: string
   precioVenta: number | null
+  raciones?: number | null
   onClose: () => void
+  onSaved?: () => void
   embedded?: boolean
 }
+
+// Unidades cómodas para cocina (feedback P1): el sistema convierte solo
+// (150 g de un ingrediente a €/kg → 0,15 kg) sin obligar a pensar en decimales.
+const UNIDADES_COCINA = ['g', 'kg', 'ml', 'cl', 'l', 'ud', 'docena']
 
 function eur(v: number | null | undefined) {
   if (v == null) return '-'
@@ -62,13 +68,18 @@ function priceDelta(l: Linea): number | null {
   return Math.round(((l.ing_coste - l.coste_unitario) / l.coste_unitario) * 100)
 }
 
-export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta, onClose, embedded }: Props) {
+export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta, raciones, onClose, onSaved, embedded }: Props) {
   const [lineas, setLineas] = useState<Linea[]>([])
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [usarLibre, setUsarLibre] = useState(false)
+  // Cierre financiero de la receta (feedback P0): PVP y raciones editables aquí mismo
+  const [pvp, setPvp] = useState<string>(precioVenta != null ? String(precioVenta) : '')
+  const [rac, setRac] = useState<string>(raciones != null && raciones > 0 ? String(raciones) : '1')
+  const [savingReceta, setSavingReceta] = useState(false)
+  const [recetaGuardada, setRecetaGuardada] = useState(false)
   const [nueva, setNueva] = useState({
     ingrediente_id: '',
     nombre_libre: '',
@@ -137,16 +148,38 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
     }))
   }
 
+  async function guardarReceta() {
+    setSavingReceta(true)
+    await fetch(`/api/data/escandallo-receta/${recetaId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        precio_venta: pvp !== '' ? parseFloat(pvp) : null,
+        raciones: rac !== '' ? parseInt(rac) : null,
+      }),
+    })
+    setSavingReceta(false)
+    setRecetaGuardada(true)
+    setTimeout(() => setRecetaGuardada(false), 2500)
+    onSaved?.()
+  }
+
   const costeTotal = lineas.reduce((sum, l) => sum + (lineSubtotal(l) ?? 0), 0)
 
-  const foodCostPct = precioVenta && precioVenta > 0 ? (costeTotal / precioVenta) * 100 : null
-  const margen = precioVenta != null ? precioVenta - costeTotal : null
-  const margenPct = precioVenta && precioVenta > 0 ? ((precioVenta - costeTotal) / precioVenta) * 100 : null
+  const pvpNum = pvp !== '' ? parseFloat(pvp) : null
+  const racNum = rac !== '' && parseInt(rac) > 0 ? parseInt(rac) : 1
+  const costeRacion = costeTotal / racNum
+  const foodCostPct = pvpNum && pvpNum > 0 ? (costeRacion / pvpNum) * 100 : null
+  const margen = pvpNum != null ? pvpNum - costeRacion : null
+  const margenPct = pvpNum && pvpNum > 0 ? ((pvpNum - costeRacion) / pvpNum) * 100 : null
+  const pvpSugerido = costeRacion > 0 ? Math.ceil((costeRacion / 0.30) * 100) / 100 : null
   const badge = foodCostPct != null ? foodCostBadge(foodCostPct) : null
 
   const lineasConDelta = lineas.filter(l => priceDelta(l) !== null)
   const hasPriceChanges = lineasConDelta.length > 0
 
+  const sumLabel: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 4px', letterSpacing: 1 }
+  const sumValue: React.CSSProperties = { fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 22, color: '#3d3834', margin: 0 }
   const tdStyle: React.CSSProperties = { padding: '8px 10px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', borderBottom: '1px solid #e8e2db' }
   const thStyle: React.CSSProperties = { padding: '6px 10px', fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#3d3834', opacity: 0.45, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'left', borderBottom: '1px solid #e8e2db' }
 
@@ -303,12 +336,15 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
                 onChange={e => setNueva(n => ({ ...n, cantidad: e.target.value }))}
                 style={{ flex: '0 1 90px', fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '7px 10px', border: '1px solid #e8e2db', borderRadius: 8, backgroundColor: '#fff', color: '#3d3834' }}
               />
-              <input
-                type="text" placeholder="kg, l, ud..."
+              <select
                 value={nueva.unidad}
                 onChange={e => setNueva(n => ({ ...n, unidad: e.target.value }))}
-                style={{ flex: '0 1 80px', fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '7px 10px', border: '1px solid #e8e2db', borderRadius: 8, backgroundColor: '#fff', color: '#3d3834' }}
-              />
+                style={{ flex: '0 1 90px', fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '7px 10px', border: '1px solid #e8e2db', borderRadius: 8, backgroundColor: '#fff', color: '#3d3834' }}
+              >
+                <option value="">unidad…</option>
+                {UNIDADES_COCINA.map(u => <option key={u} value={u}>{u}</option>)}
+                {nueva.unidad && !UNIDADES_COCINA.includes(nueva.unidad) && <option value={nueva.unidad}>{nueva.unidad}</option>}
+              </select>
               <input
                 type="number" step="0.0001" min="0" placeholder="€/ud (auto)"
                 value={nueva.coste_unitario}
@@ -325,33 +361,80 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
             </div>
           </div>
 
-          {/* Resumen */}
-          <div style={{ backgroundColor: '#faf6ec', borderRadius: 0, padding: 20, display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-            <div>
-              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 4px', letterSpacing: 1 }}>Coste total ingredientes</p>
-              <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 22, color: '#3d3834', margin: 0 }}>{eur(costeTotal)}</p>
-            </div>
-            <div>
-              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 4px', letterSpacing: 1 }}>Precio de venta</p>
-              <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 22, color: '#3d3834', margin: 0 }}>{precioVenta != null ? eur(precioVenta) : 'Sin precio definido'}</p>
-            </div>
-            {foodCostPct != null && badge && (
+          {/* Cierre financiero: PVP + raciones editables → coste/ración, FC%, márgenes */}
+          <div style={{ backgroundColor: '#faf6ec', borderRadius: 0, padding: 20 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end', marginBottom: 18 }}>
               <div>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 4px', letterSpacing: 1 }}>Food Cost %</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 22, color: '#3d3834', margin: 0 }}>{foodCostPct.toFixed(1)}%</p>
-                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, backgroundColor: badge.bg, color: badge.color }}>{badge.label}</span>
-                </div>
+                <p style={sumLabel}>Precio de venta / ración (€)</p>
+                <input
+                  type="number" step="0.01" min="0" placeholder="0.00"
+                  value={pvp}
+                  onChange={e => setPvp(e.target.value)}
+                  style={{ width: 110, fontFamily: 'DM Mono, monospace', fontSize: 13, padding: '8px 10px', border: '1.5px solid #c4b8a8', borderRadius: 0, backgroundColor: '#fff', color: '#3d3834', outline: 'none' }}
+                />
               </div>
-            )}
-            {margen != null && (
               <div>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: '#3d3834', opacity: 0.45, margin: '0 0 4px', letterSpacing: 1 }}>Margen bruto</p>
-                <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 22, color: margen >= 0 ? '#0fa651' : '#a83e1e', margin: 0 }}>
-                  {eur(margen)} {margenPct != null ? `(${margenPct.toFixed(1)}%)` : ''}
+                <p style={sumLabel}>Raciones</p>
+                <input
+                  type="number" step="1" min="1"
+                  value={rac}
+                  onChange={e => setRac(e.target.value)}
+                  style={{ width: 70, fontFamily: 'DM Mono, monospace', fontSize: 13, padding: '8px 10px', border: '1.5px solid #c4b8a8', borderRadius: 0, backgroundColor: '#fff', color: '#3d3834', outline: 'none' }}
+                />
+              </div>
+              <button
+                onClick={guardarReceta}
+                disabled={savingReceta}
+                style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '9px 16px', backgroundColor: recetaGuardada ? '#d6f9e0' : '#19f973', border: '1.5px solid #3d3834', borderRadius: 0, cursor: 'pointer', color: recetaGuardada ? '#0fa651' : '#2a2522', opacity: savingReceta ? 0.6 : 1 }}
+              >
+                {savingReceta ? 'GUARDANDO…' : recetaGuardada ? '✓ GUARDADO' : 'GUARDAR PVP + RACIONES'}
+              </button>
+              {pvpSugerido != null && (
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, color: '#6c635a', margin: '0 0 8px' }}>
+                  PVP sugerido (FC 30%): <strong>{eur(pvpSugerido)}</strong>
                 </p>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+              <div>
+                <p style={sumLabel}>Coste total receta</p>
+                <p style={sumValue}>{eur(costeTotal)}</p>
               </div>
-            )}
+              <div>
+                <p style={sumLabel}>Coste / ración</p>
+                <p style={sumValue}>{eur(costeRacion)}</p>
+              </div>
+              {foodCostPct != null && badge && (
+                <div>
+                  <p style={sumLabel}>Food Cost %</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <p style={sumValue}>{foodCostPct.toFixed(1)}%</p>
+                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, backgroundColor: badge.bg, color: badge.color }}>{badge.label}</span>
+                  </div>
+                </div>
+              )}
+              {margen != null && (
+                <div>
+                  <p style={sumLabel}>Margen bruto / ración</p>
+                  <p style={{ ...sumValue, color: margen >= 0 ? '#0fa651' : '#a83e1e' }}>
+                    {eur(margen)} {margenPct != null ? `(${margenPct.toFixed(1)}%)` : ''}
+                  </p>
+                </div>
+              )}
+              {margen != null && racNum > 1 && (
+                <div>
+                  <p style={sumLabel}>Margen total ({racNum} raciones)</p>
+                  <p style={{ ...sumValue, color: margen >= 0 ? '#0fa651' : '#a83e1e' }}>{eur(margen * racNum)}</p>
+                </div>
+              )}
+              {foodCostPct == null && (
+                <div>
+                  <p style={sumLabel}>Food Cost %</p>
+                  <p style={{ ...sumValue, opacity: 0.4, fontSize: 14 }}>Define el precio de venta para cerrar la rentabilidad</p>
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}

@@ -20,11 +20,12 @@ function fmt(v: number | null) {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
 }
 
-type SelectedReceta = { id: number; nombre: string; precio_venta: number | null }
+type SelectedReceta = { id: number; nombre: string; precio_venta: number | null; raciones: number | null }
 
 export default function SangradoPage() {
   const [selectedReceta, setSelectedReceta] = useState<SelectedReceta | null>(null)
   const [drawerVisible, setDrawerVisible] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   function openCalc(r: SelectedReceta) {
     setSelectedReceta(r)
@@ -47,7 +48,7 @@ export default function SangradoPage() {
       label: 'Food Cost',
       render: r => (
         <button
-          onClick={e => { e.stopPropagation(); openCalc({ id: r.id, nombre: r.nombre, precio_venta: r.precio_venta }) }}
+          onClick={e => { e.stopPropagation(); openCalc({ id: r.id, nombre: r.nombre, precio_venta: r.precio_venta, raciones: r.raciones }) }}
           style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, backgroundColor: '#19f973', border: '1.5px solid #3d3834', borderRadius: 0, padding: '4px 10px', cursor: 'pointer', color: '#2a2522', fontWeight: 700 }}
         >
           Calcular
@@ -58,7 +59,7 @@ export default function SangradoPage() {
 
   return (
     <>
-      <CRUDPage title="Escandallo / Sangrado" entity="escandallo-receta" fields={fields} columns={columns} />
+      <CRUDPage key={reloadKey} title="Escandallo / Sangrado" entity="escandallo-receta" fields={fields} columns={columns} />
 
       {/* Backdrop */}
       <div
@@ -116,7 +117,9 @@ export default function SangradoPage() {
               recetaId={selectedReceta.id}
               recetaNombre={selectedReceta.nombre}
               precioVenta={selectedReceta.precio_venta}
+              raciones={selectedReceta.raciones}
               onClose={closeCalc}
+              onSaved={() => setReloadKey(k => k + 1)}
               embedded
             />
           )}

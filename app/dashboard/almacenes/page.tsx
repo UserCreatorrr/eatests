@@ -63,7 +63,7 @@ export default function AlmacenesPage() {
     grupos.get(key)!.push(r)
   }
   // Orden: almacenes con nombre primero (alfabético), "Sin asignar" al final
-  const ordenados = [...grupos.entries()].sort((a, b) => {
+  const ordenados = Array.from(grupos.entries()).sort((a, b) => {
     if (a[0] === SIN_ASIGNAR) return 1
     if (b[0] === SIN_ASIGNAR) return -1
     return a[0].localeCompare(b[0])
@@ -107,7 +107,7 @@ export default function AlmacenesPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {ordenados.map(([almacen, items]) => {
             const color = ALMACEN_COLOR[almacen] ?? '#6c635a'
-            const total = items.reduce((s, i) => s + (i.cost || 0), 0)
+            const total = items.reduce((s: number, i: Ingrediente) => s + (i.cost || 0), 0)
             return (
               <div key={almacen} style={{ backgroundColor: 'var(--paper)', border: '1px solid #e8e2db', overflow: 'hidden' }}>
                 {/* Cabecera del almacén */}
@@ -121,7 +121,7 @@ export default function AlmacenesPage() {
                 {/* Tabla de ingredientes del almacén */}
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
-                    {items.map((ing, idx) => (
+                    {items.map((ing: Ingrediente, idx: number) => (
                       <tr key={ing.id} style={{ borderBottom: idx < items.length - 1 ? '1px solid #f0ebe2' : 'none' }}>
                         <td style={{ padding: '8px 16px', fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834' }}>{ing.descr || '-'}</td>
                         <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45 }}>{ing.type || '-'}</td>

@@ -75,22 +75,22 @@ export async function GET(req: NextRequest) {
   // ── FOOD COST CRÍTICO ─────────────────────────────────────
   const recetasCriticas = db.prepare(`
     SELECT r.nombre, r.precio_venta,
-           ROUND(SUM(${COSTE_LINEA_SQL}), 4) AS coste_total
+           ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1), 4) AS coste_racion
     FROM escandallo_receta r
     JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
     LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
     WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0
     GROUP BY r.id
-    HAVING CAST(coste_total AS REAL) / r.precio_venta > 0.33
-       AND CAST(coste_total AS REAL) / r.precio_venta <= 3
-    ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
+    HAVING CAST(coste_racion AS REAL) / r.precio_venta > 0.33
+       AND CAST(coste_racion AS REAL) / r.precio_venta <= 3
+    ORDER BY CAST(coste_racion AS REAL) / r.precio_venta DESC
     LIMIT 5
   `).all(uid) as any[]
 
   const foodCostCritico = recetasCriticas.map(r => ({
     nombre: r.nombre,
-    pct: Math.round((r.coste_total / r.precio_venta) * 100),
-    coste: r.coste_total,
+    pct: Math.round((r.coste_racion / r.precio_venta) * 100),
+    coste: r.coste_racion,
     pvp: r.precio_venta,
   }))
 

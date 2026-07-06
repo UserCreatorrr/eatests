@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   const user = await getUserFromRequest(req)
-  const uid = user?.id ?? ''
+  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  const uid = user.id
 
   // Recipes with their ingredients
   const recetas = db.prepare(`
@@ -37,7 +38,9 @@ export async function GET(req: NextRequest) {
 
     const merma_factor = r.merma_pct ? (1 + r.merma_pct / 100) : 1
     const coste_real = coste_ingredientes * merma_factor
-    const food_cost_pct = r.precio_venta > 0 ? Math.round((coste_real / r.precio_venta) * 100) : null
+    // Food cost por ración (el escandallo produce `raciones`; el PVP es por ración)
+    const raciones = r.raciones && r.raciones > 0 ? r.raciones : 1
+    const food_cost_pct = r.precio_venta > 0 ? Math.round(((coste_real / raciones) / r.precio_venta) * 100) : null
 
     return { ...r, lineas, coste_ingredientes: Math.round(coste_ingredientes * 100) / 100, coste_real: Math.round(coste_real * 100) / 100, food_cost_pct }
   })
@@ -57,14 +60,18 @@ export async function GET(req: NextRequest) {
     const receta = recetasConLineas.find(r => r.id === prod.receta_id)
     if (!receta) continue
 
+    // Las cantidades del escandallo son para la receta completa (raciones definidas);
+    // el consumo por ración se obtiene dividiendo entre las raciones de la receta.
+    const racionesReceta = receta.raciones && receta.raciones > 0 ? receta.raciones : 1
     for (const linea of receta.lineas) {
-      const consumo_esperado = linea.cantidad * prod.total_raciones
+      const porRacion = linea.cantidad / racionesReceta
+      const consumo_esperado = porRacion * prod.total_raciones
       const nombre = linea.ingrediente_nombre || linea.nombre_libre
       consumoTeorico.push({
         ingrediente: nombre,
         receta: receta.nombre,
         raciones_producidas: prod.total_raciones,
-        consumo_esperado_por_racion: linea.cantidad,
+        consumo_esperado_por_racion: Math.round(porRacion * 1000) / 1000,
         consumo_esperado_total: Math.round(consumo_esperado * 100) / 100,
         unidad: linea.unidad || linea.ingrediente_unit,
         coste_esperado: Math.round(consumo_esperado * (linea.coste_unitario ?? linea.ingrediente_cost ?? 0) * 100) / 100,

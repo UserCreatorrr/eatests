@@ -1,5 +1,6 @@
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
+import { COSTE_LINEA_SQL, RACIONES_SQL } from '@/lib/foodcost'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -154,27 +155,60 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // 8. Recetas con food cost crítico (>35% con precios actuales)
+  // 7a. Ingredientes sin coste o sin proveedor usados en escandallos activos
+  // (diagnóstico: "alerta por ingrediente sin proveedor o sin coste")
+  const ingIncompletos = db.prepare(`
+    SELECT COUNT(DISTINCT i.id) AS c
+    FROM ingredientes i
+    JOIN escandallo_lineas l ON l.ingrediente_id = i.id AND l.user_id = i.user_id
+    JOIN escandallo_receta r ON r.id = l.receta_id AND r.user_id = i.user_id AND r.activo = 1
+    WHERE i.user_id = ? AND (i.cost IS NULL OR i.cost <= 0 OR i.proveedor_id IS NULL)
+  `).get(userId) as any
+  if (ingIncompletos.c > 0) {
+    alerts.push({
+      id: 'ingredientes_incompletos',
+      tipo: 'warning',
+      titulo: `${ingIncompletos.c} ingrediente${ingIncompletos.c > 1 ? 's' : ''} en escandallos sin coste o sin proveedor`,
+      detalle: 'El food cost de esas recetas no es fiable hasta completarlos',
+      chat: 'Qué ingredientes de mis escandallos no tienen coste o proveedor asignado',
+      href: '/dashboard/ingredientes',
+    })
+  }
+
+  // 7b. Merma elevada últimos 7 días
+  const mermaSemana = db.prepare(
+    "SELECT ROUND(SUM(coste_estimado),2) as t, COUNT(*) as c FROM merma_registro WHERE user_id=? AND date(fecha) >= date('now','-7 days')"
+  ).get(userId) as any
+  if ((mermaSemana.t || 0) >= 50) {
+    alerts.push({
+      id: 'merma_elevada',
+      tipo: 'warning',
+      titulo: `Merma de ${mermaSemana.t} EUR en los últimos 7 días`,
+      detalle: `${mermaSemana.c} registro${mermaSemana.c > 1 ? 's' : ''} de merma esta semana`,
+      chat: 'Analiza la merma de esta semana y dime dónde se concentra',
+      href: '/dashboard/merma',
+    })
+  }
+
+  // 8. Recetas con food cost crítico (>35% con precios actuales).
+  // Coste normalizado por unidades (COSTE_LINEA_SQL) y por ración — igual que el calculador.
   const recetasCriticas = db.prepare(`
     SELECT r.nombre, r.precio_venta,
-           ROUND(SUM(
-             CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN l.cantidad * i.cost
-                  WHEN l.coste_unitario IS NOT NULL THEN l.cantidad * l.coste_unitario
-                  ELSE 0 END
-           ), 4) AS coste_total
+           ROUND(SUM(${COSTE_LINEA_SQL}) / ${RACIONES_SQL}, 4) AS coste_racion
     FROM escandallo_receta r
     JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
     LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
     WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
     GROUP BY r.id
-    HAVING CAST(coste_total AS REAL) / r.precio_venta > 0.35
-    ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
+    HAVING CAST(coste_racion AS REAL) / r.precio_venta > 0.35
+       AND CAST(coste_racion AS REAL) / r.precio_venta <= 3
+    ORDER BY CAST(coste_racion AS REAL) / r.precio_venta DESC
     LIMIT 5
   `).all(userId) as any[]
 
   if (recetasCriticas.length > 0) {
     const detalle = recetasCriticas
-      .map(r => `${r.nombre} ${Math.round((r.coste_total / r.precio_venta) * 100)}%`)
+      .map(r => `${r.nombre} ${Math.round((r.coste_racion / r.precio_venta) * 100)}%`)
       .join(' · ')
     alerts.push({
       id: 'food_cost_critico',

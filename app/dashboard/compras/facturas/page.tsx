@@ -1,5 +1,6 @@
 'use client'
 import { useMemo } from 'react'
+import Link from 'next/link'
 import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
 
 const fields: FieldDef[] = [
@@ -77,7 +78,15 @@ export default function FacturasCompraPage() {
   const asOf = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
 
   const columns: ColDef[] = useMemo(() => [
-    { label: 'Nº Factura', render: r => r.invoice_num || '-', className: 'col-mono' },
+    {
+      label: 'Nº Factura',
+      render: r => (
+        <Link href={`/dashboard/compras/documentos/factura/${r.id}`} style={{ color: '#0fa651', fontWeight: 600, textDecoration: 'none' }}>
+          {r.invoice_num || `#${r.id}`}
+        </Link>
+      ),
+      className: 'col-mono',
+    },
     { label: 'Proveedor', render: r => r.vendor || '-', className: 'col-main' },
     { label: 'NIF', render: r => r.nif || '-', className: 'col-mono' },
     { label: 'Fecha', render: r => r.date_invoice || '-' },

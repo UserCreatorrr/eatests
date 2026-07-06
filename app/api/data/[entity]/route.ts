@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
-import { pickValidColumns, idIsText } from '@/lib/security'
+import { pickValidColumns, idIsText, tableColumns } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,7 +65,10 @@ export async function GET(
   const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 5000)
   const offset = parseInt(searchParams.get('offset') || '0')
 
-  const rows = db.prepare(`SELECT * FROM ${table} WHERE user_id = ? LIMIT ? OFFSET ?`).all(user.id, limit, offset)
+  // Excluir columnas pesadas de los listados (la imagen del documento puede
+  // pesar varios MB por fila; se sirve solo desde el endpoint de detalle).
+  const cols = Array.from(tableColumns(table)).filter(c => c !== 'doc_image')
+  const rows = db.prepare(`SELECT ${cols.join(', ')} FROM ${table} WHERE user_id = ? LIMIT ? OFFSET ?`).all(user.id, limit, offset)
   const { count } = db.prepare(`SELECT COUNT(*) as count FROM ${table} WHERE user_id = ?`).get(user.id) as { count: number }
 
   return NextResponse.json({ data: rows, count })

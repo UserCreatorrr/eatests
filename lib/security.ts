@@ -67,7 +67,7 @@ export function rateLimit(key: string, limit: number, windowMs: number): boolean
 if (typeof globalThis !== 'undefined' && !(globalThis as any).__rlCleanup) {
   ;(globalThis as any).__rlCleanup = setInterval(() => {
     const now = Date.now()
-    for (const [k, v] of buckets) if (now > v.reset) buckets.delete(k)
+    for (const [k, v] of Array.from(buckets)) if (now > v.reset) buckets.delete(k)
   }, 5 * 60 * 1000)
   // No bloquear el cierre del proceso por este timer.
   ;(globalThis as any).__rlCleanup?.unref?.()

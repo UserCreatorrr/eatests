@@ -627,9 +627,10 @@ const tools: any[] = [
 ]
 
 function checkFoodCostImpact(userId: string, ingredienteName: string): string {
+  // coste_total = coste por RACIÓN (dividido entre raciones), coherente con el calculador
   const afectadas = db.prepare(`
     SELECT r.nombre, r.precio_venta,
-           ROUND(SUM(${COSTE_LINEA_SQL}), 4) AS coste_total
+           ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1), 4) AS coste_total
     FROM escandallo_receta r
     JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
     LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
@@ -1038,7 +1039,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     }
 
     const recetas = db.prepare(`
-      SELECT r.id, r.nombre, r.precio_venta
+      SELECT r.id, r.nombre, r.precio_venta, COALESCE(NULLIF(r.raciones, 0), 1) AS raciones
       FROM escandallo_receta r
       WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0
     `).all(userId) as any[]
@@ -1067,9 +1068,10 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
         const delta = (c60 - costoBase) * cant
         if (trend && delta > topImpacto.delta) topImpacto = { nombre: trend.nombre, delta }
       }
-      const pctActual = (costeActual / r.precio_venta) * 100
-      const pct30 = (coste30 / r.precio_venta) * 100
-      const pct60 = (coste60 / r.precio_venta) * 100
+      // Food cost por ración: el coste de la receta se divide entre sus raciones
+      const pctActual = (costeActual / r.raciones / r.precio_venta) * 100
+      const pct30 = (coste30 / r.raciones / r.precio_venta) * 100
+      const pct60 = (coste60 / r.raciones / r.precio_venta) * 100
       // Solo alertar si cruza umbral 33% en 60 días, sube >2pts y la cifra es coherente (<=300%)
       if (pct60 >= 33 && pct60 <= 300 && pct60 - pctActual >= 2) {
         fcProyectado.push({
@@ -1255,8 +1257,9 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       const fecha = date_delivery ?? new Date().toISOString().split('T')[0]
 
       const albaran = db.prepare(
-        `INSERT INTO albaranes_compra (user_id, vendor, delivery_num, date_delivery, base, taxes, total, nif) VALUES (?,?,?,?,?,?,?,?)`
+        `INSERT INTO albaranes_compra (user_id, vendor, delivery_num, date_delivery, base, taxes, total, nif, estado, source) VALUES (?,?,?,?,?,?,?,?,'validado','chat')`
       ).run(userId, vendor ?? null, delivery_num ?? null, fecha, base ?? null, taxes ?? null, total ?? null, nif ?? null)
+      const albId = albaran.lastInsertRowid as number
 
       const priceChanges: { nombre: string; precio_anterior: number | null; precio_nuevo: number; diff_pct: number | null; recetas_afectadas: string[] }[] = []
 
@@ -1264,18 +1267,28 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
         for (const l of lineas as any[]) {
           const { nombre, cantidad, unidad, precio_unitario, total_linea } = l
           if (!nombre) continue
-          db.prepare(`INSERT INTO lineas_albaran_compra (user_id, vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha) VALUES (?,?,?,?,?,?,?,?)`)
-            .run(userId, vendor ?? null, nombre, cantidad ?? null, unidad ?? null, precio_unitario ?? null, total_linea ?? null, fecha)
+          const ing = db.prepare(`SELECT id, descr, cost, unit, almacen_principal FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1`).get(userId, '%' + nombre + '%') as any
+          // Precio normalizado a la unidad base del ingrediente (g→kg, ml→l...)
+          let nuevoCoste: number | null = null
+          let cambioPct: number | null = null
+          if (ing && precio_unitario != null) {
+            const factor = unitFactor(unidad, ing.unit)
+            nuevoCoste = factor !== 0 ? Math.round((Number(precio_unitario) / factor) * 10000) / 10000 : Number(precio_unitario)
+            if (ing.cost > 0 && Math.abs(nuevoCoste - ing.cost) > 0.0001) cambioPct = Math.round(((nuevoCoste - ing.cost) / ing.cost) * 1000) / 10
+          }
+          db.prepare(`INSERT INTO lineas_albaran_compra (user_id, albaran_id, doc_tipo, doc_id, vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha, ingrediente_id, ingrediente_nombre, almacen_destino, precio_anterior, cambio_pct) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+            .run(userId, albId, 'albaran', albId, vendor ?? null, nombre, cantidad ?? null, unidad ?? null, precio_unitario ?? null, total_linea ?? null, fecha, ing?.id ?? null, ing?.descr ?? null, ing?.almacen_principal ?? null, ing?.cost ?? null, cambioPct)
           if (precio_unitario != null) {
-            const prev = db.prepare(`SELECT precio FROM precio_historial WHERE user_id=? AND nombre LIKE ? ORDER BY id DESC LIMIT 1`).get(userId, '%' + nombre + '%') as any
-            db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente) VALUES (?,?,?,?,?,?)`).run(userId, nombre, vendor ?? null, precio_unitario, unidad ?? null, 'albaran')
-            const ing = db.prepare(`SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1`).get(userId, '%' + nombre + '%') as any
-            if (ing) db.prepare(`UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?`).run(precio_unitario, ing.id, userId)
-            const prevPrice = prev?.precio ?? null
-            const diffPct = prevPrice && prevPrice > 0 ? Math.round(((precio_unitario - prevPrice) / prevPrice) * 100) : null
-            // Find affected recipes
-            const recetas = ing ? db.prepare(`SELECT r.nombre FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id WHERE l.ingrediente_id=? AND r.user_id=? AND r.activo=1`).all(ing.id, userId) as any[] : []
-            priceChanges.push({ nombre, precio_anterior: prevPrice, precio_nuevo: precio_unitario, diff_pct: diffPct, recetas_afectadas: recetas.map(r => r.nombre) })
+            if (ing && nuevoCoste != null) {
+              db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente, ingrediente_id, precio_anterior, doc_tipo, doc_id) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+                .run(userId, ing.descr ?? nombre, vendor ?? null, nuevoCoste, ing.unit ?? unidad ?? null, 'albaran', ing.id, ing.cost ?? null, 'albaran', albId)
+              db.prepare(`UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?`).run(nuevoCoste, ing.id, userId)
+              const recetas = db.prepare(`SELECT r.nombre FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id WHERE l.ingrediente_id=? AND r.user_id=? AND r.activo=1`).all(ing.id, userId) as any[]
+              priceChanges.push({ nombre: ing.descr ?? nombre, precio_anterior: ing.cost ?? null, precio_nuevo: nuevoCoste, diff_pct: cambioPct, recetas_afectadas: recetas.map(r => r.nombre) })
+            } else {
+              db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente, doc_tipo, doc_id) VALUES (?,?,?,?,?,?,?,?)`)
+                .run(userId, nombre, vendor ?? null, precio_unitario, unidad ?? null, 'albaran', 'albaran', albId)
+            }
           }
         }
       })
@@ -1315,7 +1328,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     }
     const subidas = Object.entries(precMap).filter(([, v]) => v.first > 0 && ((v.last - v.first) / v.first) > 0.05).sort((a, b) => ((b[1].last - b[1].first) / b[1].first) - ((a[1].last - a[1].first) / a[1].first)).slice(0, 4)
 
-    const recetasCrit = db.prepare(`SELECT r.nombre, r.precio_venta, ROUND(SUM(${COSTE_LINEA_SQL}),4) AS coste FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id AND l.user_id=r.user_id LEFT JOIN ingredientes i ON i.id=l.ingrediente_id WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0 GROUP BY r.id HAVING CAST(coste AS REAL)/r.precio_venta>0.35 AND CAST(coste AS REAL)/r.precio_venta<=3 ORDER BY CAST(coste AS REAL)/r.precio_venta DESC LIMIT 4`).all(userId) as any[]
+    const recetasCrit = db.prepare(`SELECT r.nombre, r.precio_venta, ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1),4) AS coste FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id AND l.user_id=r.user_id LEFT JOIN ingredientes i ON i.id=l.ingrediente_id WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0 GROUP BY r.id HAVING CAST(coste AS REAL)/r.precio_venta>0.35 AND CAST(coste AS REAL)/r.precio_venta<=3 ORDER BY CAST(coste AS REAL)/r.precio_venta DESC LIMIT 4`).all(userId) as any[]
 
     const semana = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
     return `__INFORME_SEMANAL__${JSON.stringify({
@@ -1436,7 +1449,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     const umbral = (args.umbral_pct || 33) / 100
     const recetas = db.prepare(`
       SELECT r.id, r.nombre, r.precio_venta, r.raciones,
-             ROUND(SUM(${COSTE_LINEA_SQL}), 4) AS coste_total
+             ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1), 4) AS coste_total
       FROM escandallo_receta r
       JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
       LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
@@ -1570,11 +1583,16 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
   if (name === 'registrar_precio') {
     try {
       const { nombre, vendor, precio, unidad, fuente } = args
-      db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente) VALUES (?,?,?,?,?,?)`)
-        .run(userId, nombre, vendor ?? null, precio, unidad ?? null, fuente ?? 'manual')
-      // Also update ingredientes cost if match found
-      const ing = db.prepare('SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
-      if (ing) db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(precio, ing.id, userId)
+      const ing = db.prepare('SELECT id, descr, cost, unit FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
+      // Normalizar el precio a la unidad base del ingrediente antes de actualizar coste
+      let precioNorm = Number(precio)
+      if (ing && unidad) {
+        const factor = unitFactor(unidad, ing.unit)
+        if (factor !== 0) precioNorm = Math.round((Number(precio) / factor) * 10000) / 10000
+      }
+      db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente, ingrediente_id, precio_anterior) VALUES (?,?,?,?,?,?,?,?)`)
+        .run(userId, ing?.descr ?? nombre, vendor ?? null, ing ? precioNorm : precio, ing ? (ing.unit ?? unidad ?? null) : (unidad ?? null), fuente ?? 'manual', ing?.id ?? null, ing?.cost ?? null)
+      if (ing) db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(precioNorm, ing.id, userId)
       const impacto = checkFoodCostImpact(userId, nombre)
       return `Precio registrado: ${nombre} → ${precio}€${unidad ? '/' + unidad : ''}${vendor ? ' (' + vendor + ')' : ''}${impacto}`
     } catch (e: any) { return `Error: ${e.message}` }
@@ -1584,14 +1602,27 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
   if (name === 'guardar_linea_albaran') {
     try {
       const { vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha } = args
-      db.prepare(`INSERT INTO lineas_albaran_compra (user_id, vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha) VALUES (?,?,?,?,?,?,?,?)`)
-        .run(userId, vendor ?? null, nombre, cantidad ?? null, unidad ?? null, precio_unitario ?? null, total_linea ?? null, fecha ?? new Date().toISOString().split('T')[0])
+      const ing = db.prepare('SELECT id, descr, cost, unit, almacen_principal FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
+      // Precio normalizado a la unidad base del ingrediente
+      let nuevoCoste: number | null = null
+      let cambioPct: number | null = null
+      if (ing && precio_unitario != null) {
+        const factor = unitFactor(unidad, ing.unit)
+        nuevoCoste = factor !== 0 ? Math.round((Number(precio_unitario) / factor) * 10000) / 10000 : Number(precio_unitario)
+        if (ing.cost > 0 && Math.abs(nuevoCoste - ing.cost) > 0.0001) cambioPct = Math.round(((nuevoCoste - ing.cost) / ing.cost) * 1000) / 10
+      }
+      db.prepare(`INSERT INTO lineas_albaran_compra (user_id, vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha, ingrediente_id, ingrediente_nombre, almacen_destino, precio_anterior, cambio_pct) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(userId, vendor ?? null, nombre, cantidad ?? null, unidad ?? null, precio_unitario ?? null, total_linea ?? null, fecha ?? new Date().toISOString().split('T')[0], ing?.id ?? null, ing?.descr ?? null, ing?.almacen_principal ?? null, ing?.cost ?? null, cambioPct)
       // Register price in history
       if (precio_unitario) {
-        db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente) VALUES (?,?,?,?,?,?)`)
-          .run(userId, nombre, vendor ?? null, precio_unitario, unidad ?? null, 'albaran')
-        const ing = db.prepare('SELECT id FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(userId, '%' + nombre + '%') as any
-        if (ing) db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(precio_unitario, ing.id, userId)
+        if (ing && nuevoCoste != null) {
+          db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente, ingrediente_id, precio_anterior) VALUES (?,?,?,?,?,?,?,?)`)
+            .run(userId, ing.descr ?? nombre, vendor ?? null, nuevoCoste, ing.unit ?? unidad ?? null, 'albaran', ing.id, ing.cost ?? null)
+          db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(nuevoCoste, ing.id, userId)
+        } else {
+          db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente) VALUES (?,?,?,?,?,?)`)
+            .run(userId, nombre, vendor ?? null, precio_unitario, unidad ?? null, 'albaran')
+        }
       }
       const impacto = precio_unitario ? checkFoodCostImpact(userId, nombre) : ''
       return `Línea guardada: ${nombre} × ${cantidad || '?'} ${unidad || ''} a ${precio_unitario || '?'}€${impacto}`

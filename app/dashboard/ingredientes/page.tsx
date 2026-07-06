@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { CATEGORIAS_INGREDIENTE, ALMACENES, TIPOS_IVA, ivaPorCategoria, almacenPorCategoria } from '@/lib/catalog'
 
 type Ingrediente = {
@@ -153,7 +154,11 @@ export default function IngredientesPage() {
               {filtered.map((ing, idx) => (
                 <tr key={ing.id} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid #e8e2db' : 'none' }}>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4 }}>{ing.codi || '-'}</td>
-                  <td style={{ padding: '8px 14px', fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834' }}>{ing.descr || '-'}</td>
+                  <td style={{ padding: '8px 14px', fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13 }}>
+                    <Link href={`/dashboard/ingredientes/${ing.id}`} title="Ver ficha de trazabilidad" style={{ color: '#3d3834', textDecoration: 'none', borderBottom: '1.5px solid #19f973' }}>
+                      {ing.descr || '-'}
+                    </Link>
+                  </td>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45 }}>{ing.type || '-'}</td>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834' }}>{ing.unit || '-'}</td>
                   <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', whiteSpace: 'nowrap' }}>{fmt(ing.cost)}</td>

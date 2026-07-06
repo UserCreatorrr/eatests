@@ -32,3 +32,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local sqlite db (prod usa /data via DB_PATH)
+marginbites.db
+marginbites.db-shm
+marginbites.db-wal

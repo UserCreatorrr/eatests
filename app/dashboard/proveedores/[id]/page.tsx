@@ -55,6 +55,11 @@ export default function ProveedorFichaPage() {
           <div style={{ textAlign: 'right' as const }}>
             <p style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', opacity: 0.5, textTransform: 'uppercase', margin: 0 }}>Gasto total</p>
             <p style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 26, color: tk.apple, margin: '4px 0 0' }}>{fmt(t.gasto_total || 0)}</p>
+            {(t.gasto_albaranes > 0 || t.gasto_facturas > 0) && (
+              <p style={{ fontFamily: ff.mono, fontSize: 10, opacity: 0.5, margin: '2px 0 0' }}>
+                {[t.gasto_albaranes > 0 && `${fmt(t.gasto_albaranes)} en albaranes`, t.gasto_facturas > 0 && `${fmt(t.gasto_facturas)} en facturas`].filter(Boolean).join(' · ')}
+              </p>
+            )}
             {t.facturas_pendientes > 0 && (
               <p style={{ fontFamily: ff.mono, fontSize: 11, color: '#fca5a5', margin: '4px 0 0' }}>
                 {t.facturas_pendientes} factura{t.facturas_pendientes !== 1 ? 's' : ''} sin pagar · {fmt(t.importe_pendiente || 0)}
@@ -111,7 +116,7 @@ export default function ProveedorFichaPage() {
         {data.facturas.length === 0 ? <Empty text="Sin facturas registradas" /> : (
           <Tbl head={['Nº', 'Fecha', 'Vence', 'Total', 'Estado']}>
             {data.facturas.map((f: any) => (
-              <Row key={f.id} cells={[
+              <Row key={f.id} href={`/dashboard/compras/documentos/factura/${f.id}`} cells={[
                 f.invoice_num || '—', f.date_invoice || '—', f.date_due || '—', fmt(f.total || 0),
                 f.paid ? 'Pagada' : 'Pendiente',
               ]} rightCols={[3]} colColors={{ 4: f.paid ? tk.appleDeep : tk.clay }} />
@@ -132,7 +137,7 @@ export default function ProveedorFichaPage() {
         <Panel title={`Albaranes (${data.albaranes.length})`}>
           {data.albaranes.length === 0 ? <Empty text="Sin albaranes" /> : (
             <Tbl head={['Nº', 'Fecha', 'Total']}>
-              {data.albaranes.map((a: any) => <Row key={a.id} cells={[a.delivery_num || '—', a.date_delivery || '—', fmt(a.total || 0)]} rightCols={[2]} />)}
+              {data.albaranes.map((a: any) => <Row key={a.id} href={`/dashboard/compras/documentos/albaran/${a.id}`} cells={[a.delivery_num || '—', a.date_delivery || '—', fmt(a.total || 0)]} rightCols={[2]} />)}
             </Tbl>
           )}
         </Panel>
@@ -169,7 +174,7 @@ function Tbl({ head, children }: { head: string[]; children: React.ReactNode }) 
     </table>
   )
 }
-function Row({ cells, rightCols = [], colColors = {} }: { cells: (string | number)[]; rightCols?: number[]; colColors?: Record<number, string> }) {
+function Row({ cells, rightCols = [], colColors = {}, href }: { cells: (string | number)[]; rightCols?: number[]; colColors?: Record<number, string>; href?: string }) {
   return (
     <tr style={{ borderTop: `1px solid ${tk.iron20}` }}>
       {cells.map((c, i) => (
@@ -178,7 +183,11 @@ function Row({ cells, rightCols = [], colColors = {} }: { cells: (string | numbe
           textAlign: i === 0 ? 'left' : (rightCols.includes(i) ? 'right' : 'left'),
           color: colColors[i] || tk.iron, fontVariantNumeric: 'tabular-nums',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220,
-        }}>{c}</td>
+        }}>
+          {i === 0 && href
+            ? <Link href={href} style={{ color: tk.iron, textDecoration: 'underline', textDecorationColor: tk.iron40, textUnderlineOffset: 3 }}>{c}</Link>
+            : c}
+        </td>
       ))}
     </tr>
   )

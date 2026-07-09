@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     lineas: 0,
     precios_actualizados: 0,
     recetas_afectadas: 0,
+    ingredientes_creados: 0,
   }
   const ingredientesActualizados: number[] = []
 
@@ -68,9 +69,21 @@ export async function POST(req: NextRequest) {
       if (l.excluida) continue
 
       // Estado actual del ingrediente mapeado (para precio_anterior y almacén destino)
-      const ing = l.ingrediente_id
+      let ing = l.ingrediente_id
         ? db.prepare('SELECT id, descr, cost, unit, almacen_principal FROM ingredientes WHERE id=? AND user_id=?').get(l.ingrediente_id, uid) as any
         : null
+
+      // Alta directa desde la validación (feedback P0): la línea sin match puede
+      // crear el ingrediente en el catálogo, con proveedor y unidad de la compra.
+      let esNuevo = false
+      if (!ing && l.crear_ingrediente && l.nombre) {
+        const r = db.prepare(`INSERT INTO ingredientes (user_id, descr, type, unit, cost, proveedor_id, proveedor_nombre)
+                              VALUES (?, ?, 'Ingrediente', ?, NULL, ?, ?)`)
+          .run(uid, l.nombre, l.unidad || 'ud', provId, c.vendor || null)
+        ing = { id: r.lastInsertRowid as number, descr: l.nombre, cost: null, unit: l.unidad || 'ud', almacen_principal: null }
+        esNuevo = true
+        resumen.ingredientes_creados++
+      }
 
       // Cambio de precio normalizado a la unidad del ingrediente
       let nuevoCoste: number | null = null
@@ -99,8 +112,9 @@ export async function POST(req: NextRequest) {
         )
       resumen.lineas++
 
-      // Actualizar coste del ingrediente + historial (solo si mapeado y el usuario aceptó)
-      if (actualizar_precios && ing && nuevoCoste != null) {
+      // Actualizar coste del ingrediente + historial (si mapeado y el usuario aceptó;
+      // los ingredientes recién creados siempre reciben su primer coste)
+      if ((actualizar_precios || esNuevo) && ing && nuevoCoste != null) {
         db.prepare('UPDATE ingredientes SET cost=? WHERE id=? AND user_id=?').run(nuevoCoste, ing.id, uid)
         db.prepare(`INSERT INTO precio_historial (user_id, nombre, vendor, precio, unidad, fuente, ingrediente_id, precio_anterior, doc_tipo, doc_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)

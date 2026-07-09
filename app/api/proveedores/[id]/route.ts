@@ -55,6 +55,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     cambio_pct: v.first > 0 && Math.abs(v.last - v.first) > 0.00005 ? Math.round(((v.last - v.first) / v.first) * 100) : 0,
   })).sort((a, b) => Math.abs(b.cambio_pct) - Math.abs(a.cambio_pct)).slice(0, 30)
 
+  // Gasto total sobre TODOS los documentos (no solo los 20 listados) y contando
+  // también albaranes validados — antes solo sumaba facturas y un proveedor con
+  // albaranes podía mostrar gasto 0 (feedback QA MB-03B).
+  const gastoAlbaranes = (db.prepare('SELECT ROUND(SUM(total),2) AS t FROM albaranes_compra WHERE user_id=? AND vendor LIKE ?').get(uid, like) as any)?.t || 0
+  const gastoFacturas = (db.prepare('SELECT ROUND(SUM(total),2) AS t FROM facturas_compra WHERE user_id=? AND vendor LIKE ?').get(uid, like) as any)?.t || 0
+
   const totals = {
     ingredientes: ingredientes.length,
     pedidos: pedidos.length,
@@ -62,7 +68,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     facturas: facturas.length,
     facturas_pendientes: facturas.filter(f => !f.paid).length,
     importe_pendiente: facturas.filter(f => !f.paid).reduce((s, f) => s + (f.total || 0), 0),
-    gasto_total: facturas.reduce((s, f) => s + (f.total || 0), 0),
+    gasto_total: Math.round((gastoAlbaranes + gastoFacturas) * 100) / 100,
+    gasto_albaranes: gastoAlbaranes,
+    gasto_facturas: gastoFacturas,
   }
 
   return NextResponse.json({ proveedor: prov, totals, ingredientes, pedidos, albaranes, facturas, ultimos_precios })

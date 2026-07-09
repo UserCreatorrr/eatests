@@ -11,6 +11,7 @@ interface Linea {
   nombre: string; cantidad: number | null; unidad: string | null; precio_unitario: number | null; total_linea: number | null
   ingrediente_id: number | null; ingrediente_nombre: string | null; ingrediente_unidad: string | null
   coste_actual: number | null; cambio_pct: number | null; mapeado: boolean; excluida?: boolean
+  crear_ingrediente?: boolean
 }
 
 const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
@@ -49,10 +50,17 @@ export default function EscaneoPage() {
   }
 
   function remap(idx: number, ingId: string) {
+    if (ingId === '__crear__') {
+      setLineas(ls => ls.map((l, i) => i !== idx ? l : {
+        ...l, ingrediente_id: null, ingrediente_nombre: l.nombre, ingrediente_unidad: l.unidad,
+        coste_actual: null, cambio_pct: null, mapeado: true, crear_ingrediente: true,
+      }))
+      return
+    }
     const ing = ingredientes.find(i => String(i.id) === ingId)
     setLineas(ls => ls.map((l, i) => i !== idx ? l : {
       ...l, ingrediente_id: ing?.id ?? null, ingrediente_nombre: ing?.descr ?? null, ingrediente_unidad: ing?.unit ?? null,
-      coste_actual: ing?.cost ?? null, mapeado: !!ing,
+      coste_actual: ing?.cost ?? null, mapeado: !!ing, crear_ingrediente: false,
     }))
   }
   function toggleExcl(idx: number) { setLineas(ls => ls.map((l, i) => i === idx ? { ...l, excluida: !l.excluida } : l)) }
@@ -132,8 +140,9 @@ export default function EscaneoPage() {
                     <td style={td}>{l.unidad || '—'}</td>
                     <td style={{ ...td, textAlign: 'right' }}>{l.precio_unitario != null ? fmt(l.precio_unitario) : '—'}</td>
                     <td style={td}>
-                      <select value={l.ingrediente_id ?? ''} onChange={e => remap(idx, e.target.value)} style={{ ...sel, borderColor: l.mapeado ? tk.iron20 : tk.clay }}>
+                      <select value={l.crear_ingrediente ? '__crear__' : (l.ingrediente_id ?? '')} onChange={e => remap(idx, e.target.value)} style={{ ...sel, borderColor: l.mapeado ? (l.crear_ingrediente ? tk.appleDeep : tk.iron20) : tk.clay }}>
                         <option value="">— sin mapear —</option>
+                        <option value="__crear__">+ Crear "{(l.nombre || 'ingrediente').slice(0, 40)}" como ingrediente nuevo</option>
                         {ingredientes.map(i => <option key={i.id} value={i.id}>{i.descr}</option>)}
                       </select>
                     </td>
@@ -163,6 +172,7 @@ export default function EscaneoPage() {
             <div style={{ marginTop: 16, background: tk.appleSoft, border: `1.5px solid ${tk.appleDeep}`, padding: '12px 16px', fontFamily: ff.mono, fontSize: 12, color: tk.iron, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
               <span>
                 ✓ Guardado <strong>{resultado.resumen.documento}</strong> · {resultado.resumen.lineas} líneas · {resultado.resumen.precios_actualizados} precios actualizados
+                {resultado.resumen.ingredientes_creados > 0 ? ` · ${resultado.resumen.ingredientes_creados} ingrediente(s) nuevo(s) en el catálogo` : ''}
                 {resultado.resumen.recetas_afectadas > 0 ? ` · ${resultado.resumen.recetas_afectadas} escandallo(s) afectado(s)` : ''}.
               </span>
               <Link

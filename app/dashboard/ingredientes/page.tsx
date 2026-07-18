@@ -83,7 +83,7 @@ export default function IngredientesPage() {
 
   function openEdit(r: Ingrediente) {
     setEditingId(r.id)
-    setForm({ codi: r.codi || '', descr: r.descr || '', type: r.type || '', unit: r.unit || '', cost: r.cost ?? undefined, iva: r.iva ?? undefined, almacen_principal: r.almacen_principal || '', almacen_secundario: r.almacen_secundario || '' })
+    setForm({ codi: r.codi || '', descr: r.descr || '', type: r.type || '', unit: r.unit || '', cost: r.cost ?? undefined, iva: r.iva ?? undefined, proveedor_id: r.proveedor_id ?? null, proveedor_nombre: r.proveedor_nombre ?? null, almacen_principal: r.almacen_principal || '', almacen_secundario: r.almacen_secundario || '' })
     setMsg('')
     setModalOpen(true)
   }
@@ -295,6 +295,23 @@ export default function IngredientesPage() {
                     {TIPOS_IVA.map(v => <option key={v} value={v}>{v}%</option>)}
                   </select>
                 </div>
+              </div>
+
+              {/* Proveedor (feedback P0: el ingrediente debe conectarse a proveedor) */}
+              <div>
+                <label style={labelStyle}>Proveedor</label>
+                <select
+                  value={(form as any).proveedor_id ?? ''}
+                  onChange={e => {
+                    const pid = e.target.value ? Number(e.target.value) : null
+                    const prov = pid ? proveedores.find(p => p.id === pid) || null : null
+                    setForm(prev => ({ ...prev, proveedor_id: pid, proveedor_nombre: prov?.descr ?? null }))
+                  }}
+                  style={{ ...fieldStyle, cursor: 'pointer' }}
+                >
+                  <option value="">— sin asignar (pendiente) —</option>
+                  {proveedores.map(p => <option key={p.id} value={p.id}>{p.descr}</option>)}
+                </select>
               </div>
 
               {/* Almacenes (ubicaciones reales) */}

@@ -93,6 +93,7 @@ export async function GET(req: NextRequest) {
       titulo: `${reorderCount} artículo${reorderCount > 1 ? 's' : ''} con reposición pendiente`,
       detalle: 'Stock bajo según histórico de pedidos',
       chat: 'Quiero hacer un pedido',
+      href: '/dashboard/lista-pedidos',
     })
   }
 
@@ -152,6 +153,7 @@ export async function GET(req: NextRequest) {
       titulo: `${oportunidades.length} ingrediente${oportunidades.length > 1 ? 's' : ''} con diferencial de precio entre proveedores`,
       detalle: oportunidades.map(o => `${o.nombre} +${o.diffPct}%`).join(' · '),
       chat: 'Muéstrame las oportunidades de ahorro comparando precios entre proveedores',
+      href: '/dashboard/analytics',
     })
   }
 

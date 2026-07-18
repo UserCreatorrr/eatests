@@ -22,22 +22,33 @@ const fmtN = (v: number, d = 1) => new Intl.NumberFormat('es-ES', { minimumFract
 export default function ProductivityOverviewPage() {
   const [data, setData] = useState<{ summary: ProductivitySummary; from: string; to: string } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [range, setRange] = useState<'7' | '30' | 'mtd'>('7')
+  const [range, setRange] = useState<'7' | '30' | 'mtd' | 'custom'>('7')
+  // Rango personalizado (feedback LC-03): cualquier fecha/periodo es consultable,
+  // no solo presets — los datos importados de meses anteriores dejan de ser inaccesibles.
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   useEffect(() => {
-    setLoading(true)
     const today = new Date()
-    let from = new Date()
-    if (range === '7') from.setDate(today.getDate() - 7)
-    else if (range === '30') from.setDate(today.getDate() - 30)
-    else from.setDate(1)
-    const fromStr = from.toISOString().split('T')[0]
-    const toStr = today.toISOString().split('T')[0]
+    let fromStr: string
+    let toStr = today.toISOString().split('T')[0]
+    if (range === 'custom') {
+      if (!customFrom || !customTo) return
+      fromStr = customFrom
+      toStr = customTo
+    } else {
+      const from = new Date()
+      if (range === '7') from.setDate(today.getDate() - 7)
+      else if (range === '30') from.setDate(today.getDate() - 30)
+      else from.setDate(1)
+      fromStr = from.toISOString().split('T')[0]
+    }
+    setLoading(true)
     fetch(`/api/productivity/summary?from=${fromStr}&to=${toStr}`)
       .then(r => r.json())
       .then(setData)
       .finally(() => setLoading(false))
-  }, [range])
+  }, [range, customFrom, customTo])
 
   const s = data?.summary
   const statusColor = (st: 'ok' | 'warn' | 'crit') => st === 'crit' ? tk.terra : st === 'warn' ? tk.clay : tk.appleDeep
@@ -58,23 +69,33 @@ export default function ProductivityOverviewPage() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: 0, border: `1.5px solid ${tk.iron}`, marginBottom: 20, width: 'fit-content' }}>
-        {(['7', '30', 'mtd'] as const).map(r => (
-          <button
-            key={r}
-            onClick={() => setRange(r)}
-            style={{
-              padding: '7px 14px',
-              background: range === r ? tk.iron : tk.paper,
-              color: range === r ? tk.cream : tk.iron,
-              border: 'none', cursor: 'pointer',
-              fontFamily: ff.mono, fontSize: 11, letterSpacing: '0.06em',
-              borderLeft: r !== '7' ? `1.5px solid ${tk.iron}` : 'none',
-            }}
-          >
-            {r === '7' ? 'ÚLTIMA SEMANA' : r === '30' ? 'ÚLTIMOS 30D' : 'ESTE MES'}
-          </button>
-        ))}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 0, border: `1.5px solid ${tk.iron}`, width: 'fit-content' }}>
+          {(['7', '30', 'mtd', 'custom'] as const).map(r => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              style={{
+                padding: '7px 14px',
+                background: range === r ? tk.iron : tk.paper,
+                color: range === r ? tk.cream : tk.iron,
+                border: 'none', cursor: 'pointer',
+                fontFamily: ff.mono, fontSize: 11, letterSpacing: '0.06em',
+                borderLeft: r !== '7' ? `1.5px solid ${tk.iron}` : 'none',
+              }}
+            >
+              {r === '7' ? 'ÚLTIMA SEMANA' : r === '30' ? 'ÚLTIMOS 30D' : r === 'mtd' ? 'ESTE MES' : 'PERSONALIZADO'}
+            </button>
+          ))}
+        </div>
+        {range === 'custom' && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontFamily: ff.mono, fontSize: 11, color: tk.iron }}>
+            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={dateInput} />
+            <span>→</span>
+            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={dateInput} />
+          </div>
+        )}
+        {data && <span style={{ fontFamily: ff.mono, fontSize: 10.5, color: tk.iron40 }}>Periodo: {data.from} → {data.to}</span>}
       </div>
 
       {loading || !s ? (
@@ -163,5 +184,6 @@ function KpiCell({ label, value, sub, variant = 'default', last }: { label: stri
   )
 }
 
+const dateInput: React.CSSProperties = { padding: '6px 8px', border: `1.5px solid ${tk.iron}`, background: tk.paper, color: tk.iron, fontFamily: ff.mono, fontSize: 11 }
 const thStyle: React.CSSProperties = { padding: '8px 14px', textAlign: 'left' as const, fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', color: tk.iron40, textTransform: 'uppercase' as const, fontWeight: 400, background: tk.creamSoft, borderBottom: `1px solid ${tk.iron20}` }
 const tdStyle: React.CSSProperties = { padding: '8px 14px', color: tk.iron, fontVariantNumeric: 'tabular-nums' as const }

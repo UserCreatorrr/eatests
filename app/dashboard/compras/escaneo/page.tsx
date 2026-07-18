@@ -6,13 +6,18 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { tk, ff } from '@/lib/design'
 
-interface Ing { id: number; descr: string; unit: string | null; cost: number | null }
+interface Ing { id: number; descr: string; unit: string | null; cost: number | null; type?: string | null; almacen_principal?: string | null }
 interface Linea {
   nombre: string; cantidad: number | null; unidad: string | null; precio_unitario: number | null; total_linea: number | null
   ingrediente_id: number | null; ingrediente_nombre: string | null; ingrediente_unidad: string | null
   coste_actual: number | null; cambio_pct: number | null; mapeado: boolean; excluida?: boolean
   crear_ingrediente?: boolean
+  crear_tipo?: string; crear_iva?: number | null; crear_almacen?: string
 }
+
+const IVAS = [0, 4, 10, 21]
+const TIPOS_BASE = ['Carne', 'Pescado', 'Marisco', 'Verdura', 'Fruta', 'Lácteo', 'Seco', 'Bebida', 'Congelado', 'Ingrediente']
+const ALMACENES_BASE = ['Almacén seco', 'Nevera', 'Congelador']
 
 const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
 
@@ -54,6 +59,7 @@ export default function EscaneoPage() {
       setLineas(ls => ls.map((l, i) => i !== idx ? l : {
         ...l, ingrediente_id: null, ingrediente_nombre: l.nombre, ingrediente_unidad: l.unidad,
         coste_actual: null, cambio_pct: null, mapeado: true, crear_ingrediente: true,
+        crear_tipo: l.crear_tipo || 'Ingrediente', crear_iva: l.crear_iva ?? 10, crear_almacen: l.crear_almacen || '',
       }))
       return
     }
@@ -64,6 +70,13 @@ export default function EscaneoPage() {
     }))
   }
   function toggleExcl(idx: number) { setLineas(ls => ls.map((l, i) => i === idx ? { ...l, excluida: !l.excluida } : l)) }
+  function setCrearCampo(idx: number, campo: 'crear_tipo' | 'crear_iva' | 'crear_almacen', valor: string) {
+    setLineas(ls => ls.map((l, i) => i !== idx ? l : { ...l, [campo]: campo === 'crear_iva' ? (valor === '' ? null : Number(valor)) : valor }))
+  }
+
+  // Opciones de categoría y almacén: las del catálogo del usuario + básicas
+  const tipos = Array.from(new Set([...ingredientes.map(i => i.type).filter(Boolean) as string[], ...TIPOS_BASE]))
+  const almacenes = Array.from(new Set([...ingredientes.map(i => i.almacen_principal).filter(Boolean) as string[], ...ALMACENES_BASE]))
 
   async function guardar() {
     setSaving(true)
@@ -139,12 +152,27 @@ export default function EscaneoPage() {
                     <td style={{ ...td, textAlign: 'right' }}>{l.cantidad ?? '—'}</td>
                     <td style={td}>{l.unidad || '—'}</td>
                     <td style={{ ...td, textAlign: 'right' }}>{l.precio_unitario != null ? fmt(l.precio_unitario) : '—'}</td>
-                    <td style={td}>
+                    <td style={{ ...td, whiteSpace: 'normal' }}>
                       <select value={l.crear_ingrediente ? '__crear__' : (l.ingrediente_id ?? '')} onChange={e => remap(idx, e.target.value)} style={{ ...sel, borderColor: l.mapeado ? (l.crear_ingrediente ? tk.appleDeep : tk.iron20) : tk.clay }}>
                         <option value="">— sin mapear —</option>
                         <option value="__crear__">+ Crear "{(l.nombre || 'ingrediente').slice(0, 40)}" como ingrediente nuevo</option>
                         {ingredientes.map(i => <option key={i.id} value={i.id}>{i.descr}</option>)}
                       </select>
+                      {l.crear_ingrediente && (
+                        <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
+                          <select value={l.crear_tipo || 'Ingrediente'} onChange={e => setCrearCampo(idx, 'crear_tipo', e.target.value)} title="Categoría" style={{ ...sel, fontSize: 10 }}>
+                            {tipos.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                          <select value={l.crear_iva ?? ''} onChange={e => setCrearCampo(idx, 'crear_iva', e.target.value)} title="IVA" style={{ ...sel, fontSize: 10, width: 76 }}>
+                            <option value="">IVA —</option>
+                            {IVAS.map(v => <option key={v} value={v}>IVA {v}%</option>)}
+                          </select>
+                          <select value={l.crear_almacen || ''} onChange={e => setCrearCampo(idx, 'crear_almacen', e.target.value)} title="Almacén" style={{ ...sel, fontSize: 10 }}>
+                            <option value="">Almacén —</option>
+                            {almacenes.map(a => <option key={a} value={a}>{a}</option>)}
+                          </select>
+                        </div>
+                      )}
                     </td>
                     <td style={{ ...td, textAlign: 'right', color: l.cambio_pct == null ? tk.iron40 : l.cambio_pct > 0 ? tk.terra : tk.appleDeep, fontWeight: 600 }}>
                       {l.cambio_pct == null ? '—' : `${l.cambio_pct > 0 ? '+' : ''}${l.cambio_pct}%`}
@@ -174,6 +202,9 @@ export default function EscaneoPage() {
                 ✓ Guardado <strong>{resultado.resumen.documento}</strong> · {resultado.resumen.lineas} líneas · {resultado.resumen.precios_actualizados} precios actualizados
                 {resultado.resumen.ingredientes_creados > 0 ? ` · ${resultado.resumen.ingredientes_creados} ingrediente(s) nuevo(s) en el catálogo` : ''}
                 {resultado.resumen.recetas_afectadas > 0 ? ` · ${resultado.resumen.recetas_afectadas} escandallo(s) afectado(s)` : ''}.
+                {resultado.resumen.estado === 'parcial' && (
+                  <strong style={{ color: tk.clay }}> Documento en estado PARCIAL: {resultado.resumen.lineas_sin_mapear} línea(s) sin mapear no actualizan costes.</strong>
+                )}
               </span>
               <Link
                 href={`/dashboard/compras/documentos/${resultado.resumen.doc_tipo}/${resultado.resumen.doc_id}`}

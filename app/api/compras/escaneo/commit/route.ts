@@ -26,7 +26,17 @@ export async function POST(req: NextRequest) {
     precios_actualizados: 0,
     recetas_afectadas: 0,
     ingredientes_creados: 0,
+    lineas_sin_mapear: 0,
+    estado: 'validado',
   }
+
+  // Estado honesto del documento (feedback FC-05): solo es "validado" si todas
+  // las líneas activas quedan resueltas (mapeadas a ingrediente o creadas).
+  // Con líneas pendientes el documento queda en "parcial" y se ve en la ficha.
+  const activas = (lineas || []).filter((l: any) => !l.excluida)
+  const sinResolver = activas.filter((l: any) => !l.ingrediente_id && !(l.crear_ingrediente && l.nombre))
+  resumen.lineas_sin_mapear = sinResolver.length
+  resumen.estado = sinResolver.length === 0 ? 'validado' : 'parcial'
   const ingredientesActualizados: number[] = []
 
   const tx = db.transaction(() => {
@@ -54,13 +64,13 @@ export async function POST(req: NextRequest) {
     // Cabecera del documento (con imagen original — no desaparece tras validar)
     if (tipo === 'factura') {
       const r = db.prepare(`INSERT INTO facturas_compra (user_id, invoice_num, vendor, nif, date_invoice, date_due, base, taxes, total, paid, validated, doc_image, source)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, 'scanny')`)
-        .run(uid, docNum, c.vendor || null, c.vendor_nif || null, c.fecha || null, c.fecha_vencimiento || null, c.base ?? null, c.iva ?? null, c.total ?? null, image || null)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'scanny')`)
+        .run(uid, docNum, c.vendor || null, c.vendor_nif || null, c.fecha || null, c.fecha_vencimiento || null, c.base ?? null, c.iva ?? null, c.total ?? null, resumen.estado === 'validado' ? 1 : 0, image || null)
       resumen.doc_id = r.lastInsertRowid as number
     } else {
       const r = db.prepare(`INSERT INTO albaranes_compra (user_id, delivery_num, vendor, nif, date_delivery, base, taxes, total, doc_image, estado, source)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'validado', 'scanny')`)
-        .run(uid, docNum, c.vendor || null, c.vendor_nif || null, c.fecha || null, c.base ?? null, c.iva ?? null, c.total ?? null, image || null)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scanny')`)
+        .run(uid, docNum, c.vendor || null, c.vendor_nif || null, c.fecha || null, c.base ?? null, c.iva ?? null, c.total ?? null, image || null, resumen.estado)
       resumen.doc_id = r.lastInsertRowid as number
     }
 
@@ -77,10 +87,12 @@ export async function POST(req: NextRequest) {
       // crear el ingrediente en el catálogo, con proveedor y unidad de la compra.
       let esNuevo = false
       if (!ing && l.crear_ingrediente && l.nombre) {
-        const r = db.prepare(`INSERT INTO ingredientes (user_id, descr, type, unit, cost, proveedor_id, proveedor_nombre)
-                              VALUES (?, ?, 'Ingrediente', ?, NULL, ?, ?)`)
-          .run(uid, l.nombre, l.unidad || 'ud', provId, c.vendor || null)
-        ing = { id: r.lastInsertRowid as number, descr: l.nombre, cost: null, unit: l.unidad || 'ud', almacen_principal: null }
+        // Ficha enriquecida desde la validación (feedback FC-06): categoría,
+        // IVA y almacén se eligen en la misma pantalla, no ficha por ficha después.
+        const r = db.prepare(`INSERT INTO ingredientes (user_id, descr, type, unit, cost, proveedor_id, proveedor_nombre, iva, almacen_principal)
+                              VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)`)
+          .run(uid, l.nombre, l.crear_tipo || 'Ingrediente', l.unidad || 'ud', provId, c.vendor || null, l.crear_iva ?? null, l.crear_almacen || null)
+        ing = { id: r.lastInsertRowid as number, descr: l.nombre, cost: null, unit: l.unidad || 'ud', almacen_principal: l.crear_almacen || null }
         esNuevo = true
         resumen.ingredientes_creados++
       }
@@ -122,6 +134,18 @@ export async function POST(req: NextRequest) {
         resumen.precios_actualizados++
         if (cambioPct != null) ingredientesActualizados.push(ing.id)
       }
+    }
+
+    // Documento con líneas pendientes → aviso explícito, no silencio (FC-05)
+    if (resumen.estado === 'parcial') {
+      db.prepare(`INSERT INTO notifications (user_id, type, title, body, urgency, link)
+                  VALUES (?, 'validacion', ?, ?, 'alta', ?)`)
+        .run(
+          uid,
+          `${resumen.documento} guardado con ${resumen.lineas_sin_mapear} línea(s) sin mapear`,
+          'El documento queda en estado parcial: esas líneas no actualizan costes ni ingredientes hasta resolverse.',
+          `/dashboard/compras/documentos/${resumen.doc_tipo}/${resumen.doc_id}`,
+        )
     }
 
     // Impacto: recetas afectadas por los cambios de precio → notificación accionable

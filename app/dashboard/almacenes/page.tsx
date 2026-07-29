@@ -139,7 +139,7 @@ export default function AlmacenesPage() {
                 {/* Cabecera del almacén — clicable (acordeón) */}
                 <button
                   onClick={() => toggle(almacen)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', backgroundColor: '#faf6ec', borderBottom: abierto ? '1px solid #e8e2db' : 'none', width: '100%', border: 'none', borderBottomWidth: abierto ? 1 : 0, cursor: 'pointer', textAlign: 'left' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', backgroundColor: '#faf6ec', width: '100%', cursor: 'pointer', textAlign: 'left', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: abierto ? '1px solid #e8e2db' : '1px solid transparent' }}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6c635a" strokeWidth={2.5} style={{ transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform .18s', flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                   <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, flexShrink: 0 }} />

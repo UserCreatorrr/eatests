@@ -110,19 +110,24 @@ export async function POST(req: NextRequest) {
       }
 
       db.prepare(`INSERT INTO lineas_albaran_compra
-                    (user_id, albaran_id, doc_tipo, doc_id, vendor, nombre, cantidad, unidad, precio_unitario, total_linea, fecha,
+                    (user_id, albaran_id, doc_tipo, doc_id, vendor, nombre, cantidad, unidad, precio_unitario, total_linea, iva_pct, fecha,
                      ingrediente_id, ingrediente_nombre, almacen_destino, precio_anterior, cambio_pct)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(
           uid,
           tipo === 'factura' ? null : resumen.doc_id,
           resumen.doc_tipo, resumen.doc_id,
           c.vendor || null, l.nombre || null, l.cantidad ?? null, l.unidad ?? null,
-          l.precio_unitario ?? null, l.total_linea ?? null, c.fecha || new Date().toISOString().split('T')[0],
+          l.precio_unitario ?? null, l.total_linea ?? null, l.iva_pct ?? null, c.fecha || new Date().toISOString().split('T')[0],
           ing?.id ?? null, ing?.descr ?? l.ingrediente_nombre ?? null, ing?.almacen_principal ?? null,
           ing?.cost ?? null, cambioPct,
         )
       resumen.lineas++
+
+      // Si la línea trae IVA y el ingrediente aún no tiene, se lo asigna (FC-07)
+      if (ing && l.iva_pct != null) {
+        db.prepare('UPDATE ingredientes SET iva=? WHERE id=? AND user_id=? AND (iva IS NULL)').run(l.iva_pct, ing.id, uid)
+      }
 
       // Actualizar coste del ingrediente + historial (si mapeado y el usuario aceptó;
       // los ingredientes recién creados siempre reciben su primer coste)

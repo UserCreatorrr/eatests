@@ -173,7 +173,7 @@ export async function GET(req: NextRequest) {
       titulo: `${ingIncompletos.c} ingrediente${ingIncompletos.c > 1 ? 's' : ''} en escandallos sin coste o sin proveedor`,
       detalle: 'El food cost de esas recetas no es fiable hasta completarlos',
       chat: 'Qué ingredientes de mis escandallos no tienen coste o proveedor asignado',
-      href: '/dashboard/ingredientes',
+      href: '/dashboard/ingredientes?filtro=sin_coste',
     })
   }
 

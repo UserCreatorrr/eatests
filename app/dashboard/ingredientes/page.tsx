@@ -39,6 +39,13 @@ export default function IngredientesPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
+  // Filtro por estado (FC-14/RP-03): clicable desde contadores y deep-link (?filtro=)
+  const [filtro, setFiltro] = useState<'todos' | 'sin_proveedor' | 'con_proveedor' | 'sin_coste' | 'sin_almacen'>('todos')
+
+  useEffect(() => {
+    const f = new URLSearchParams(window.location.search).get('filtro')
+    if (f && ['sin_proveedor', 'con_proveedor', 'sin_coste', 'sin_almacen'].includes(f)) setFiltro(f as any)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -55,8 +62,17 @@ export default function IngredientesPage() {
 
   useEffect(() => { load() }, [load])
 
+  const matchFiltro = (r: Ingrediente) =>
+    filtro === 'todos' ? true
+    : filtro === 'sin_proveedor' ? !r.proveedor_id
+    : filtro === 'con_proveedor' ? !!r.proveedor_id
+    : filtro === 'sin_coste' ? (r.cost == null || r.cost === 0)
+    : filtro === 'sin_almacen' ? !r.almacen_principal?.trim()
+    : true
+
   const filtered = rows.filter(r =>
-    !search || [r.descr, r.codi, r.type, r.proveedor_nombre].some(v => v?.toLowerCase().includes(search.toLowerCase()))
+    matchFiltro(r) &&
+    (!search || [r.descr, r.codi, r.type, r.proveedor_nombre].some(v => v?.toLowerCase().includes(search.toLowerCase())))
   )
 
   async function assignProveedor(ing: Ingrediente, prov: Proveedor | null) {
@@ -113,17 +129,32 @@ export default function IngredientesPage() {
 
   const sinProveedor = rows.filter(r => !r.proveedor_id).length
   const conProveedor = rows.filter(r => r.proveedor_id).length
+  const sinCoste = rows.filter(r => r.cost == null || r.cost === 0).length
+  const sinAlmacen = rows.filter(r => !r.almacen_principal?.trim()).length
+
+  const chip = (activo: boolean, color: string): React.CSSProperties => ({
+    fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '4px 10px', cursor: 'pointer',
+    border: `1.5px solid ${activo ? color : '#e8e2db'}`, background: activo ? color : 'transparent',
+    color: activo ? '#fff' : color, letterSpacing: '0.02em',
+  })
 
   return (
     <div className="p-8">
       <div className="page-header">
         <div>
           <h1 className="page-title">Ingredientes</h1>
-          <p className="page-subtitle">
-            {rows.length} ingredientes · <span style={{ color: '#0fa651' }}>{conProveedor} con proveedor</span> · <span style={{ opacity: 0.5 }}>{sinProveedor} sin asignar</span>
-          </p>
+          <p className="page-subtitle">{rows.length} ingredientes en el catálogo</p>
         </div>
         <button onClick={openAdd} className="btn-primary">+ Añadir</button>
+      </div>
+
+      {/* Contadores clicables → filtran la lista (FC-14/RP-03) */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        <button onClick={() => setFiltro('todos')} style={chip(filtro === 'todos', '#3d3834')}>Todos · {rows.length}</button>
+        <button onClick={() => setFiltro('con_proveedor')} style={chip(filtro === 'con_proveedor', '#0fa651')}>Con proveedor · {conProveedor}</button>
+        <button onClick={() => setFiltro('sin_proveedor')} style={chip(filtro === 'sin_proveedor', '#c97b3d')}>Sin proveedor · {sinProveedor}</button>
+        <button onClick={() => setFiltro('sin_coste')} style={chip(filtro === 'sin_coste', '#a83e1e')}>Sin coste · {sinCoste}</button>
+        <button onClick={() => setFiltro('sin_almacen')} style={chip(filtro === 'sin_almacen', '#c97b3d')}>Sin almacén · {sinAlmacen}</button>
       </div>
 
       {/* Search */}

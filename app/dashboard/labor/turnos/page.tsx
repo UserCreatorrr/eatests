@@ -312,6 +312,27 @@ export default function TurnosPage() {
               </ul>
             </div>
           )}
+
+          {/* LC-01: vínculo turno↔empleado del maestro */}
+          {result.vinculo && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${tk.iron20}` }}>
+              <p style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron, margin: '0 0 4px' }}>
+                <strong>{result.vinculo.vinculados}</strong> turno(s) vinculados a un empleado del maestro
+                {result.vinculo.sin_vincular > 0 && <> · <strong style={{ color: tk.clay }}>{result.vinculo.sin_vincular} sin vincular</strong></>}
+              </p>
+              {result.vinculo.sin_vincular > 0 && (
+                <>
+                  <p style={{ fontFamily: ff.mono, fontSize: 10.5, color: tk.iron60, margin: '2px 0 4px' }}>
+                    Estos nombres no existen en Empleados (el turno se guarda, pero sin coste ni métricas por persona hasta crearlos):
+                  </p>
+                  <p style={{ fontFamily: ff.mono, fontSize: 10.5, color: tk.clay, margin: '0 0 6px' }}>
+                    {result.vinculo.nombres_sin_vincular.join(' · ')}
+                  </p>
+                  <a href="/dashboard/labor/empleados" style={{ fontFamily: ff.mono, fontSize: 11, fontWeight: 600, padding: '6px 12px', background: tk.paper, border: `1.5px solid ${tk.iron}`, color: tk.iron, textDecoration: 'none', letterSpacing: '0.04em' }}>Crear empleados →</a>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

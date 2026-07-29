@@ -9,6 +9,7 @@ import { tk, ff } from '@/lib/design'
 interface Ing { id: number; descr: string; unit: string | null; cost: number | null; type?: string | null; almacen_principal?: string | null }
 interface Linea {
   nombre: string; cantidad: number | null; unidad: string | null; precio_unitario: number | null; total_linea: number | null
+  iva_pct: number | null
   ingrediente_id: number | null; ingrediente_nombre: string | null; ingrediente_unidad: string | null
   coste_actual: number | null; cambio_pct: number | null; mapeado: boolean; excluida?: boolean
   crear_ingrediente?: boolean
@@ -70,6 +71,7 @@ export default function EscaneoPage() {
     }))
   }
   function toggleExcl(idx: number) { setLineas(ls => ls.map((l, i) => i === idx ? { ...l, excluida: !l.excluida } : l)) }
+  function setIva(idx: number, valor: string) { setLineas(ls => ls.map((l, i) => i === idx ? { ...l, iva_pct: valor === '' ? null : Number(valor) } : l)) }
   function setCrearCampo(idx: number, campo: 'crear_tipo' | 'crear_iva' | 'crear_almacen', valor: string) {
     setLineas(ls => ls.map((l, i) => i !== idx ? l : { ...l, [campo]: campo === 'crear_iva' ? (valor === '' ? null : Number(valor)) : valor }))
   }
@@ -126,13 +128,32 @@ export default function EscaneoPage() {
           </div>
 
           {/* Warnings */}
-          {(data.warnings.sin_mapear > 0 || data.warnings.con_cambio_precio > 0 || data.warnings.proveedor_nuevo) && (
+          {(data.warnings.sin_mapear > 0 || data.warnings.con_cambio_precio > 0 || data.warnings.proveedor_nuevo || data.warnings.sin_iva > 0) && (
             <div style={{ background: tk.claySoft, border: `1.5px solid ${tk.clay}`, padding: '10px 14px', marginBottom: 16, fontFamily: ff.mono, fontSize: 11, color: tk.clay }}>
               {[
                 data.warnings.proveedor_nuevo && 'proveedor no encontrado en el catálogo',
                 data.warnings.sin_mapear > 0 && `${data.warnings.sin_mapear} línea(s) sin ingrediente mapeado`,
                 data.warnings.con_cambio_precio > 0 && `${data.warnings.con_cambio_precio} cambio(s) de precio detectados`,
+                data.warnings.sin_iva > 0 && `${data.warnings.sin_iva} línea(s) sin IVA — revísalo antes de cerrar`,
               ].filter(Boolean).join(' · ')}
+            </div>
+          )}
+
+          {/* Cuadre del documento (FC-07): base + IVA vs total detectado */}
+          {data.cuadre && (data.cuadre.base != null || data.cuadre.iva != null || data.cuadre.total != null) && (
+            <div style={{
+              background: data.warnings.descuadre ? tk.terraSoft : tk.appleSoft,
+              border: `1.5px solid ${data.warnings.descuadre ? tk.terra : tk.appleDeep}`,
+              padding: '10px 14px', marginBottom: 16, fontFamily: ff.mono, fontSize: 11.5,
+              color: data.warnings.descuadre ? tk.terra : tk.iron, display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center',
+            }}>
+              <span style={{ fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', fontSize: 10 }}>Cuadre</span>
+              <span>Base {data.cuadre.base != null ? fmt(data.cuadre.base) : '—'}</span>
+              <span>+ IVA {data.cuadre.iva != null ? fmt(data.cuadre.iva) : '—'}</span>
+              <span>= Total {data.cuadre.total != null ? fmt(data.cuadre.total) : '—'}</span>
+              {data.warnings.descuadre
+                ? <strong style={{ marginLeft: 'auto' }}>⚠ Descuadre de {fmt(Math.abs(data.cuadre.descuadre))} — revisa base/IVA/total antes de cerrar.</strong>
+                : (data.cuadre.descuadre != null && <span style={{ marginLeft: 'auto', color: tk.appleDeep, fontWeight: 600 }}>✓ Cuadra</span>)}
             </div>
           )}
 
@@ -141,8 +162,8 @@ export default function EscaneoPage() {
             <div style={panelHead}>Líneas extraídas · valida el mapeo de ingredientes</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: ff.mono, fontSize: 11 }}>
               <thead><tr>
-                {['Producto detectado', 'Cant.', 'Ud.', '€/ud', 'Ingrediente (catálogo)', 'Cambio', ''].map((h, i) => (
-                  <th key={h} style={{ ...th, textAlign: i === 1 || i === 3 || i === 5 ? 'right' : 'left' }}>{h}</th>
+                {['Producto detectado', 'Cant.', 'Ud.', '€/ud', 'IVA', 'Ingrediente (catálogo)', 'Cambio', ''].map((h, i) => (
+                  <th key={h} style={{ ...th, textAlign: i === 1 || i === 3 || i === 6 ? 'right' : i === 4 ? 'center' : 'left' }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
@@ -152,6 +173,12 @@ export default function EscaneoPage() {
                     <td style={{ ...td, textAlign: 'right' }}>{l.cantidad ?? '—'}</td>
                     <td style={td}>{l.unidad || '—'}</td>
                     <td style={{ ...td, textAlign: 'right' }}>{l.precio_unitario != null ? fmt(l.precio_unitario) : '—'}</td>
+                    <td style={{ ...td, textAlign: 'center' }}>
+                      <select value={l.iva_pct ?? ''} onChange={e => setIva(idx, e.target.value)} title="IVA de la línea" style={{ ...sel, width: 62, padding: '4px 4px', borderColor: l.iva_pct == null ? tk.clay : tk.iron20 }}>
+                        <option value="">—</option>
+                        {IVAS.map(v => <option key={v} value={v}>{v}%</option>)}
+                      </select>
+                    </td>
                     <td style={{ ...td, whiteSpace: 'normal' }}>
                       <select value={l.crear_ingrediente ? '__crear__' : (l.ingrediente_id ?? '')} onChange={e => remap(idx, e.target.value)} style={{ ...sel, borderColor: l.mapeado ? (l.crear_ingrediente ? tk.appleDeep : tk.iron20) : tk.clay }}>
                         <option value="">— sin mapear —</option>
@@ -182,7 +209,7 @@ export default function EscaneoPage() {
                     </td>
                   </tr>
                 ))}
-                {lineas.length === 0 && <tr><td colSpan={7} style={{ padding: 22, textAlign: 'center', color: tk.iron40 }}>No se detectaron líneas.</td></tr>}
+                {lineas.length === 0 && <tr><td colSpan={8} style={{ padding: 22, textAlign: 'center', color: tk.iron40 }}>No se detectaron líneas.</td></tr>}
               </tbody>
             </table>
           </div>

@@ -33,13 +33,13 @@ export async function POST(req: NextRequest) {
   "fecha": "YYYY-MM-DD si se ve, sino null",
   "fecha_vencimiento": "YYYY-MM-DD si es factura y se ve, sino null",
   "base": número o null,
-  "iva": número (importe IVA) o null,
+  "iva": número (importe IVA total del documento) o null,
   "total": número o null,
   "lineas": [
-    { "nombre": "producto", "cantidad": número, "unidad": "kg|l|ud|...", "precio_unitario": número, "total_linea": número }
+    { "nombre": "producto", "cantidad": número, "unidad": "kg|l|ud|...", "precio_unitario": número, "total_linea": número, "iva_pct": número (0|4|10|21) si el % de IVA de esa línea aparece, sino null }
   ]
 }
-Normaliza nombres a singular sin marca. No inventes nada que no se vea.`,
+Normaliza nombres a singular sin marca. Para iva_pct usa el porcentaje (no el importe). No inventes nada que no se vea.`,
         },
         { type: 'image_url', image_url: { url: image, detail: 'high' } },
       ],
@@ -61,7 +61,7 @@ Normaliza nombres a singular sin marca. No inventes nada que no se vea.`,
   const lineas = (doc.lineas || []).map((l: any) => {
     const nombre = (l.nombre || '').trim()
     const ing = nombre
-      ? db.prepare('SELECT id, descr, unit, cost FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(uid, `%${nombre}%`) as any
+      ? db.prepare('SELECT id, descr, unit, cost, iva FROM ingredientes WHERE user_id=? AND descr LIKE ? LIMIT 1').get(uid, `%${nombre}%`) as any
       : null
     const precioNuevo = l.precio_unitario != null ? Number(l.precio_unitario) : null
     let cambio_pct: number | null = null
@@ -73,12 +73,15 @@ Normaliza nombres a singular sin marca. No inventes nada que no se vea.`,
         cambio_pct = Math.round(((precioEnUnidadIng - ing.cost) / ing.cost) * 100)
       }
     }
+    // IVA de la línea: el detectado por OCR, o el del ingrediente mapeado como propuesta
+    const ivaLinea = l.iva_pct != null ? Number(l.iva_pct) : (ing?.iva ?? null)
     return {
       nombre,
       cantidad: l.cantidad != null ? Number(l.cantidad) : null,
       unidad: l.unidad || null,
       precio_unitario: precioNuevo,
       total_linea: l.total_linea != null ? Number(l.total_linea) : null,
+      iva_pct: ivaLinea,
       ingrediente_id: ing?.id ?? null,
       ingrediente_nombre: ing?.descr ?? null,
       ingrediente_unidad: ing?.unit ?? null,
@@ -90,6 +93,16 @@ Normaliza nombres a singular sin marca. No inventes nada que no se vea.`,
 
   const sinMapear = lineas.filter((l: any) => !l.mapeado).length
   const conCambio = lineas.filter((l: any) => l.cambio_pct != null).length
+  const sinIva = lineas.filter((l: any) => l.iva_pct == null).length
+
+  // Cuadre del documento (FC-07): base + IVA debe aproximar el total.
+  const sumaLineas = lineas.reduce((s: number, l: any) => s + (l.total_linea ?? 0), 0)
+  const baseNum = doc.base != null ? Number(doc.base) : null
+  const ivaNum = doc.iva != null ? Number(doc.iva) : null
+  const totalNum = doc.total != null ? Number(doc.total) : null
+  const descuadre = (baseNum != null && ivaNum != null && totalNum != null)
+    ? Math.round((baseNum + ivaNum - totalNum) * 100) / 100
+    : null
 
   return NextResponse.json({
     cabecera: {
@@ -105,10 +118,19 @@ Normaliza nombres a singular sin marca. No inventes nada que no se vea.`,
       total: doc.total ?? null,
     },
     lineas,
+    cuadre: {
+      suma_lineas: Math.round(sumaLineas * 100) / 100,
+      base: baseNum,
+      iva: ivaNum,
+      total: totalNum,
+      descuadre,            // base+iva-total; null si falta algún dato
+    },
     warnings: {
       sin_mapear: sinMapear,
       con_cambio_precio: conCambio,
       proveedor_nuevo: !provMatch,
+      sin_iva: sinIva,
+      descuadre: descuadre != null && Math.abs(descuadre) > 0.02,
     },
     tipo,
   })

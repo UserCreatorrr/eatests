@@ -481,6 +481,9 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN almacen_destino TEXT`) } catch {}
   try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN precio_anterior REAL`) } catch {}
   try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN cambio_pct REAL`) } catch {}
+  // IVA por línea (feedback FC-07): el OCR lo detecta si aparece, el usuario lo
+  // corrige, y el cuadre base+IVA=total se valida antes de cerrar el documento.
+  try { db.exec(`ALTER TABLE lineas_albaran_compra ADD COLUMN iva_pct REAL`) } catch {}
   try { db.exec(`ALTER TABLE precio_historial ADD COLUMN ingrediente_id INTEGER`) } catch {}
   try { db.exec(`ALTER TABLE precio_historial ADD COLUMN precio_anterior REAL`) } catch {}
   try { db.exec(`ALTER TABLE precio_historial ADD COLUMN doc_tipo TEXT`) } catch {}

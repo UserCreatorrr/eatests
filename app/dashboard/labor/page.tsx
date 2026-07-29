@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { tk, ff } from '@/lib/design'
+import EmptyState from '@/components/EmptyState'
 
 interface LaborSummary {
   horas_plan: number
@@ -215,9 +216,13 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 
 function Empty() {
   return (
-    <div style={{ padding: '30px 16px', textAlign: 'center', fontFamily: ff.mono, fontSize: 11, color: tk.iron40, letterSpacing: '0.06em' }}>
-      SIN DATOS · IMPORTA TURNOS PARA EMPEZAR
-    </div>
+    <EmptyState
+      titulo="Sin datos de turnos todavía"
+      detalle="Este panel se calcula con los turnos planificados. Importa un CSV/Excel de turnos (o créalos) para ver coste laboral, horas y desviaciones por rol, servicio y día."
+      accionLabel="Importar turnos"
+      accionHref="/dashboard/labor/turnos"
+      ayuda="Formato admitido: fecha, empleado, inicio, fin, descanso, coste/hora."
+    />
   )
 }
 

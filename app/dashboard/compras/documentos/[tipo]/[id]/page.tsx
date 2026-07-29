@@ -101,8 +101,8 @@ export default function DocumentoDetallePage() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: ff.mono, fontSize: 11 }}>
             <thead><tr>
-              {['Producto', 'Cant.', 'Ud.', '€/ud', 'Total', 'Ingrediente mapeado', 'Almacén', 'Cambio precio'].map((h, i) => (
-                <th key={h} style={{ ...th, textAlign: [1, 3, 4, 7].includes(i) ? 'right' : 'left' }}>{h}</th>
+              {['Producto', 'Cant.', 'Ud.', '€/ud', 'IVA', 'Total', 'Ingrediente mapeado', 'Almacén', 'Cambio precio'].map((h, i) => (
+                <th key={h} style={{ ...th, textAlign: [1, 3, 5, 8].includes(i) ? 'right' : i === 4 ? 'center' : 'left' }}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -112,6 +112,7 @@ export default function DocumentoDetallePage() {
                   <td style={{ ...td, textAlign: 'right' }}>{l.cantidad ?? '—'}</td>
                   <td style={td}>{l.unidad || '—'}</td>
                   <td style={{ ...td, textAlign: 'right' }}>{fmt(l.precio_unitario)}</td>
+                  <td style={{ ...td, textAlign: 'center' }}>{l.iva_pct != null ? `${l.iva_pct}%` : '—'}</td>
                   <td style={{ ...td, textAlign: 'right' }}>{fmt(l.total_linea)}</td>
                   <td style={td}>
                     {l.ingrediente_id ? (
@@ -128,7 +129,7 @@ export default function DocumentoDetallePage() {
                   </td>
                 </tr>
               ))}
-              {lineas.length === 0 && <tr><td colSpan={8} style={{ padding: 22, textAlign: 'center', color: tk.iron40 }}>Sin líneas registradas para este documento.</td></tr>}
+              {lineas.length === 0 && <tr><td colSpan={9} style={{ padding: 22, textAlign: 'center', color: tk.iron40 }}>Sin líneas registradas para este documento.</td></tr>}
             </tbody>
           </table>
         </div>

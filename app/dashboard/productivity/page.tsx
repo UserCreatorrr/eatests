@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { tk, ff } from '@/lib/design'
+import EmptyState from '@/components/EmptyState'
 
 interface ProductivitySummary {
   splh: number | null
@@ -133,9 +134,13 @@ export default function ProductivityOverviewPage() {
               SPLH por franja vs target
             </div>
             {s.por_franja.length === 0 ? (
-              <div style={{ padding: '30px 16px', textAlign: 'center', fontFamily: ff.mono, fontSize: 11, color: tk.iron40, letterSpacing: '0.06em' }}>
-                SIN DATOS · IMPORTA TURNOS Y VENTAS POR FRANJA
-              </div>
+              <EmptyState
+                titulo="Sin productividad para este periodo"
+                detalle="El SPLH por franja necesita turnos (horas) y ventas por franja del mismo día y centro. Falta al menos una de las dos fuentes para el periodo seleccionado."
+                accionLabel="Importar turnos y ventas"
+                accionHref="/dashboard/labor/turnos"
+                ayuda="Si ya importaste datos, revisa que la fecha y el centro coincidan en ambos ficheros."
+              />
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontFamily: ff.mono, fontSize: 11.5 }}>
                 <thead><tr>

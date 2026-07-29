@@ -36,10 +36,17 @@ function fmt(v: number | null) {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
 }
 
+const ghostBtn: React.CSSProperties = {
+  fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '8px 12px', cursor: 'pointer',
+  background: 'var(--paper)', border: '1.5px solid #c4b8a8', color: '#3d3834', letterSpacing: '0.04em',
+}
+
 export default function AlmacenesPage() {
   const [rows, setRows] = useState<Ingrediente[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  // Acordeones plegables (FC-13): estado de apertura por almacén, persistido
+  const [colapsados, setColapsados] = useState<Record<string, boolean>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -50,6 +57,17 @@ export default function AlmacenesPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    try { const s = localStorage.getItem('mb_almacenes_colapsados'); if (s) setColapsados(JSON.parse(s)) } catch {}
+  }, [])
+
+  function toggle(almacen: string) {
+    setColapsados(prev => {
+      const next = { ...prev, [almacen]: !prev[almacen] }
+      try { localStorage.setItem('mb_almacenes_colapsados', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
 
   const filtered = rows.filter(r =>
     !search || [r.descr, r.codi, r.type, r.proveedor_nombre, r.almacen_principal].some(v => v?.toLowerCase().includes(search.toLowerCase()))
@@ -81,7 +99,13 @@ export default function AlmacenesPage() {
             {sinAsignar > 0 && <> · <span style={{ color: '#a83e1e' }}>{sinAsignar} sin almacén</span></>}
           </p>
         </div>
-        <Link href="/dashboard/ingredientes" className="btn-primary" style={{ textDecoration: 'none' }}>Gestionar ingredientes →</Link>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={() => { const all: Record<string, boolean> = {}; ordenados.forEach(([a]) => all[a] = true); setColapsados(all); try { localStorage.setItem('mb_almacenes_colapsados', JSON.stringify(all)) } catch {} }}
+            style={ghostBtn} title="Plegar todos los almacenes">Plegar todo</button>
+          <button onClick={() => { setColapsados({}); try { localStorage.setItem('mb_almacenes_colapsados', '{}') } catch {} }}
+            style={ghostBtn} title="Desplegar todos los almacenes">Desplegar todo</button>
+          <Link href="/dashboard/ingredientes" className="btn-primary" style={{ textDecoration: 'none' }}>Gestionar ingredientes →</Link>
+        </div>
       </div>
 
       {/* Search */}
@@ -108,17 +132,24 @@ export default function AlmacenesPage() {
           {ordenados.map(([almacen, items]) => {
             const color = ALMACEN_COLOR[almacen] ?? '#6c635a'
             const total = items.reduce((s: number, i: Ingrediente) => s + (i.cost || 0), 0)
+            // Buscando → forzar abierto para que los resultados se vean
+            const abierto = search.trim() ? true : !colapsados[almacen]
             return (
               <div key={almacen} style={{ backgroundColor: 'var(--paper)', border: '1px solid #e8e2db', overflow: 'hidden' }}>
-                {/* Cabecera del almacén */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', backgroundColor: '#faf6ec', borderBottom: '1px solid #e8e2db' }}>
+                {/* Cabecera del almacén — clicable (acordeón) */}
+                <button
+                  onClick={() => toggle(almacen)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', backgroundColor: '#faf6ec', borderBottom: abierto ? '1px solid #e8e2db' : 'none', width: '100%', border: 'none', borderBottomWidth: abierto ? 1 : 0, cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6c635a" strokeWidth={2.5} style={{ transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform .18s', flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                   <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, flexShrink: 0 }} />
                   <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: almacen === SIN_ASIGNAR ? '#a83e1e' : '#3d3834' }}>{almacen}</span>
                   <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#6c635a', marginLeft: 'auto' }}>
-                    {items.length} ítem{items.length !== 1 ? 's' : ''} · {fmt(total)}/ud coste ref.
+                    {items.length} referencia{items.length !== 1 ? 's' : ''} · {fmt(total)} valor de coste
                   </span>
-                </div>
+                </button>
                 {/* Tabla de ingredientes del almacén */}
+                {abierto && (
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     {items.map((ing: Ingrediente, idx: number) => (
@@ -136,6 +167,7 @@ export default function AlmacenesPage() {
                     ))}
                   </tbody>
                 </table>
+                )}
               </div>
             )
           })}

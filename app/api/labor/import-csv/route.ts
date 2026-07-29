@@ -44,6 +44,9 @@ export async function POST(req: NextRequest) {
 
   let inserted = 0
   const errors: { row: number; reason: string }[] = []
+  // LC-01: trazabilidad del vínculo turno↔empleado
+  let vinculados = 0
+  const sinVincular = new Set<string>()
 
   // Snapshot empleados para mapear nombre→id+coste
   const empleados = db.prepare('SELECT id, nombre, employee_id, coste_hora, rol FROM empleados WHERE user_id=?').all(user.id) as any[]
@@ -80,6 +83,9 @@ export async function POST(req: NextRequest) {
           const ext = row.employee_id ? empByExtId[row.employee_id] : null
           const byName = row.employee_name ? empByName[row.employee_name.toLowerCase().trim()] : null
           const emp = ext || byName
+          // LC-01: si el turno trae persona pero no casa con el maestro, queda "sin vincular"
+          if (emp) vinculados++
+          else if (row.employee_name || row.employee_id) sinVincular.add(row.employee_name || row.employee_id)
           const costeHora = numEU(row.hourly_cost) ?? (emp?.coste_hora || null)
           const overnight = parseHM(row.end_time) <= parseHM(row.start_time) ? 1 : 0
           const horasPlan = netHours({
@@ -132,5 +138,16 @@ export async function POST(req: NextRequest) {
   })
   tx()
 
-  return NextResponse.json({ inserted, errors, total: rows.length, available_fields: type === 'turnos' ? FIELDS_TURNOS : FIELDS_VENTAS })
+  return NextResponse.json({
+    inserted, errors, total: rows.length,
+    available_fields: type === 'turnos' ? FIELDS_TURNOS : FIELDS_VENTAS,
+    // LC-01: reporte de vínculo con el maestro de empleados (solo turnos)
+    ...(type === 'turnos' ? {
+      vinculo: {
+        vinculados,
+        sin_vincular: sinVincular.size,
+        nombres_sin_vincular: Array.from(sinVincular).slice(0, 20),
+      },
+    } : {}),
+  })
 }

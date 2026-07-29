@@ -193,7 +193,7 @@ export async function GET(req: NextRequest) {
       detalle: 'Afecta al cálculo de escandallo',
       items: sinCoste.slice(0, 4).map(i => i.descr),
       mas: Math.max(0, totalSinCoste - 4),
-      link: '/dashboard/ingredientes',
+      link: '/dashboard/ingredientes?filtro=sin_coste',
       cta: 'Completar',
     })
   }
@@ -227,7 +227,7 @@ export async function GET(req: NextRequest) {
       detalle: 'Bloquean cálculos y pedidos automáticos',
       items: pendientes,
       mas: 0,
-      link: '/dashboard/ingredientes',
+      link: sinProveedor > 0 ? '/dashboard/ingredientes?filtro=sin_proveedor' : '/dashboard/ingredientes?filtro=sin_almacen',
       cta: 'Revisar ingredientes',
     })
   }

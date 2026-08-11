@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
 import FoodCostCalculator from '@/components/FoodCostCalculator'
 
@@ -59,6 +60,15 @@ export default function SangradoPage() {
 
   return (
     <>
+      {/* Alta masiva desde recetario en Excel (clientes sin software previo) */}
+      <div style={{ padding: '20px 32px 0', display: 'flex', justifyContent: 'flex-end' }}>
+        <Link
+          href="/dashboard/sangrado/importar"
+          style={{ padding: '9px 18px', background: '#faf6ec', border: '1.5px solid #3d3834', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 600, color: '#3d3834', letterSpacing: '0.06em', textDecoration: 'none' }}
+        >
+          IMPORTAR RECETARIO (EXCEL) →
+        </Link>
+      </div>
       <CRUDPage key={reloadKey} title="Escandallo / Sangrado" entity="escandallo-receta" fields={fields} columns={columns} />
 
       {/* Backdrop */}

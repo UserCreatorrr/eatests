@@ -72,7 +72,13 @@ const sidebarGroups: NavGroup[] = [
           { href: '/dashboard/proveedores/detalles', label: 'Fichas' },
         ],
       },
-      { href: '/dashboard/sangrado', label: 'Escandallo / Sangrado', icon: I.recipe },
+      {
+        href: '/dashboard/sangrado', label: 'Escandallo / Sangrado', icon: I.recipe,
+        children: [
+          { href: '/dashboard/sangrado', label: 'Recetas' },
+          { href: '/dashboard/sangrado/importar', label: 'Importar recetario' },
+        ],
+      },
       { href: '/dashboard/merma', label: 'Merma / Desperdicio', icon: I.merma },
     ],
   },

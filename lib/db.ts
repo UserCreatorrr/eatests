@@ -459,6 +459,23 @@ function initSchema(db: Database.Database) {
   // Subrecetas / preparaciones intermedias (feedback P1: salsas, fondos, masas, bases)
   try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN es_subreceta INTEGER DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE escandallo_lineas ADD COLUMN subreceta_id INTEGER`) } catch {}
+
+  // ─── Ficha técnica de receta (importador de recetarios Excel) ────────────
+  // La receta deja de ser 4 campos y pasa a ser una ficha real: código,
+  // rendimiento, alérgenos, procedimiento por pasos y conservación.
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN codigo TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN rendimiento_neto REAL`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN gramos_porcion REAL`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN alergenos TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN procedimiento TEXT`) } catch {}   // JSON de pasos
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN conservacion TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN regeneracion TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN source TEXT`) } catch {}          // 'excel' | 'manual'
+  // Merma por línea: el escandallo cuesta la cantidad BRUTA, y la merma explica
+  // la diferencia con la neta que llega al plato.
+  try { db.exec(`ALTER TABLE escandallo_lineas ADD COLUMN merma_pct REAL`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_lineas ADD COLUMN cantidad_neta REAL`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_lineas ADD COLUMN nota TEXT`) } catch {}
   // Merma: campos operativos adicionales (almacén, servicio, tipo, centro)
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN site_id TEXT`) } catch {}
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN servicio TEXT`) } catch {}

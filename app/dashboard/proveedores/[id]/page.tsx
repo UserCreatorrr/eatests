@@ -53,13 +53,19 @@ export default function ProveedorFichaPage() {
             )}
           </div>
           <div style={{ textAlign: 'right' as const }}>
-            <p style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', opacity: 0.5, textTransform: 'uppercase', margin: 0 }}>Gasto total</p>
+            <p style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', opacity: 0.5, textTransform: 'uppercase', margin: 0 }}>
+              {t.base_calculo === 'albaranes' ? 'Gasto (albaranes)' : 'Gasto facturado'}
+            </p>
             <p style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 26, color: tk.apple, margin: '4px 0 0' }}>{fmt(t.gasto_total || 0)}</p>
-            {(t.gasto_albaranes > 0 || t.gasto_facturas > 0) && (
-              <p style={{ fontFamily: ff.mono, fontSize: 10, opacity: 0.5, margin: '2px 0 0' }}>
-                {[t.gasto_albaranes > 0 && `${fmt(t.gasto_albaranes)} en albaranes`, t.gasto_facturas > 0 && `${fmt(t.gasto_facturas)} en facturas`].filter(Boolean).join(' · ')}
-              </p>
-            )}
+            {/* Se explica siempre sobre qué documentos está calculado, y el otro
+                importe se muestra como referencia, nunca sumado (evita duplicar). */}
+            <p style={{ fontFamily: ff.mono, fontSize: 10, opacity: 0.5, margin: '2px 0 0' }}>
+              {t.base_calculo === 'facturas'
+                ? `Suma de facturas${t.gasto_albaranes > 0 ? ` · ${fmt(t.gasto_albaranes)} entregado en albaranes` : ''}`
+                : t.base_calculo === 'albaranes'
+                  ? 'Aún sin facturas: calculado sobre albaranes recibidos'
+                  : 'Sin documentos de compra todavía'}
+            </p>
             {t.facturas_pendientes > 0 && (
               <p style={{ fontFamily: ff.mono, fontSize: 11, color: '#fca5a5', margin: '4px 0 0' }}>
                 {t.facturas_pendientes} factura{t.facturas_pendientes !== 1 ? 's' : ''} sin pagar · {fmt(t.importe_pendiente || 0)}

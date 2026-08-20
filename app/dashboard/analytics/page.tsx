@@ -644,7 +644,7 @@ function TabConsumo() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Ingrediente', 'Teórico', 'Real comprado', 'Diferencia'].map(h => (
+                  {['Ingrediente', 'Ud.', 'Teórico', 'Real comprado', 'Diferencia'].map(h => (
                     <th key={h} style={{ ...mono(10), textAlign: 'left', padding: '8px 12px', color: '#3d3834', opacity: 0.5, borderBottom: '1px solid #e8e2db' }}>{h}</th>
                   ))}
                 </tr>
@@ -653,10 +653,14 @@ function TabConsumo() {
                 {data.comparativa.map((c: any, i: number) => (
                   <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#faf6ec' : '#f2e9d9' }}>
                     <td style={{ ...mono(12), padding: '8px 12px', color: '#3d3834', fontWeight: 700 }}>{c.ingrediente}</td>
-                    <td style={{ ...mono(11), padding: '8px 12px', color: '#3d3834' }}>{c.consumo_teorico}</td>
+                    <td style={{ ...mono(11), padding: '8px 12px', color: '#3d3834', opacity: 0.6 }}>{c.unidad ?? '—'}</td>
+                    <td style={{ ...mono(11), padding: '8px 12px', color: '#3d3834' }}>{c.consumo_teorico ?? '—'}</td>
                     <td style={{ ...mono(11), padding: '8px 12px', color: '#3d3834' }}>{c.consumo_real ?? '—'}</td>
-                    <td style={{ ...mono(11), padding: '8px 12px', fontWeight: 700, color: c.diferencia > 0 ? '#a83e1e' : '#0fa651' }}>
-                      {c.diferencia != null ? (c.diferencia > 0 ? '+' : '') + c.diferencia : '—'}
+                    <td style={{ ...mono(11), padding: '8px 12px', fontWeight: 700, color: !c.comparable ? '#6c635a' : c.diferencia > 0 ? '#a83e1e' : '#0fa651' }}>
+                      {/* Sin unidades comparables no se inventa un número: se explica por qué */}
+                      {c.comparable
+                        ? (c.diferencia > 0 ? '+' : '') + c.diferencia + ' ' + (c.unidad ?? '')
+                        : <span title={c.motivo_no_comparable ?? ''} style={{ fontWeight: 400, opacity: 0.75 }}>— no comparable</span>}
                     </td>
                   </tr>
                 ))}

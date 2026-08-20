@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
+import { unidadDef } from '@/lib/foodcost'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,10 +11,10 @@ export async function GET(req: NextRequest) {
 
   // Full price history per ingredient
   const historial = db.prepare(`
-    SELECT nombre, vendor, precio, unidad, fecha, fuente
+    SELECT id, nombre, vendor, precio, unidad, fecha, fuente
     FROM precio_historial
     WHERE user_id = ?
-    ORDER BY nombre, fecha DESC
+    ORDER BY nombre, fecha DESC, id DESC
   `).all(uid) as any[]
 
   // Group by ingredient
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
       const impacto_mensual = gastoBase > 0
         ? Math.round((pct / 100) * gastoBase)
         : null
-      const delta_eur = Math.round(ultimo.precio - anterior.precio * 100) / 100
+      const delta_eur = Math.round((ultimo.precio - anterior.precio) * 100) / 100
 
       desviaciones.push({
         nombre,
@@ -103,10 +104,10 @@ export async function GET(req: NextRequest) {
 
   // Line items from scanned albaranes
   const lineas = db.prepare(`
-    SELECT nombre, vendor, precio_unitario, unidad, fecha, cantidad, total_linea
+    SELECT id, nombre, vendor, precio_unitario, unidad, fecha, cantidad, total_linea
     FROM lineas_albaran_compra
     WHERE user_id = ? AND precio_unitario > 0
-    ORDER BY nombre, fecha DESC
+    ORDER BY nombre, fecha DESC, id DESC
   `).all(uid) as any[]
 
   // Detect price inconsistencies across vendors for same product
@@ -120,17 +121,34 @@ export async function GET(req: NextRequest) {
   for (const [nombre, items] of Object.entries(byProduct)) {
     const vendors = Array.from(new Set(items.map((i: any) => i.vendor).filter(Boolean)))
     if (vendors.length < 2) continue
+    // Comparar proveedores exige llevar todos los precios a la MISMA unidad base:
+    // un proveedor en €/kg y otro en €/g no son comparables en crudo.
     const byVendor = vendors.map(v => {
       const last = items.find(i => i.vendor === v)
-      return { vendor: v, precio: last?.precio_unitario, unidad: last?.unidad, fecha: last?.fecha }
+      const def = unidadDef(last?.unidad)
+      const precioBase = (def && last?.precio_unitario > 0)
+        ? Math.round((last.precio_unitario / def.factorBase) * 10000) / 10000
+        : null
+      return {
+        vendor: v, precio: last?.precio_unitario, unidad: last?.unidad, fecha: last?.fecha,
+        precio_base: precioBase, unidad_base: def?.base ?? null,
+      }
     })
-    const precios = byVendor.map(v => v.precio).filter(p => p > 0) as number[]
-    if (precios.length < 2) continue
+    // Solo entran los proveedores con unidad reconocida y de la misma magnitud
+    const base = byVendor.find(v => v.unidad_base)?.unidad_base ?? null
+    const comparables = byVendor.filter(v => v.precio_base != null && v.unidad_base === base)
+    if (!base || comparables.length < 2) continue
+    const precios = comparables.map(v => v.precio_base as number)
     const max = Math.max(...precios)
     const min = Math.min(...precios)
+    if (!(min > 0)) continue
     const diff_pct = Math.round(((max - min) / min) * 100)
     if (diff_pct >= 10) {
-      inconsistencias.push({ nombre, vendors: byVendor, diff_pct, ahorro_potencial: Math.round(max - min) })
+      inconsistencias.push({
+        nombre, vendors: comparables, diff_pct,
+        unidad_base: base,
+        ahorro_potencial: Math.round((max - min) * 100) / 100,
+      })
     }
   }
 

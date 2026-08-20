@@ -20,6 +20,82 @@ export const COSTE_LINEA_SQL = `(
 // El food cost % se calcula SIEMPRE por ración: (coste_total / raciones) / pvp.
 export const RACIONES_SQL = `COALESCE(NULLIF(r.raciones, 0), 1)`
 
+// ─── Vocabulario CERRADO de unidades ───────────────────────────────────────
+// Causa raíz de los food cost absurdos: la unidad era texto libre, así que se
+// podía escribir "Manojo" en un ingrediente cuyas recetas estaban en gramos.
+// Aquí queda un catálogo fijo con su dimensión física, y toda la app elige de él.
+
+export type Dimension = 'masa' | 'volumen' | 'discreta'
+
+export interface UnidadDef {
+  code: string        // valor que se guarda en BD
+  label: string       // lo que ve el usuario
+  dim: Dimension
+  base: string        // unidad base de su dimensión
+  factorBase: number  // cuántas unidades base es 1 de esta
+}
+
+export const UNIDADES: UnidadDef[] = [
+  { code: 'kg', label: 'kg (kilogramo)',  dim: 'masa',      base: 'kg', factorBase: 1 },
+  { code: 'g',  label: 'g (gramo)',       dim: 'masa',      base: 'kg', factorBase: 0.001 },
+  { code: 'mg', label: 'mg (miligramo)',  dim: 'masa',      base: 'kg', factorBase: 0.000001 },
+  { code: 'l',  label: 'l (litro)',       dim: 'volumen',   base: 'l',  factorBase: 1 },
+  { code: 'cl', label: 'cl (centilitro)', dim: 'volumen',   base: 'l',  factorBase: 0.01 },
+  { code: 'ml', label: 'ml (mililitro)',  dim: 'volumen',   base: 'l',  factorBase: 0.001 },
+  { code: 'ud', label: 'ud (unidad)',     dim: 'discreta',  base: 'ud', factorBase: 1 },
+  { code: 'docena', label: 'docena',      dim: 'discreta',  base: 'ud', factorBase: 12 },
+]
+
+// Sinónimos que llegan de Excel, OCR o datos antiguos → código canónico.
+const SINONIMOS: Record<string, string> = {
+  kg: 'kg', kilo: 'kg', kilos: 'kg', kgs: 'kg', 'kilogramo': 'kg', 'kilogramos': 'kg',
+  g: 'g', gr: 'g', grs: 'g', gramo: 'g', gramos: 'g',
+  mg: 'mg',
+  l: 'l', lt: 'l', lts: 'l', litro: 'l', litros: 'l',
+  cl: 'cl',
+  ml: 'ml', cc: 'ml',
+  ud: 'ud', u: 'ud', uds: 'ud', unidad: 'ud', unidades: 'ud', pieza: 'ud', piezas: 'ud',
+  docena: 'docena', docenas: 'docena',
+}
+
+/** Normaliza cualquier variante escrita a un código del vocabulario, o null. */
+export function unidadCanonica(u: string | null | undefined): string | null {
+  if (!u) return null
+  const k = String(u).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+  return SINONIMOS[k] ?? null
+}
+
+export function unidadDef(u: string | null | undefined): UnidadDef | null {
+  const c = unidadCanonica(u)
+  return c ? (UNIDADES.find(x => x.code === c) ?? null) : null
+}
+
+/** Dimensión física de una unidad; null si no pertenece al vocabulario. */
+export function dimensionUnidad(u: string | null | undefined): Dimension | null {
+  return unidadDef(u)?.dim ?? null
+}
+
+/** false solo si ambas unidades son conocidas y de dimensiones distintas.
+ *  Con una unidad desconocida no se bloquea, se deja pasar y se avisa aparte. */
+export function unidadesCompatibles(a: string | null | undefined, b: string | null | undefined): boolean {
+  const da = dimensionUnidad(a), dbb = dimensionUnidad(b)
+  if (!da || !dbb) return true
+  return da === dbb
+}
+
+/** Unidad de COMPRA de una unidad de receta: g→kg, ml→l, ud→ud.
+ *  Las fichas dan cantidades en g/ml pero los precios en €/kg·L·ud. */
+export function unidadBaseCompra(u: string | null | undefined): string {
+  const d = unidadDef(u)
+  return d ? d.base : ((u || 'ud').trim() || 'ud')
+}
+
+/** Unidades que se pueden usar en una línea cuyo ingrediente está en `unidadIng`. */
+export function unidadesCompatiblesCon(unidadIng: string | null | undefined): UnidadDef[] {
+  const d = dimensionUnidad(unidadIng)
+  return d ? UNIDADES.filter(u => u.dim === d) : UNIDADES
+}
+
 // Factor para convertir la cantidad de una línea a la unidad base del ingrediente.
 // Ej: línea en 'g', ingrediente en 'kg' → 0.001  (180 g → 0.18 kg)
 export function unitFactor(lineUnit: string | null | undefined, ingUnit: string | null | undefined): number {

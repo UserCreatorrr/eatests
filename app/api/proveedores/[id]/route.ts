@@ -68,7 +68,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     facturas: facturas.length,
     facturas_pendientes: facturas.filter(f => !f.paid).length,
     importe_pendiente: facturas.filter(f => !f.paid).reduce((s, f) => s + (f.total || 0), 0),
-    gasto_total: Math.round((gastoAlbaranes + gastoFacturas) * 100) / 100,
+    // Definición ÚNICA de gasto: el documento contable es la factura. Sumar
+    // albaranes + facturas duplicaba el mismo pedido (entregado y luego facturado).
+    // Si el proveedor aún no tiene facturas, se informa sobre albaranes y se
+    // indica la base de cálculo para que la cifra nunca sea ambigua.
+    gasto_total: Math.round((gastoFacturas > 0 ? gastoFacturas : gastoAlbaranes) * 100) / 100,
+    base_calculo: gastoFacturas > 0 ? 'facturas' : (gastoAlbaranes > 0 ? 'albaranes' : 'sin_datos'),
     gasto_albaranes: gastoAlbaranes,
     gasto_facturas: gastoFacturas,
   }

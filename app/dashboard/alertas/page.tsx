@@ -4,33 +4,19 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 type Urgencia = 'alta' | 'media' | 'baja'
-type TipoAlerta = 'stock_bajo' | 'merma' | 'factura_vence' | 'pedido_pendiente' | 'recepcion_pendiente'
 
 type Alerta = {
-  tipo: TipoAlerta
+  tipo: string
   titulo: string
   descripcion: string
   urgencia: Urgencia
   link: string
   cta: string
-  count: number
 }
 
 const colorMap: Record<Urgencia, string> = { alta: '#a83e1e', media: '#c97b3d', baja: '#0fa651' }
 const bgMap: Record<Urgencia, string> = { alta: '#fbeae2', media: '#fcf2e8', baja: '#d6f9e0' }
 const labelMap: Record<Urgencia, string> = { alta: 'Urgente', media: 'Aviso', baja: 'Info' }
-
-const tipoLabel: Record<TipoAlerta, string> = {
-  stock_bajo: 'Ingredientes',
-  merma: 'Merma',
-  factura_vence: 'Facturas',
-  pedido_pendiente: 'Pedidos',
-  recepcion_pendiente: 'Recepción',
-}
-
-function fmt(v: number) {
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
-}
 
 export default function AlertasPage() {
   const [alertas, setAlertas] = useState<Alerta[]>([])
@@ -38,96 +24,34 @@ export default function AlertasPage() {
   const router = useRouter()
 
   useEffect(() => {
+    // Fuente ÚNICA de alertas: /api/alerts. Antes esta pantalla se fabricaba sus
+    // propias alertas leyendo tablas sueltas, así que ignoraba las de precio,
+    // food cost crítico y merma, y aparecía vacía aunque hubiera avisos reales.
     async function load() {
-      const [ingRes, pedRes, facRes] = await Promise.all([
-        fetch('/api/data/ingredientes?limit=1000').then(r => r.json()),
-        fetch('/api/data/lista-pedidos?limit=500').then(r => r.json()),
-        fetch('/api/data/facturas-compra?limit=500').then(r => r.json()),
-      ])
+      try {
+        const res = await fetch('/api/alerts').then(r => r.json())
+        const urgencia = (t: string): Urgencia => t === 'danger' ? 'alta' : t === 'warning' ? 'media' : 'baja'
+        const ctaDe = (href?: string) =>
+          !href ? 'Ver detalle'
+          : href.includes('facturas') ? 'Ver facturas'
+          : href.includes('pedidos') ? 'Ver pedidos'
+          : href.includes('ingredientes') ? 'Completar ingredientes'
+          : href.includes('sangrado') ? 'Ver escandallos'
+          : href.includes('merma') ? 'Ver merma'
+          : href.includes('analytics') ? 'Ver desviaciones'
+          : 'Ver detalle'
 
-      const alerts: Alerta[] = []
-
-      const sinCoste = (ingRes.data || []).filter((i: any) => !i.cost)
-      if (sinCoste.length > 0) {
-        alerts.push({
-          tipo: 'stock_bajo',
-          titulo: `${sinCoste.length} ingrediente${sinCoste.length !== 1 ? 's' : ''} sin coste registrado`,
-          descripcion: sinCoste.slice(0, 5).map((i: any) => i.descr).join(', ') + (sinCoste.length > 5 ? `… y ${sinCoste.length - 5} más` : ''),
-          urgencia: 'media',
-          link: '/dashboard/ingredientes',
-          cta: 'Ir a Ingredientes',
-          count: sinCoste.length,
-        })
+        setAlertas((res.alerts || []).map((a: any) => ({
+          tipo: a.id,
+          titulo: a.titulo,
+          descripcion: a.detalle,
+          urgencia: urgencia(a.tipo),
+          link: a.href || '/dashboard',
+          cta: ctaDe(a.href),
+        })))
+      } catch {
+        setAlertas([])
       }
-
-      const pendEnvio = (pedRes.data || []).filter((p: any) => p.pending_send > 0)
-      if (pendEnvio.length > 0) {
-        alerts.push({
-          tipo: 'pedido_pendiente',
-          titulo: `${pendEnvio.length} lista${pendEnvio.length !== 1 ? 's' : ''} de pedidos pendiente${pendEnvio.length !== 1 ? 's' : ''} de envío`,
-          descripcion: pendEnvio.slice(0, 3).map((p: any) => p.descr || 'Sin nombre').join(', ') + (pendEnvio.length > 3 ? ` y ${pendEnvio.length - 3} más` : ''),
-          urgencia: 'alta',
-          link: '/dashboard/compras/pedidos',
-          cta: 'Ver pedidos',
-          count: pendEnvio.length,
-        })
-      }
-
-      const hoy = new Date()
-      hoy.setHours(0, 0, 0, 0)
-      const en7dias = new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000)
-
-      const vencidas = (facRes.data || []).filter((f: any) => {
-        if (f.paid) return false
-        if (!f.date_due) return false
-        return new Date(f.date_due) < hoy
-      })
-      if (vencidas.length > 0) {
-        const total = vencidas.reduce((s: number, f: any) => s + (f.total || 0), 0)
-        alerts.push({
-          tipo: 'factura_vence',
-          titulo: `${vencidas.length} factura${vencidas.length !== 1 ? 's' : ''} vencida${vencidas.length !== 1 ? 's' : ''} sin pagar`,
-          descripcion: `Total pendiente: ${fmt(total)} · ${vencidas.slice(0, 2).map((f: any) => f.vendor || '-').join(', ')}${vencidas.length > 2 ? ` y ${vencidas.length - 2} más` : ''}`,
-          urgencia: 'alta',
-          link: '/dashboard/compras/facturas',
-          cta: 'Ver facturas',
-          count: vencidas.length,
-        })
-      }
-
-      const vencenProx = (facRes.data || []).filter((f: any) => {
-        if (f.paid) return false
-        if (!f.date_due) return false
-        const d = new Date(f.date_due)
-        return d >= hoy && d <= en7dias
-      })
-      if (vencenProx.length > 0) {
-        const total = vencenProx.reduce((s: number, f: any) => s + (f.total || 0), 0)
-        alerts.push({
-          tipo: 'factura_vence',
-          titulo: `${vencenProx.length} factura${vencenProx.length !== 1 ? 's' : ''} vence${vencenProx.length === 1 ? '' : 'n'} en los próximos 7 días`,
-          descripcion: `Total: ${fmt(total)} · ${vencenProx.slice(0, 2).map((f: any) => f.vendor || '-').join(', ')}${vencenProx.length > 2 ? ` y ${vencenProx.length - 2} más` : ''}`,
-          urgencia: 'media',
-          link: '/dashboard/compras/facturas',
-          cta: 'Ver facturas',
-          count: vencenProx.length,
-        })
-      }
-
-      const pendRec = (pedRes.data || []).filter((p: any) => p.pending_receive > 0)
-      if (pendRec.length > 0) {
-        alerts.push({
-          tipo: 'recepcion_pendiente',
-          titulo: `${pendRec.length} lista${pendRec.length !== 1 ? 's' : ''} pendiente${pendRec.length !== 1 ? 's' : ''} de recepción`,
-          descripcion: pendRec.slice(0, 3).map((p: any) => p.descr || 'Sin nombre').join(', ') + (pendRec.length > 3 ? ` y ${pendRec.length - 3} más` : ''),
-          urgencia: 'media',
-          link: '/dashboard/compras/pedidos',
-          cta: 'Ver pedidos',
-          count: pendRec.length,
-        })
-      }
-
-      setAlertas(alerts)
       setLoading(false)
     }
     load()

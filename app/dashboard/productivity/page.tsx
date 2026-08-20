@@ -21,7 +21,7 @@ const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', c
 const fmtN = (v: number, d = 1) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v)
 
 export default function ProductivityOverviewPage() {
-  const [data, setData] = useState<{ summary: ProductivitySummary; from: string; to: string } | null>(null)
+  const [data, setData] = useState<{ summary: ProductivitySummary; from: string; to: string; fuente_horas?: 'real' | 'plan' | 'mixta' | 'sin_datos'; turnos_con_fichaje?: number; turnos_total?: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState<'7' | '30' | 'mtd' | 'custom'>('7')
   // Rango personalizado (feedback LC-03): cualquier fecha/periodo es consultable,
@@ -52,6 +52,7 @@ export default function ProductivityOverviewPage() {
   }, [range, customFrom, customTo])
 
   const s = data?.summary
+  const fuenteHoras = data?.fuente_horas ?? 'sin_datos'
   const statusColor = (st: 'ok' | 'warn' | 'crit') => st === 'crit' ? tk.terra : st === 'warn' ? tk.clay : tk.appleDeep
   const statusBg = (st: 'ok' | 'warn' | 'crit') => st === 'crit' ? tk.terraSoft : st === 'warn' ? tk.claySoft : tk.appleSoft
   const statusLabel = (st: 'ok' | 'warn' | 'crit') => st === 'crit' ? 'CRÍT.' : st === 'warn' ? 'BAJO' : 'OK'
@@ -103,9 +104,19 @@ export default function ProductivityOverviewPage() {
         <div style={{ fontFamily: ff.mono, fontSize: 12, color: tk.iron60 }}>Cargando…</div>
       ) : (
         <>
+          {/* Procedencia de las horas: sin fichajes, todo esto se calcula sobre el
+              PLAN, y decirlo evita leer una estimación como si fuera el resultado real. */}
+          {(fuenteHoras === 'plan' || fuenteHoras === 'mixta') && (
+            <div style={{ background: tk.claySoft, border: `1.5px solid ${tk.clay}`, padding: '10px 14px', marginBottom: 14, fontFamily: ff.mono, fontSize: 11.5, color: tk.clay }}>
+              {fuenteHoras === 'plan'
+                ? 'Calculado sobre HORAS PLANIFICADAS: todavía no hay fichajes cargados, así que estas cifras son una previsión, no el resultado real.'
+                : `Calculado con horas mixtas: ${data?.turnos_con_fichaje} de ${data?.turnos_total} turnos tienen fichaje; el resto usa horas planificadas.`}
+            </div>
+          )}
+
           {/* KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', border: `1.5px solid ${tk.iron}`, marginBottom: 14 }}>
-            <KpiCell label="SPLH" value={s.splh != null ? `€${fmtN(s.splh)}` : '—'} sub="ventas / hora trabajada" />
+            <KpiCell label="SPLH" value={s.splh != null ? `€${fmtN(s.splh)}` : '—'} sub={fuenteHoras === 'real' ? 'ventas / hora real trabajada' : fuenteHoras === 'mixta' ? 'ventas / hora (plan + fichaje)' : 'ventas / hora PLANIFICADA'} />
             <KpiCell label="VENTAS/EMPLEADO" value={s.ventas_por_empleado != null ? fmt(s.ventas_por_empleado) : '—'} sub="por turno" />
             <KpiCell label="TICKETS/HORA" value={s.tickets_por_hora != null ? fmtN(s.tickets_por_hora) : '—'} sub="ticket promedio" />
             <KpiCell label="PRODUCT. INDEX" value={s.productividad_index != null ? `${s.productividad_index}` : '—'} sub="vs target SPLH" variant={s.productividad_index != null && s.productividad_index < 60 ? 'crit' : s.productividad_index != null && s.productividad_index < 85 ? 'warn' : 'ok'} last />

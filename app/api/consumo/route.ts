@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
-import { unitFactor } from '@/lib/foodcost'
+import { unitFactor, unidadDef } from '@/lib/foodcost'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,20 +87,45 @@ export async function GET(req: NextRequest) {
     GROUP BY nombre, unidad
   `).all(uid) as any[]
 
-  // Cross-reference theoretical vs real
-  const comparativa: any[] = []
-  const grouped: Record<string, number> = {}
-  for (const c of consumoTeorico) {
-    grouped[c.ingrediente] = (grouped[c.ingrediente] || 0) + c.consumo_esperado_total
+  // Cross-reference teórico vs real.
+  // CLAVE: el escandallo va en g/ml y las compras en kg/l, así que ambos lados se
+  // convierten a la unidad BASE antes de restar. Sin esto se comparaba 2000 (g)
+  // contra 20 (kg) y salía una diferencia de -1980 con el signo invertido.
+  const aBase = (cantidad: number | null | undefined, unidad: string | null | undefined) => {
+    const def = unidadDef(unidad)
+    if (!def || cantidad == null) return null
+    return { cantidad: cantidad * def.factorBase, unidad: def.base }
   }
-  for (const [ingrediente, teorico] of Object.entries(grouped)) {
+
+  const comparativa: any[] = []
+  const grouped: Record<string, { base: number | null; unidadBase: string | null; sinUnidad: boolean }> = {}
+  for (const c of consumoTeorico) {
+    const conv = aBase(c.consumo_esperado_total, c.unidad)
+    const g = grouped[c.ingrediente] || (grouped[c.ingrediente] = { base: 0, unidadBase: null, sinUnidad: false })
+    if (!conv) { g.sinUnidad = true; continue }
+    g.base = (g.base ?? 0) + conv.cantidad
+    g.unidadBase = conv.unidad
+  }
+
+  for (const [ingrediente, t] of Object.entries(grouped)) {
     const real = comprasReales.find(c => c.nombre.toLowerCase().includes(ingrediente.toLowerCase()))
+    const realConv = real ? aBase(real.total_comprado, real.unidad) : null
+
+    // Solo se compara si ambos lados tienen unidad reconocida y de la misma magnitud
+    const comparable = t.base != null && !t.sinUnidad && realConv != null && realConv.unidad === t.unidadBase
     comparativa.push({
       ingrediente,
-      consumo_teorico: teorico,
-      consumo_real: real?.total_comprado ?? null,
-      diferencia: real ? Math.round((real.total_comprado - teorico) * 100) / 100 : null,
-      coste_diferencia: real?.coste_real ? Math.round((real.coste_real - (grouped[ingrediente] * 0)) * 100) / 100 : null,
+      unidad: t.unidadBase,
+      consumo_teorico: t.base != null ? Math.round(t.base * 1000) / 1000 : null,
+      consumo_real: realConv ? Math.round(realConv.cantidad * 1000) / 1000 : null,
+      diferencia: comparable ? Math.round((realConv!.cantidad - t.base!) * 1000) / 1000 : null,
+      comparable,
+      motivo_no_comparable: comparable ? null
+        : t.sinUnidad ? 'La receta tiene líneas sin unidad reconocida'
+        : !real ? 'Sin compras registradas de este ingrediente en el mes'
+        : !realConv ? 'La compra no tiene una unidad reconocida'
+        : 'La receta y la compra usan magnitudes distintas',
+      coste_real: real?.coste_real ?? null,
     })
   }
 

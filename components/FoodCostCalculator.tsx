@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { unitFactor } from '@/lib/foodcost'
+import { unitFactor, unidadesCompatibles, unidadesCompatiblesCon, dimensionUnidad } from '@/lib/foodcost'
 
 type Linea = {
   id: number
@@ -34,6 +34,8 @@ type Props = {
 
 // Unidades cómodas para cocina (feedback P1): el sistema convierte solo
 // (150 g de un ingrediente a €/kg → 0,15 kg) sin obligar a pensar en decimales.
+// El desplegable se filtra por la MAGNITUD del ingrediente elegido, para que no
+// se pueda pedir "14 ud" de algo que se controla en kg.
 const UNIDADES_COCINA = ['g', 'kg', 'ml', 'cl', 'l', 'ud', 'docena']
 
 function eur(v: number | null | undefined) {
@@ -79,6 +81,7 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
   const [pvp, setPvp] = useState<string>(precioVenta != null ? String(precioVenta) : '')
   const [rac, setRac] = useState<string>(raciones != null && raciones > 0 ? String(raciones) : '1')
   const [savingReceta, setSavingReceta] = useState(false)
+  const [errorUnidad, setErrorUnidad] = useState('')
   const [recetaGuardada, setRecetaGuardada] = useState(false)
   const [nueva, setNueva] = useState({
     ingrediente_id: '',
@@ -113,6 +116,16 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
 
   async function addLinea() {
     if (!nueva.cantidad || parseFloat(nueva.cantidad) <= 0) return
+    // No se permite guardar una línea cuya unidad no es de la misma magnitud que
+    // la del ingrediente: daría un coste sin sentido (14 ud x 20 €/kg = 280 €).
+    if (!usarLibre && nueva.ingrediente_id) {
+      const ing = ingredientes.find(i => i.id === parseInt(nueva.ingrediente_id))
+      if (ing && !unidadesCompatibles(nueva.unidad, ing.unit)) {
+        setErrorUnidad(`«${ing.descr}» se controla en ${ing.unit} y estás usando ${nueva.unidad}. Elige una unidad de la misma magnitud o cambia la unidad base del ingrediente.`)
+        return
+      }
+    }
+    setErrorUnidad('')
     setSaving(true)
     const body: any = {
       cantidad: parseFloat(nueva.cantidad),
@@ -140,10 +153,12 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
 
   function onIngSelect(id: string) {
     const ing = ingredientes.find(i => i.id === parseInt(id))
+    setErrorUnidad('')
     setNueva(n => ({
       ...n,
       ingrediente_id: id,
-      unidad: ing?.unit || n.unidad,
+      // Si la unidad actual no es de la magnitud del ingrediente, se sustituye
+      unidad: (n.unidad && unidadesCompatibles(n.unidad, ing?.unit)) ? n.unidad : (ing?.unit || ''),
       coste_unitario: ing?.cost ? String(ing.cost) : n.coste_unitario,
     }))
   }
@@ -163,6 +178,14 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
     setTimeout(() => setRecetaGuardada(false), 2500)
     onSaved?.()
   }
+
+  // Unidades ofrecidas: solo las de la magnitud del ingrediente seleccionado
+  const ingSeleccionado = !usarLibre && nueva.ingrediente_id
+    ? ingredientes.find(i => i.id === parseInt(nueva.ingrediente_id))
+    : null
+  const unidadesPermitidas = ingSeleccionado && dimensionUnidad(ingSeleccionado.unit)
+    ? unidadesCompatiblesCon(ingSeleccionado.unit).map(u => u.code)
+    : UNIDADES_COCINA
 
   const costeTotal = lineas.reduce((sum, l) => sum + (lineSubtotal(l) ?? 0), 0)
 
@@ -342,8 +365,8 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
                 style={{ flex: '0 1 90px', fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '7px 10px', border: '1px solid #e8e2db', borderRadius: 8, backgroundColor: '#fff', color: '#3d3834' }}
               >
                 <option value="">unidad…</option>
-                {UNIDADES_COCINA.map(u => <option key={u} value={u}>{u}</option>)}
-                {nueva.unidad && !UNIDADES_COCINA.includes(nueva.unidad) && <option value={nueva.unidad}>{nueva.unidad}</option>}
+                {unidadesPermitidas.map(u => <option key={u} value={u}>{u}</option>)}
+                {nueva.unidad && !unidadesPermitidas.includes(nueva.unidad) && <option value={nueva.unidad}>{nueva.unidad}</option>}
               </select>
               <input
                 type="number" step="0.0001" min="0" placeholder="€/ud (auto)"
@@ -359,6 +382,11 @@ export default function FoodCostCalculator({ recetaId, recetaNombre, precioVenta
                 +
               </button>
             </div>
+            {errorUnidad && (
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#a83e1e', margin: '10px 0 0', lineHeight: 1.45 }}>
+                ⚠ {errorUnidad}
+              </p>
+            )}
           </div>
 
           {/* Cierre financiero: PVP + raciones editables → coste/ración, FC%, márgenes */}

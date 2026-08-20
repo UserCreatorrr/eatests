@@ -50,7 +50,9 @@ export async function GET(req: NextRequest) {
     SELECT ROUND(SUM(sales_net),2) as t FROM ventas_franja
     WHERE user_id=? AND fecha BETWEEN date(?,'-7 days') AND ? ${where_site}
   `).get(userId, fecha, fecha, ...siteParams) as any
-  const fc_pct = (ventasUlt7?.t > 0) ? Math.round((fc7d / ventasUlt7.t) * 100) : null
+  // Contrato de "sin datos": hace falta gasto Y ventas. Con uno de los dos a cero
+  // el porcentaje no significa nada, así que se devuelve null y la UI pinta "—".
+  const fc_pct = (ventasUlt7?.t > 0 && fc7d > 0) ? Math.round((fc7d / ventasUlt7.t) * 100) : null
 
   // ── MERMA AYER
   const mermaRow = db.prepare(`
@@ -134,8 +136,10 @@ export async function GET(req: NextRequest) {
   }
   if (mermaRow?.n > 0) prioridades.push(`Analizar merma de ayer (${mermaRow.n} eventos, ${mermaRow.t || 0}€)`)
   if (fc_pct != null && fc_pct > 30) prioridades.push(`Revisar escandallo: FC% en ${fc_pct}%`)
-  while (prioridades.length < 3) prioridades.push('Revisar Daily Brief al cierre y comparar plan vs real')
-  prioridades.length = 3
+  // Antes se rellenaba hasta 3 repitiendo la misma frase, y el brief mostraba
+  // tres prioridades idénticas. Ahora se muestran solo las reales (máximo 3) y,
+  // si no hay ninguna, se dice explícitamente que no hay acciones pendientes.
+  const prioridadesUnicas = Array.from(new Set(prioridades)).slice(0, 3)
 
   // ── DATA QUALITY
   const hasVentas = ventasFranjaAyer.length > 0
@@ -163,7 +167,8 @@ export async function GET(req: NextRequest) {
       cash: { vencidas: facVencidasRow, proximas_7d: facProx7Row },
     },
     alertas: top5,
-    prioridades,
+    prioridades: prioridadesUnicas,
+    sin_prioridades: prioridadesUnicas.length === 0,
   }
 
   // Guardar histórico — un único registro por (scope, site, fecha). Si ya existe, se actualiza.

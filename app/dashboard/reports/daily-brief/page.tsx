@@ -70,7 +70,7 @@ export default function DailyBriefPage() {
           El brief que tu COO lee en 90 segundos.
         </h1>
         <p style={{ fontFamily: ff.mono, fontSize: 12.5, color: tk.iron60, margin: 0 }}>
-          Templated email con KPI strip, top 5 alertas y 3 prioridades del día. Programable diariamente.
+          Templated email con KPI strip, alertas y las prioridades reales del día. Programable diariamente.
         </p>
       </div>
 
@@ -197,11 +197,17 @@ export default function DailyBriefPage() {
           {/* 3 PRIORIDADES */}
           <div style={{ background: tk.iron, color: tk.cream, padding: '20px 22px' }}>
             <p style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.2em', color: tk.apple, textTransform: 'uppercase', margin: '0 0 12px' }}>
-              HOY TOCA · 3 PRIORIDADES
+              HOY TOCA · {brief.prioridades.length} PRIORIDAD{brief.prioridades.length === 1 ? '' : 'ES'}
             </p>
-            <ol style={{ margin: 0, paddingLeft: 18, fontFamily: ff.mono, fontSize: 13, lineHeight: 1.7 }}>
-              {brief.prioridades.map((p, i) => <li key={i}>{p}</li>)}
-            </ol>
+            {brief.prioridades.length === 0 ? (
+              <p style={{ fontFamily: ff.mono, fontSize: 13, margin: 0, opacity: 0.75 }}>
+                No hay acciones pendientes con los datos de hoy.
+              </p>
+            ) : (
+              <ol style={{ margin: 0, paddingLeft: 18, fontFamily: ff.mono, fontSize: 13, lineHeight: 1.7 }}>
+                {brief.prioridades.map((p, i) => <li key={i}>{p}</li>)}
+              </ol>
+            )}
           </div>
 
           <p style={{ fontFamily: ff.mono, fontSize: 10, color: tk.iron40, textAlign: 'center', marginTop: 22, letterSpacing: '0.08em' }}>

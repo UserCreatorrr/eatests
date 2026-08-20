@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { CATEGORIAS_INGREDIENTE, ALMACENES, TIPOS_IVA, ivaPorCategoria, almacenPorCategoria } from '@/lib/catalog'
+import { UNIDADES, dimensionUnidad } from '@/lib/foodcost'
 
 type Ingrediente = {
   id: number
@@ -41,6 +42,10 @@ export default function IngredientesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   // Filtro por estado (FC-14/RP-03): clicable desde contadores y deep-link (?filtro=)
   const [filtro, setFiltro] = useState<'todos' | 'sin_proveedor' | 'con_proveedor' | 'sin_coste' | 'sin_almacen'>('todos')
+  // Cambiar la unidad base recalcula TODAS las recetas que usan el ingrediente:
+  // se avisa del impacto antes de guardar en vez de alterarlas en silencio.
+  const [unidadOriginal, setUnidadOriginal] = useState<string | null>(null)
+  const [recetasAfectadas, setRecetasAfectadas] = useState<number | null>(null)
 
   useEffect(() => {
     const f = new URLSearchParams(window.location.search).get('filtro')
@@ -92,6 +97,8 @@ export default function IngredientesPage() {
 
   function openAdd() {
     setEditingId(null)
+    setUnidadOriginal(null)
+    setRecetasAfectadas(null)
     setForm({})
     setMsg('')
     setModalOpen(true)
@@ -99,12 +106,37 @@ export default function IngredientesPage() {
 
   function openEdit(r: Ingrediente) {
     setEditingId(r.id)
+    setUnidadOriginal(r.unit || null)
+    setRecetasAfectadas(null)
+    fetch(`/api/ingredientes/${r.id}/ficha`)
+      .then(res => res.json())
+      .then(d => setRecetasAfectadas(Array.isArray(d.recetas) ? d.recetas.length : 0))
+      .catch(() => setRecetasAfectadas(null))
     setForm({ codi: r.codi || '', descr: r.descr || '', type: r.type || '', unit: r.unit || '', cost: r.cost ?? undefined, iva: r.iva ?? undefined, proveedor_id: r.proveedor_id ?? null, proveedor_nombre: r.proveedor_nombre ?? null, almacen_principal: r.almacen_principal || '', almacen_secundario: r.almacen_secundario || '' })
     setMsg('')
     setModalOpen(true)
   }
 
   async function save() {
+    // Cambio de dimensión (p. ej. kg → ud): el coste de las recetas cambia de
+    // escala. Se pide confirmación explícita con el número de recetas afectadas.
+    if (editingId && unidadOriginal && form.unit && form.unit !== unidadOriginal) {
+      const antes = dimensionUnidad(unidadOriginal)
+      const despues = dimensionUnidad(form.unit as string)
+      if (antes && despues && antes !== despues) {
+        const n = recetasAfectadas ?? 0
+        const aviso = n > 0
+          ? `Vas a cambiar la unidad de ${unidadOriginal} (${antes}) a ${form.unit} (${despues}).
+
+${n} receta(s) usan este ingrediente y su coste se recalculará con la nueva unidad, lo que puede alterar su food cost.
+
+¿Continuar?`
+          : `Vas a cambiar la unidad de ${unidadOriginal} (${antes}) a ${form.unit} (${despues}), que son magnitudes distintas.
+
+¿Continuar?`
+        if (!confirm(aviso)) return
+      }
+    }
     setSaving(true)
     setMsg('')
     const body = {
@@ -310,8 +342,11 @@ export default function IngredientesPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Unidad base</label>
-                  <input type="text" value={(form as any).unit ?? ''} onChange={e => setForm(prev => ({ ...prev, unit: e.target.value }))}
-                    placeholder="kg, l, ud" style={fieldStyle} onFocus={e => e.currentTarget.style.borderColor = '#3d3834'} onBlur={e => e.currentTarget.style.borderColor = '#c4b8a8'} />
+                  <select value={(form as any).unit ?? ''} onChange={e => setForm(prev => ({ ...prev, unit: e.target.value }))}
+                    style={{ ...fieldStyle, cursor: 'pointer' }}>
+                    <option value="">— seleccionar —</option>
+                    {UNIDADES.map(u => <option key={u.code} value={u.code}>{u.label}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label style={labelStyle}>Coste (€)</label>

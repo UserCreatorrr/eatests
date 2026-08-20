@@ -80,36 +80,9 @@ export function num(v: Celda): number | null {
 }
 
 // ─── Unidades ──────────────────────────────────────────────────────────────
-
-/** Familia física de una unidad, para detectar comparaciones imposibles. */
-export function familiaUnidad(u: string | null | undefined): 'masa' | 'volumen' | 'unidad' | null {
-  const n = norm(u)
-  if (!n) return null
-  if (['g', 'gr', 'gramo', 'gramos', 'grs', 'kg', 'kilo', 'kilos', 'kgs', 'mg'].includes(n)) return 'masa'
-  if (['ml', 'cc', 'cl', 'l', 'lt', 'litro', 'litros', 'lts'].includes(n)) return 'volumen'
-  if (['ud', 'uds', 'u', 'unidad', 'unidades', 'pieza', 'piezas', 'docena', 'manojo', 'bandeja'].includes(n)) return 'unidad'
-  return null
-}
-
-/** false solo si ambas unidades son conocidas y de familias distintas
- *  (p. ej. receta en gramos contra un ingrediente que se compra por manojo). */
-export function unidadesCompatibles(a: string | null | undefined, b: string | null | undefined): boolean {
-  const fa = familiaUnidad(a), fb = familiaUnidad(b)
-  if (!fa || !fb) return true
-  return fa === fb
-}
-
-/** Unidad de COMPRA correspondiente a una unidad de receta.
- *  Las fichas expresan cantidades en g/ml pero los precios en €/kg·L·ud, así que
- *  un ingrediente nuevo debe nacer con la unidad del precio, no la de la receta. */
-export function unidadBaseCompra(u: string | null | undefined): string {
-  switch (familiaUnidad(u)) {
-    case 'masa': return 'kg'
-    case 'volumen': return 'l'
-    case 'unidad': return 'ud'
-    default: return (u || 'ud').trim() || 'ud'
-  }
-}
+// El vocabulario de unidades vive en lib/foodcost.ts y es el ÚNICO de la app:
+// el importador, el escandallo y el catálogo comparten la misma definición.
+export { unidadesCompatibles, unidadBaseCompra, dimensionUnidad } from './foodcost'
 
 // La merma puede venir como fracción (0,05) o como porcentaje (5). Normaliza a %.
 function mermaPct(v: Celda): number | null {

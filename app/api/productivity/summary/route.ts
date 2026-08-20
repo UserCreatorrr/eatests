@@ -44,7 +44,15 @@ export async function GET(req: NextRequest) {
 
   const summary = summarizeProductivity(turnos, ventas, targets, foodCostEur)
 
-  return NextResponse.json({ summary, from, to, site })
+  // Sin fichajes, el motor cae a horas PLANIFICADAS. Se declara la procedencia
+  // para que la interfaz no llame "hora trabajada" a una hora planificada.
+  const conReal = turnos.filter((t: any) => t.horas_real != null).length
+  const fuente_horas = turnos.length === 0 ? 'sin_datos'
+    : conReal === 0 ? 'plan'
+    : conReal === turnos.length ? 'real'
+    : 'mixta'
+
+  return NextResponse.json({ summary, from, to, site, fuente_horas, turnos_con_fichaje: conReal, turnos_total: turnos.length })
 }
 
 function sevenDaysAgo(): string {

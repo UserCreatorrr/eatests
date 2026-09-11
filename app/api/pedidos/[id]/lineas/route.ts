@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
-import { lineCost } from '@/lib/foodcost'
+import { lineCost, unidadesCompatibles } from '@/lib/foodcost'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const lineas = db.prepare(`
     SELECT l.*, i.descr AS ing_nombre, i.unit AS ing_unidad, i.cost AS ing_coste
     FROM pedidos_compra_lineas l
-    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
     WHERE l.pedido_id=? AND l.user_id=? ORDER BY l.id ASC
   `).all(params.id, user.id) as any[]
 
@@ -37,15 +37,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   let unidad = b.unidad || null
   let coste = b.coste_estimado != null ? Number(b.coste_estimado) : null
 
+  if (cantidad != null && cantidad < 0) return NextResponse.json({ error: 'La cantidad no puede ser negativa' }, { status: 400 })
   // Si viene del catálogo, completar nombre/unidad/coste automáticamente (normalizado)
   if (ingId) {
     const ing = db.prepare('SELECT descr, unit, cost, almacen_principal FROM ingredientes WHERE id=? AND user_id=?').get(ingId, user.id) as any
-    if (ing) {
-      nombre = nombre || ing.descr
-      unidad = unidad || ing.unit
-      if (coste == null && cantidad != null && ing.cost) coste = Math.round(lineCost(cantidad, unidad, ing.cost, ing.unit) * 100) / 100
-      if (!b.almacen_destino && ing.almacen_principal) b.almacen_destino = ing.almacen_principal
+    if (!ing) return NextResponse.json({ error: 'Ingrediente no encontrado' }, { status: 404 })
+    nombre = nombre || ing.descr
+    unidad = unidad || ing.unit
+    if (!unidadesCompatibles(unidad, ing.unit)) {
+      return NextResponse.json({ error: `La unidad "${unidad}" no es compatible con "${ing.unit}" del ingrediente.` }, { status: 400 })
     }
+    if (coste == null && cantidad != null && ing.cost) coste = Math.round(lineCost(cantidad, unidad, ing.cost, ing.unit) * 100) / 100
+    if (!b.almacen_destino && ing.almacen_principal) b.almacen_destino = ing.almacen_principal
   }
 
   db.prepare(`

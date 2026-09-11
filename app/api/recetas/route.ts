@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const recetas = db.prepare(`
     SELECT r.*,
       (SELECT ROUND(SUM(${COSTE_LINEA_SQL}),4) FROM escandallo_lineas l
-       LEFT JOIN ingredientes i ON l.ingrediente_id = i.id
+       LEFT JOIN ingredientes i ON l.ingrediente_id = i.id AND i.user_id = l.user_id
        WHERE l.receta_id = r.id AND l.user_id = ?) as coste_total
     FROM escandallo_receta r WHERE r.user_id = ? ORDER BY r.nombre
   `).all(uid, uid) as any[]

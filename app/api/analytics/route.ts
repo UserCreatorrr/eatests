@@ -10,18 +10,21 @@ export async function GET(req: NextRequest) {
 
   const uid = user.id
 
+  // Gasto = facturas de compra (verdad contable). Antes se sumaban PEDIDOS, que
+  // son encargos y no dinero gastado, y no cuadraba con la ficha de proveedor
+  // ni con el Daily Brief. Ahora todas las pantallas usan la misma definición.
   const gastoMensual = db.prepare(`
-    SELECT strftime('%Y-%m', date_order) as mes,
+    SELECT strftime('%Y-%m', date_invoice) as mes,
            ROUND(SUM(total),2) as total,
            COUNT(*) as num_pedidos
-    FROM pedidos_compra
-    WHERE user_id=? AND date_order IS NOT NULL AND date_order != ''
+    FROM facturas_compra
+    WHERE user_id=? AND date_invoice IS NOT NULL AND date_invoice != ''
     GROUP BY mes ORDER BY mes ASC LIMIT 12
   `).all(uid)
 
   const topProveedores = db.prepare(`
     SELECT vendor, ROUND(SUM(total),2) as total, COUNT(*) as pedidos
-    FROM pedidos_compra
+    FROM facturas_compra
     WHERE user_id=? AND vendor IS NOT NULL AND vendor != ''
     GROUP BY vendor ORDER BY total DESC LIMIT 5
   `).all(uid)
@@ -37,13 +40,13 @@ export async function GET(req: NextRequest) {
   `).get(uid)
 
   const gastoEsteMes = (db.prepare(`
-    SELECT ROUND(SUM(total),2) as v FROM pedidos_compra
-    WHERE user_id=? AND strftime('%Y-%m', date_order) = strftime('%Y-%m', 'now')
+    SELECT ROUND(SUM(total),2) as v FROM facturas_compra
+    WHERE user_id=? AND strftime('%Y-%m', date_invoice) = strftime('%Y-%m', 'now')
   `).get(uid) as any)?.v ?? 0
 
   const gastoMesAnterior = (db.prepare(`
-    SELECT ROUND(SUM(total),2) as v FROM pedidos_compra
-    WHERE user_id=? AND strftime('%Y-%m', date_order) = strftime('%Y-%m', date('now','-1 month'))
+    SELECT ROUND(SUM(total),2) as v FROM facturas_compra
+    WHERE user_id=? AND strftime('%Y-%m', date_invoice) = strftime('%Y-%m', date('now','-1 month'))
   `).get(uid) as any)?.v ?? 0
 
   const ingredientesSinCoste = (db.prepare(`
@@ -64,8 +67,8 @@ export async function GET(req: NextRequest) {
 
   const gastoPorMesActual = db.prepare(`
     SELECT vendor, ROUND(SUM(total),2) as total
-    FROM pedidos_compra
-    WHERE user_id=? AND strftime('%Y-%m', date_order) = strftime('%Y-%m', 'now')
+    FROM facturas_compra
+    WHERE user_id=? AND strftime('%Y-%m', date_invoice) = strftime('%Y-%m', 'now')
     GROUP BY vendor ORDER BY total DESC LIMIT 8
   `).all(uid)
 

@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
            ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1), 4) AS coste_racion
     FROM escandallo_receta r
     JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
-    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
     WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0
     GROUP BY r.id
     HAVING CAST(coste_racion AS REAL) / r.precio_venta > 0.33

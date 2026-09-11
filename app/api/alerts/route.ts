@@ -99,11 +99,13 @@ export async function GET(req: NextRequest) {
 
   // 5. Subidas de precio >10%
   const allPrecios = db.prepare(
-    'SELECT nombre, precio FROM precio_historial WHERE user_id=? ORDER BY nombre, id ASC'
+    'SELECT nombre, precio, precio_anterior FROM precio_historial WHERE user_id=? ORDER BY nombre, id ASC'
   ).all(userId) as any[]
   const precioMap: Record<string, { first: number; last: number }> = {}
   for (const p of allPrecios) {
-    if (!precioMap[p.nombre]) precioMap[p.nombre] = { first: p.precio, last: p.precio }
+    // `first` es el precio ANTERIOR del primer registro si existe: así una única
+    // compra que ya subió el coste (2,00 → 2,40) también cuenta como subida.
+    if (!precioMap[p.nombre]) precioMap[p.nombre] = { first: (p.precio_anterior ?? p.precio), last: p.precio }
     precioMap[p.nombre].last = p.precio
   }
   const subidas = Object.entries(precioMap)
@@ -199,7 +201,7 @@ export async function GET(req: NextRequest) {
            ROUND(SUM(${COSTE_LINEA_SQL}) / ${RACIONES_SQL}, 4) AS coste_racion
     FROM escandallo_receta r
     JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
-    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
     WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
     GROUP BY r.id
     HAVING CAST(coste_racion AS REAL) / r.precio_venta > 0.35

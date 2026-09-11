@@ -11,6 +11,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Demasiados intentos. Espera un minuto.' }, { status: 429 })
     }
     const { email, password } = await req.json()
+    // Segundo límite por CUENTA: rotar la IP declarada (X-Forwarded-For) no sirve
+    // para machacar un email concreto. 10 intentos/5 min por email.
+    if (email && !rateLimit(`login-acct:${String(email).toLowerCase().trim()}`, 10, 300_000)) {
+      return NextResponse.json({ error: 'Demasiados intentos para esta cuenta. Espera unos minutos.' }, { status: 429 })
+    }
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email y contraseña requeridos' }, { status: 400 })

@@ -633,11 +633,11 @@ function checkFoodCostImpact(userId: string, ingredienteName: string): string {
            ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1), 4) AS coste_total
     FROM escandallo_receta r
     JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
-    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
     WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
       AND r.id IN (
         SELECT DISTINCT l2.receta_id FROM escandallo_lineas l2
-        JOIN ingredientes i2 ON i2.id = l2.ingrediente_id
+        JOIN ingredientes i2 ON i2.id = l2.ingrediente_id AND i2.user_id = l2.user_id
         WHERE l2.user_id = ? AND i2.descr LIKE ?
       )
     GROUP BY r.id
@@ -1049,7 +1049,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       const lineas = db.prepare(`
         SELECT l.ingrediente_id, l.cantidad, l.unidad, l.coste_unitario, i.cost, i.unit AS ing_unit
         FROM escandallo_lineas l
-        LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+        LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
         WHERE l.receta_id=? AND l.user_id=?
       `).all(r.id, userId) as any[]
       if (!lineas.length) continue
@@ -1328,7 +1328,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     }
     const subidas = Object.entries(precMap).filter(([, v]) => v.first > 0 && ((v.last - v.first) / v.first) > 0.05).sort((a, b) => ((b[1].last - b[1].first) / b[1].first) - ((a[1].last - a[1].first) / a[1].first)).slice(0, 4)
 
-    const recetasCrit = db.prepare(`SELECT r.nombre, r.precio_venta, ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1),4) AS coste FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id AND l.user_id=r.user_id LEFT JOIN ingredientes i ON i.id=l.ingrediente_id WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0 GROUP BY r.id HAVING CAST(coste AS REAL)/r.precio_venta>0.35 AND CAST(coste AS REAL)/r.precio_venta<=3 ORDER BY CAST(coste AS REAL)/r.precio_venta DESC LIMIT 4`).all(userId) as any[]
+    const recetasCrit = db.prepare(`SELECT r.nombre, r.precio_venta, ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1),4) AS coste FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id AND l.user_id=r.user_id LEFT JOIN ingredientes i ON i.id=l.ingrediente_id AND i.user_id = l.user_id WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0 GROUP BY r.id HAVING CAST(coste AS REAL)/r.precio_venta>0.35 AND CAST(coste AS REAL)/r.precio_venta<=3 ORDER BY CAST(coste AS REAL)/r.precio_venta DESC LIMIT 4`).all(userId) as any[]
 
     const semana = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
     return `__INFORME_SEMANAL__${JSON.stringify({
@@ -1452,7 +1452,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
              ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1), 4) AS coste_total
       FROM escandallo_receta r
       JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
-      LEFT JOIN ingredientes i ON i.id = l.ingrediente_id
+      LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
       WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
       GROUP BY r.id
       ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
@@ -1489,7 +1489,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
                i.descr AS ing_nombre, i.cost AS ing_coste, i.unit AS ing_unidad,
                p.descr AS proveedor_nombre, p.mail AS proveedor_email, p.phone AS proveedor_phone
         FROM escandallo_lineas l
-        LEFT JOIN ingredientes i ON l.ingrediente_id = i.id
+        LEFT JOIN ingredientes i ON l.ingrediente_id = i.id AND i.user_id = l.user_id
         LEFT JOIN proveedores p ON p.id = i.proveedor_id
         WHERE l.receta_id=? AND l.user_id=?
       `).all(receta.id, userId) as any[]

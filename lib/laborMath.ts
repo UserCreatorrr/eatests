@@ -176,7 +176,7 @@ export interface ProductivitySummary {
   covers_por_hora: number | null
   productividad_index: number | null   // 0-100 vs target
   prime_cost_pct: number | null
-  coste_ineficiencia: number
+  coste_ineficiencia: number | null
   por_franja: { slot: string; ventas: number; horas: number; splh: number | null; target_splh: number | null; status: 'ok' | 'warn' | 'crit' }[]
 }
 
@@ -229,7 +229,9 @@ export function summarizeProductivity(
     covers_por_hora: totalHoras > 0 && totalCovers > 0 ? round1(totalCovers / totalHoras) : null,
     productividad_index: productividadIdx,
     prime_cost_pct: (foodCostEur != null && totalVentas > 0) ? round1(((foodCostEur + totalCoste) / totalVentas) * 100) : null,
-    coste_ineficiencia: round2(costeInef),
+    // Sin horas o sin ventas no hay ineficiencia que medir: devolver 0 haría
+    // leer "no hay sobrecoste" cuando en realidad no hay dato (contrato sin datos).
+    coste_ineficiencia: (totalHoras > 0 && totalVentas > 0) ? round2(costeInef) : null,
     por_franja: porFranja,
   }
 }

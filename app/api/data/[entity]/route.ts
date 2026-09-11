@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
-import { pickValidColumns, idIsText, tableColumns } from '@/lib/security'
+import { pickValidColumns, idIsText, tableColumns, coerceAndValidate, requireNombre, ValidationError } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,7 +88,31 @@ export async function POST(
 
   const body = await req.json()
   // Solo columnas reales de la tabla (descarta user_id y claves maliciosas)
-  const fields: Record<string, unknown> = pickValidColumns(table, body)
+  let fields: Record<string, unknown> = pickValidColumns(table, body)
+  // …y además con el tipo y el rango correctos: la validación del formulario
+  // se puede saltar llamando a la API directamente.
+  try {
+    requireNombre(table, fields)
+    fields = coerceAndValidate(table, fields)
+  } catch (e) {
+    if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: 400 })
+    throw e
+  }
+
+  // Destinatario de informes: email válido y, si el scope es local, con centro.
+  if (table === 'reports_recipients') {
+    const email = String(fields.email ?? '')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: 'Email de destinatario no válido' }, { status: 400 })
+    if (fields.scope === 'local' && !fields.site_id) return NextResponse.json({ error: 'Un destinatario de ámbito local necesita un centro' }, { status: 400 })
+  }
+
+  // Cuadre de factura: base + IVA debe aproximar el total (no cierre silencioso).
+  if ((table === 'facturas_compra' || table === 'facturas_venta')) {
+    const base = Number(fields.base ?? 0), iva = Number(fields.taxes ?? 0), total = Number(fields.total ?? 0)
+    if (total > 0 && base > 0 && Math.abs(base + iva - total) > Math.max(0.02, total * 0.01)) {
+      return NextResponse.json({ error: `El total (${total}) no cuadra con base + IVA (${Math.round((base + iva) * 100) / 100}). Revisa los importes.` }, { status: 400 })
+    }
+  }
 
   // UUID solo para tablas con id TEXT; las de id INTEGER usan autoincrement.
   if (!fields.id && idIsText(table)) fields.id = randomUUID()
@@ -104,10 +128,13 @@ export async function POST(
   const values = [user.id, ...Object.values(fields)]
   const placeholders = columns.map(() => '?').join(', ')
 
-  const stmt = db.prepare(`INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`)
-  stmt.run(...values)
+  // INSERT puro (no REPLACE): el id ya no llega del cliente, pero así una
+  // colisión de PK falla en vez de pisar una fila existente, en silencio.
+  const stmt = db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`)
+  const info = stmt.run(...values)
 
-  return NextResponse.json({ ok: true, id: fields.id })
+  // Devuelve el id real: el UUID generado o el autoincrement recién creado.
+  return NextResponse.json({ ok: true, id: fields.id ?? info.lastInsertRowid })
 }
 
 // Autogenera el número de documento si el usuario no lo ha rellenado.

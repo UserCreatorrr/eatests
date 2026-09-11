@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
       urgencia: 'crit',
     })
   }
-  if (prodSum.coste_ineficiencia > 100) {
+  if (prodSum.coste_ineficiencia != null && prodSum.coste_ineficiencia > 100) {
     alertas.push({
       titulo: 'Coste de ineficiencia laboral elevado',
       impacto: `${prodSum.coste_ineficiencia}€ en horas no rentables`,

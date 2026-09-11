@@ -13,10 +13,17 @@ export async function POST(req: NextRequest) {
     if (!rateLimit(`register:${getClientIp(req)}`, 5, 600_000)) {
       return NextResponse.json({ error: 'Demasiados registros. Inténtalo más tarde.' }, { status: 429 })
     }
-    const { email, password, name } = await req.json()
+    let parsed: any
+    try { parsed = await req.json() } catch { return NextResponse.json({ error: 'Petición no válida' }, { status: 400 }) }
+    const email = parsed?.email
+    const password = parsed?.password == null ? '' : String(parsed.password)
+    const name = parsed?.name
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email y contraseña requeridos' }, { status: 400 })
+    }
+    if (typeof email !== 'string') {
+      return NextResponse.json({ error: 'Email no válido' }, { status: 400 })
     }
     if (!EMAIL_RE.test(String(email).trim())) {
       return NextResponse.json({ error: 'Email no válido' }, { status: 400 })

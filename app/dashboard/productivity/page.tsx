@@ -13,7 +13,7 @@ interface ProductivitySummary {
   covers_por_hora: number | null
   productividad_index: number | null
   prime_cost_pct: number | null
-  coste_ineficiencia: number
+  coste_ineficiencia: number | null
   por_franja: { slot: string; ventas: number; horas: number; splh: number | null; target_splh: number | null; status: 'ok' | 'warn' | 'crit' }[]
 }
 
@@ -132,9 +132,9 @@ export default function ProductivityOverviewPage() {
             />
             <KpiCell
               label="COSTE DE INEFICIENCIA"
-              value={fmt(s.coste_ineficiencia)}
+              value={s.coste_ineficiencia != null ? fmt(s.coste_ineficiencia) : '—'}
               sub="horas de más × coste/h (vs SPLH ideal)"
-              variant={s.coste_ineficiencia > 200 ? 'crit' : s.coste_ineficiencia > 50 ? 'warn' : 'default'}
+              variant={s.coste_ineficiencia == null ? 'default' : s.coste_ineficiencia > 200 ? 'crit' : s.coste_ineficiencia > 50 ? 'warn' : 'default'}
               last
             />
           </div>

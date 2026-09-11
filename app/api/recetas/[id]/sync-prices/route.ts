@@ -11,7 +11,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const lineas = db.prepare(`
     SELECT l.id, i.cost as live_cost
     FROM escandallo_lineas l
-    JOIN ingredientes i ON i.id = l.ingrediente_id
+    JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
     WHERE l.receta_id = ? AND l.user_id = ? AND l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL AND i.cost > 0
   `).all(params.id, user.id) as { id: number; live_cost: number }[]
 

@@ -50,7 +50,9 @@ export async function GET(req: NextRequest) {
   const dq = {
     has_turnos: turnos.length > 0,
     has_ventas: ventas.length > 0,
-    has_coste_hora: turnos.every(t => t.coste_hora != null),
+    // OJO: turnos.every() sobre un array vacío devuelve true, y la app afirmaba
+    // tener costes/hora sin un solo turno cargado. Exigir que haya turnos.
+    has_coste_hora: turnos.length > 0 && turnos.every(t => t.coste_hora != null),
     data_quality: turnos.length > 0 && ventas.length > 0 ? 'OK' : 'PARCIAL',
   }
 

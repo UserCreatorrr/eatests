@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       SELECT el.nombre_libre, el.cantidad, el.unidad, el.coste_unitario, el.ingrediente_id,
              i.descr as ingrediente_nombre, i.cost as ingrediente_cost, i.unit as ingrediente_unit
       FROM escandallo_lineas el
-      LEFT JOIN ingredientes i ON el.ingrediente_id = i.id
+      LEFT JOIN ingredientes i ON el.ingrediente_id = i.id AND i.user_id = el.user_id
       WHERE el.receta_id = ? AND el.user_id = ?
     `).all(r.id, uid) as any[]
 

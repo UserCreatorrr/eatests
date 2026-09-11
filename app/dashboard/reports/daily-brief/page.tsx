@@ -17,7 +17,7 @@ interface Brief {
     ventas: { ayer: number; hoy_forecast: number }
     food_cost: { pct: number | null; gasto_7d: number; ventas_7d: number }
     labor: { pct: number | null; coste: number; horas_plan: number }
-    productivity: { splh: number | null; productividad_index: number | null; coste_ineficiencia: number; tickets_por_hora: number | null }
+    productivity: { splh: number | null; productividad_index: number | null; coste_ineficiencia: number | null; tickets_por_hora: number | null }
     merma: { total: number; eventos: number; top: { nombre: string; t: number }[] }
     cash: { vencidas: { c: number; t: number }; proximas_7d: { c: number; t: number } }
   }

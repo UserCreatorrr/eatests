@@ -35,6 +35,17 @@ function intEU(v: string | undefined | null): number | null {
   return n == null ? null : Math.round(n)
 }
 
+// Validaciones de formato para que no entren fechas ni horas imposibles.
+const RE_FECHA = /^\d{4}-\d{2}-\d{2}$/
+const RE_HORA = /^([01]?\d|2[0-3]):[0-5]\d$/
+function fechaValida(v: string): boolean {
+  if (!RE_FECHA.test(v)) return false
+  // Validar en UTC para no desplazar el día según la zona horaria del servidor.
+  const [y, m, d] = v.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+}
+
 export async function POST(req: NextRequest) {
   const user = await getUserFromRequest(req)
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -80,6 +91,12 @@ export async function POST(req: NextRequest) {
             errors.push({ row: idx + 1, reason: `Faltan campos obligatorios: ${faltan}` })
             return
           }
+          if (!fechaValida(row.date)) { errors.push({ row: idx + 1, reason: `Fecha no válida: "${row.date}" (formato AAAA-MM-DD)` }); return }
+          if (!RE_HORA.test(row.start_time) || !RE_HORA.test(row.end_time)) { errors.push({ row: idx + 1, reason: `Hora no válida (${row.start_time}–${row.end_time})` }); return }
+          // Dedup: no reinsertar un turno idéntico ya existente (reimportar el mismo fichero)
+          const yaExiste = db.prepare(`SELECT 1 FROM turnos WHERE user_id=? AND fecha=? AND start_time=? AND end_time=? AND COALESCE(employee_name,'')=COALESCE(?, '') AND COALESCE(site_id,'')=COALESCE(?, '') LIMIT 1`)
+            .get(user.id, row.date, row.start_time, row.end_time, row.employee_name || null, row.site_id || null)
+          if (yaExiste) { errors.push({ row: idx + 1, reason: 'Turno duplicado (ya importado): se omite' }); return }
           const ext = row.employee_id ? empByExtId[row.employee_id] : null
           const byName = row.employee_name ? empByName[row.employee_name.toLowerCase().trim()] : null
           const emp = ext || byName
@@ -116,6 +133,8 @@ export async function POST(req: NextRequest) {
             errors.push({ row: idx + 1, reason: `Faltan campos obligatorios: ${faltan}` })
             return
           }
+          if (!fechaValida(row.date)) { errors.push({ row: idx + 1, reason: `Fecha no válida: "${row.date}"` }); return }
+          if (!RE_HORA.test(row.timeslot_start) || !RE_HORA.test(row.timeslot_end)) { errors.push({ row: idx + 1, reason: `Franja horaria no válida (${row.timeslot_start}–${row.timeslot_end})` }); return }
           insertVenta.run(
             user.id,
             row.site_id || null,

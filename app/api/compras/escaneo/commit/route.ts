@@ -5,6 +5,8 @@ import { unitFactor } from '@/lib/foodcost'
 
 export const dynamic = 'force-dynamic'
 
+class DuplicadoError extends Error { docId: number; constructor(m: string, docId: number) { super(m); this.docId = docId } }
+
 // Guarda el documento validado como TRANSACCIÓN TRAZABLE (diagnóstico P0):
 // cabecera + imagen original + líneas vinculadas al documento (con mapeo a
 // ingrediente, precio anterior y % cambio) + actualización de costes +
@@ -60,6 +62,15 @@ export async function POST(req: NextRequest) {
       docNum = `${prefix}-${ymd}-${String(n + 1).padStart(3, '0')}`
     }
     resumen.documento = docNum
+
+    // Anti duplicado (N-4): si ya existe ese nº de documento con ese proveedor,
+    // no se vuelve a guardar (duplicaría gasto, líneas e histórico de precios).
+    if (c.doc_num) {
+      const tbl = tipo === 'factura' ? 'facturas_compra' : 'albaranes_compra'
+      const col = tipo === 'factura' ? 'invoice_num' : 'delivery_num'
+      const dup = db.prepare(`SELECT id FROM ${tbl} WHERE user_id=? AND ${col}=? AND COALESCE(vendor,'')=COALESCE(?, '') LIMIT 1`).get(uid, docNum, c.vendor || null) as any
+      if (dup) throw new DuplicadoError(`Ya existe ${tipo === 'factura' ? 'una factura' : 'un albarán'} con el número ${docNum} de ${c.vendor || 'este proveedor'}.`, dup.id)
+    }
 
     // Cabecera del documento (con imagen original — no desaparece tras validar)
     if (tipo === 'factura') {
@@ -178,6 +189,10 @@ export async function POST(req: NextRequest) {
     }
   })
 
-  try { tx() } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  try { tx() }
+  catch (e: any) {
+    if (e instanceof DuplicadoError) return NextResponse.json({ error: e.message, duplicado: true, doc_id: e.docId }, { status: 409 })
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
   return NextResponse.json({ ok: true, resumen })
 }

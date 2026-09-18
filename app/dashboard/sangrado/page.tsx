@@ -36,6 +36,14 @@ export default function SangradoPage() {
     setDrawerVisible(true)
   }
 
+  // Entrar en la elaboración que usa una línea, sin salir del panel. Es el
+  // equivalente al chevron que TSpoonLab pone en cada línea de composición.
+  async function abrirSubreceta(id: number) {
+    const res = await fetch('/api/recetas').then(r => r.json()).catch(() => ({ recetas: [] }))
+    const r = (res.recetas || []).find((x: any) => x.id === id)
+    if (r) openCalc({ id: r.id, nombre: r.nombre, precio_venta: r.precio_venta, raciones: r.raciones, es_subreceta: r.es_subreceta, cantidad_producida: r.cantidad_producida, unidad_producida: r.unidad_producida })
+  }
+
   function closeCalc() {
     setDrawerVisible(false)
     setTimeout(() => setSelectedReceta(null), 300)
@@ -132,6 +140,12 @@ export default function SangradoPage() {
         <div style={{ padding: '0 24px 32px' }}>
           {selectedReceta && (
             <FoodCostCalculator
+              // `key` obliga a montar de nuevo el calculador al cambiar de
+              // receta. Sin esto, al entrar en una elaboración desde una línea
+              // el formulario conservaba el PVP, las raciones y la producción
+              // de la receta anterior, y "Guardar ficha" los escribía en la
+              // que no era.
+              key={selectedReceta.id}
               recetaId={selectedReceta.id}
               recetaNombre={selectedReceta.nombre}
               precioVenta={selectedReceta.precio_venta}
@@ -139,6 +153,7 @@ export default function SangradoPage() {
               esSubreceta={selectedReceta.es_subreceta}
               cantidadProducida={selectedReceta.cantidad_producida}
               unidadProducida={selectedReceta.unidad_producida}
+              onAbrirSubreceta={abrirSubreceta}
               onClose={closeCalc}
               onSaved={() => setReloadKey(k => k + 1)}
               embedded

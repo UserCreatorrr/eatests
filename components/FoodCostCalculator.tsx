@@ -46,6 +46,7 @@ type Props = {
   unidadProducida?: string | null
   onClose: () => void
   onSaved?: () => void
+  onAbrirSubreceta?: (id: number) => void
   embedded?: boolean
 }
 
@@ -71,6 +72,10 @@ function foodCostBadge(pct: number) {
   return { label: 'CRITICO', bg: '#fbeae2', color: '#a83e1e' }
 }
 
+// Colores de la distribución de coste. Se repiten a partir del séptimo, que es
+// más de lo que nadie mira en un gráfico de tarta.
+const COLORES_COSTE = ['#19f973', '#c97b3d', '#5b44b8', '#0fa651', '#a83e1e', '#6c635a', '#d4a017']
+
 function priceDelta(l: Linea): number | null {
   if (l.ingrediente_id == null || l.coste_unitario == null || l.ing_coste == null) return null
   if (Math.abs(l.ing_coste - l.coste_unitario) < 0.00005) return null
@@ -80,7 +85,7 @@ function priceDelta(l: Linea): number | null {
 export default function FoodCostCalculator({
   recetaId, recetaNombre, precioVenta, raciones,
   esSubreceta, cantidadProducida, unidadProducida,
-  onClose, onSaved, embedded,
+  onClose, onSaved, onAbrirSubreceta, embedded,
 }: Props) {
   const [lineas, setLineas] = useState<Linea[]>([])
   const [resumen, setResumen] = useState<Resumen | null>(null)
@@ -278,6 +283,17 @@ export default function FoodCostCalculator({
     ? costeTotal / parseFloat(prodCant)
     : null
 
+  // Reparto del coste por línea, de mayor a menor. Lo que no cuesta nada no
+  // pinta nada, así que se descartan las líneas a cero.
+  const reparto = lineas
+    .filter(l => (l.coste_calculado || 0) > 0)
+    .map(l => ({
+      id: l.id,
+      nombre: (l.tipo === 'subreceta' ? l.sub_nombre : l.ingrediente_id ? l.ing_nombre : l.nombre_libre) || 'Sin nombre',
+      pct: costeTotal > 0 ? (l.coste_calculado / costeTotal) * 100 : 0,
+    }))
+    .sort((a, b) => b.pct - a.pct)
+
   const lineasConDelta = lineas.filter(l => priceDelta(l) !== null)
   const hasPriceChanges = lineasConDelta.length > 0
   const lineasConAviso = lineas.filter(l => l.aviso)
@@ -384,6 +400,15 @@ export default function FoodCostCalculator({
                         <span>{esSub ? (l.sub_nombre || '-') : l.ingrediente_id ? (l.ing_nombre || '-') : (l.nombre_libre || '-')}</span>
                         {esSub && (
                           <span style={{ marginLeft: 5, fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, backgroundColor: '#e8e0ff', color: '#5b44b8' }}>elaboración</span>
+                        )}
+                        {esSub && l.subreceta_id && onAbrirSubreceta && (
+                          <button
+                            onClick={() => onAbrirSubreceta(l.subreceta_id as number)}
+                            title={`Abrir el escandallo de ${l.sub_nombre}`}
+                            style={{ marginLeft: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#5b44b8', fontFamily: 'DM Mono, monospace', fontSize: 11, padding: 0 }}
+                          >
+                            ver ›
+                          </button>
                         )}
                         {isLive && !esSub && (
                           <span style={{ marginLeft: 5, fontFamily: 'DM Mono, monospace', fontSize: 9, padding: '1px 5px', borderRadius: 4, backgroundColor: '#ece4d8', color: '#6c635a' }}>live</span>
@@ -538,6 +563,29 @@ export default function FoodCostCalculator({
             )}
           </div>
 
+          {/* Distribución del coste: en qué se va el dinero del plato.
+              Es lo que TSpoonLab enseña en tarta; aquí va en barra porque se
+              lee igual de bien y no obliga a cargar una librería de gráficos. */}
+          {reparto.length > 0 && costeTotal > 0 && (
+            <div style={{ backgroundColor: '#faf6ec', padding: 16, marginBottom: 20 }}>
+              <p style={{ ...sumLabel, marginBottom: 10 }}>Distribución del coste</p>
+              <div style={{ display: 'flex', height: 18, overflow: 'hidden', border: '1px solid #e8e2db' }}>
+                {reparto.map((r, i) => (
+                  <div key={r.id} title={`${r.nombre}: ${r.pct.toFixed(1)}%`}
+                    style={{ width: `${r.pct}%`, backgroundColor: COLORES_COSTE[i % COLORES_COSTE.length] }} />
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 10 }}>
+                {reparto.map((r, i) => (
+                  <span key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'DM Mono, monospace', fontSize: 10.5, color: '#3d3834' }}>
+                    <span style={{ width: 9, height: 9, backgroundColor: COLORES_COSTE[i % COLORES_COSTE.length], flexShrink: 0 }} />
+                    {r.nombre} <strong>{r.pct.toFixed(1)}%</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Producción: hace que esta receta se pueda usar dentro de otras */}
           <div style={{ backgroundColor: '#faf6ec', borderRadius: 0, padding: 16, marginBottom: 20 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
@@ -617,6 +665,14 @@ export default function FoodCostCalculator({
                 <p style={sumLabel}>Coste / ración</p>
                 <p style={sumValue}>{eur(costeRacion)}</p>
               </div>
+              {/* Lo que cuesta un gramo (o un mililitro) de esta elaboración:
+                  es el número con el que entra en las recetas que la usan. */}
+              {costePorUnidadProducida != null && (
+                <div>
+                  <p style={sumLabel}>Coste / {prodUnidad} producido</p>
+                  <p style={sumValue}>{eur(costePorUnidadProducida)}</p>
+                </div>
+              )}
               {foodCostPct != null && badge && (
                 <div>
                   <p style={sumLabel}>Food Cost %</p>

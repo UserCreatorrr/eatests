@@ -1,6 +1,7 @@
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
 import { recetasCriticas as calcularRecetasCriticas } from '@/lib/escandallo'
+import { unidadCanonica } from '@/lib/foodcost'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -176,6 +177,25 @@ export async function GET(req: NextRequest) {
       detalle: 'El food cost de esas recetas no es fiable hasta completarlos',
       chat: 'Qué ingredientes de mis escandallos no tienen coste o proveedor asignado',
       href: '/dashboard/ingredientes?filtro=sin_coste',
+    })
+  }
+
+  // 7a-bis. Unidades fuera del catálogo (herencia del texto libre).
+  // La migración normaliza "Kg" o "Litros", pero "Manojo" o "Bandeja" no tienen
+  // equivalencia física y nadie puede adivinarla: lo decide el usuario.
+  const unidadesRaras = db.prepare(
+    `SELECT descr, unit FROM ingredientes WHERE user_id = ? AND unit IS NOT NULL AND unit <> ''`
+  ).all(userId) as any[]
+  const fueraCatalogo = unidadesRaras.filter(i => !unidadCanonica(i.unit))
+  if (fueraCatalogo.length > 0) {
+    alerts.push({
+      id: 'unidades_fuera_catalogo',
+      tipo: 'warning',
+      titulo: `${fueraCatalogo.length} ingrediente${fueraCatalogo.length > 1 ? 's' : ''} con una unidad que el sistema no reconoce`,
+      detalle: fueraCatalogo.slice(0, 4).map(i => `${i.descr} (${i.unit})`).join(' · ')
+        + '. Hasta que se cambien a kg, g, l, ml, ud o docena, su coste no se puede convertir.',
+      chat: 'Qué ingredientes tienen una unidad que no reconoces',
+      href: '/dashboard/ingredientes',
     })
   }
 

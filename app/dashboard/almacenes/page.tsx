@@ -98,6 +98,12 @@ export default function AlmacenesPage() {
             {grupos.size} ubicaciones · {rows.length} ingredientes
             {sinAsignar > 0 && <> · <span style={{ color: '#a83e1e' }}>{sinAsignar} sin almacén</span></>}
           </p>
+          {/* Decir lo que esta pantalla es y lo que no, en vez de aparentar
+              un inventario: aquí se organiza dónde vive cada ingrediente, pero
+              no hay existencias ni movimientos, así que no se puede valorar. */}
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#6c635a', margin: '4px 0 0', maxWidth: 620, lineHeight: 1.5 }}>
+            Esta pantalla organiza dónde se guarda cada ingrediente. No lleva existencias ni entradas y salidas, así que todavía no valora el stock.
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={() => { const all: Record<string, boolean> = {}; ordenados.forEach(([a]) => all[a] = true); setColapsados(all); try { localStorage.setItem('mb_almacenes_colapsados', JSON.stringify(all)) } catch {} }}
@@ -131,7 +137,11 @@ export default function AlmacenesPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {ordenados.map(([almacen, items]) => {
             const color = ALMACEN_COLOR[almacen] ?? '#6c635a'
-            const total = items.reduce((s: number, i: Ingrediente) => s + (i.cost || 0), 0)
+            // Antes se sumaba i.cost y se llamaba "valor de coste". No lo era:
+            // sumaba €/kg con €/l y con €/ud, magnitudes distintas, y sin saber
+            // cuántas unidades hay en el almacén. Valorar existencias exige stock,
+            // que todavía no existe, así que se muestra lo que sí se sabe.
+            const conPrecio = items.filter((i: Ingrediente) => (i.cost || 0) > 0).length
             // Buscando → forzar abierto para que los resultados se vean
             const abierto = search.trim() ? true : !colapsados[almacen]
             return (
@@ -145,7 +155,7 @@ export default function AlmacenesPage() {
                   <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, flexShrink: 0 }} />
                   <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: almacen === SIN_ASIGNAR ? '#a83e1e' : '#3d3834' }}>{almacen}</span>
                   <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#6c635a', marginLeft: 'auto' }}>
-                    {items.length} referencia{items.length !== 1 ? 's' : ''} · {fmt(total)} valor de coste
+                    {items.length} referencia{items.length !== 1 ? 's' : ''} · {conPrecio} con precio
                   </span>
                 </button>
                 {/* Tabla de ingredientes del almacén */}

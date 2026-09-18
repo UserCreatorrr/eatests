@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import path from 'path'
 import fs from 'fs'
 import { seedDemoData, seedLaborData } from './seedData'
+import { unidadCanonica } from './foodcost'
 
 const DB_PATH =
   process.env.DB_PATH ||
@@ -482,6 +483,29 @@ function initSchema(db: Database.Database) {
   // como línea de otra. Sin cantidad producida no se puede repartir su coste.
   try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN cantidad_producida REAL`) } catch {}
   try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN unidad_producida TEXT`) } catch {}
+
+  // ─── Migración de unidades a texto libre al catálogo cerrado ─────────────
+  // El catálogo de unidades se cerró en agosto, pero los ingredientes dados de
+  // alta ANTES conservan lo que se escribió a mano ("Kg", "Litros", "Manojo").
+  // Aquí se normaliza lo que tiene equivalencia y se deja intacto lo que no,
+  // que se avisa como alerta para que lo revise una persona.
+  try {
+    const hecho = db.prepare("SELECT value FROM app_settings WHERE key='fix_unidades_catalogo'").get() as any
+    if (!hecho) {
+      let normalizadas = 0, sinEquivalencia = 0
+      for (const tabla of ['ingredientes', 'herramientas']) {
+        const filas = db.prepare(`SELECT id, unit FROM ${tabla} WHERE unit IS NOT NULL AND unit <> ''`).all() as any[]
+        const upd = db.prepare(`UPDATE ${tabla} SET unit = ? WHERE id = ?`)
+        for (const f of filas) {
+          const canon = unidadCanonica(f.unit)
+          if (!canon) { sinEquivalencia++; continue }   // "Manojo": decide el usuario
+          if (canon !== f.unit) { upd.run(canon, f.id); normalizadas++ }
+        }
+      }
+      db.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('fix_unidades_catalogo', ?)")
+        .run(`${normalizadas} normalizadas, ${sinEquivalencia} sin equivalencia`)
+    }
+  } catch {}
 
   // Data-fix único: las líneas importadas guardaban la cantidad BRUTA y la merma
   // por separado, así que aplicar la merma las contaría dos veces. Se pasa a

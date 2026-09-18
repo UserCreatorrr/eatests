@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
-import { pickValidColumns, coerceAndValidate, requireNombre, ValidationError } from '@/lib/security'
+import { pickValidColumns, coerceAndValidate, requireNombre, requirePrecioConProveedor, ValidationError } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +43,12 @@ export async function PUT(
   try {
     requireNombre(table, fields)
     fields = coerceAndValidate(table, fields)
+    // La edición puede tocar solo el proveedor, así que se valida contra la
+    // fila que ya existe y no únicamente contra lo que viene en la petición.
+    const actual = table === 'ingredientes'
+      ? db.prepare('SELECT proveedor_id, proveedor_nombre, cost FROM ingredientes WHERE id = ? AND user_id = ?').get(params.id, user.id) as any
+      : null
+    requirePrecioConProveedor(table, fields, actual)
   } catch (e) {
     if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: 400 })
     throw e

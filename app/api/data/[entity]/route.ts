@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
-import { pickValidColumns, idIsText, tableColumns, coerceAndValidate, requireNombre, ValidationError } from '@/lib/security'
+import { pickValidColumns, idIsText, tableColumns, coerceAndValidate, requireNombre, requirePrecioConProveedor, ValidationError } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -94,6 +94,7 @@ export async function POST(
   try {
     requireNombre(table, fields)
     fields = coerceAndValidate(table, fields)
+    requirePrecioConProveedor(table, fields)
   } catch (e) {
     if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: 400 })
     throw e

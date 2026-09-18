@@ -142,6 +142,28 @@ export function requireNombre(table: string, fields: Record<string, unknown>) {
   }
 }
 
+/**
+ * Un ingrediente con proveedor tiene que tener precio (spec 13-sep, Fase 2).
+ * Si se sabe a quién se le compra, se sabe a cuánto; y sin precio la línea de
+ * escandallo cuenta 0 y el food cost sale por debajo del real sin que nadie
+ * lo note. `actual` es la fila que ya está en BD, para que una edición parcial
+ * se valide sobre el resultado final y no solo sobre lo que llega en el body.
+ */
+export function requirePrecioConProveedor(
+  table: string,
+  fields: Record<string, unknown>,
+  actual?: { proveedor_id?: unknown; proveedor_nombre?: unknown; cost?: unknown } | null,
+) {
+  if (table !== 'ingredientes') return
+  const final = (k: string) => (k in fields ? fields[k] : (actual as any)?.[k])
+  const tieneProveedor = !!final('proveedor_id') || String(final('proveedor_nombre') ?? '').trim() !== ''
+  if (!tieneProveedor) return
+  const precio = Number(final('cost') ?? 0)
+  if (!(precio > 0)) {
+    throw new ValidationError('Si el ingrediente tiene proveedor, necesita un precio de compra. Sin precio, las recetas que lo lleven darían un food cost más bajo del real.')
+  }
+}
+
 // ─── Rate limiting (en memoria, ventana fija) ─────────────────────────────
 // Suficiente para un MVP de una sola instancia. Si se escala a varias
 // instancias, mover a Redis.

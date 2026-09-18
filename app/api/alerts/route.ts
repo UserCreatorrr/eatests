@@ -1,6 +1,6 @@
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
-import { COSTE_LINEA_SQL, RACIONES_SQL } from '@/lib/foodcost'
+import { recetasCriticas as calcularRecetasCriticas } from '@/lib/escandallo'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -195,24 +195,12 @@ export async function GET(req: NextRequest) {
   }
 
   // 8. Recetas con food cost crítico (>35% con precios actuales).
-  // Coste normalizado por unidades (COSTE_LINEA_SQL) y por ración — igual que el calculador.
-  const recetasCriticas = db.prepare(`
-    SELECT r.nombre, r.precio_venta,
-           ROUND(SUM(${COSTE_LINEA_SQL}) / ${RACIONES_SQL}, 4) AS coste_racion
-    FROM escandallo_receta r
-    JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
-    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
-    WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
-    GROUP BY r.id
-    HAVING CAST(coste_racion AS REAL) / r.precio_venta > 0.35
-       AND CAST(coste_racion AS REAL) / r.precio_venta <= 3
-    ORDER BY CAST(coste_racion AS REAL) / r.precio_venta DESC
-    LIMIT 5
-  `).all(userId) as any[]
+  // Vía motor de escandallo: incluye subrecetas y merma, igual que el calculador.
+  const recetasCriticas = calcularRecetasCriticas(userId, 35, 5)
 
   if (recetasCriticas.length > 0) {
     const detalle = recetasCriticas
-      .map(r => `${r.nombre} ${Math.round((r.coste_racion / r.precio_venta) * 100)}%`)
+      .map(r => `${r.nombre} ${r.pct}%`)
       .join(' · ')
     alerts.push({
       id: 'food_cost_critico',

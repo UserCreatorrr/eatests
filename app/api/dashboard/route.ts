@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
-import { COSTE_LINEA_SQL } from '@/lib/foodcost'
+import { recetasCriticas as calcularRecetasCriticas } from '@/lib/escandallo'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,23 +73,10 @@ export async function GET(req: NextRequest) {
     .slice(0, 5)
 
   // ── FOOD COST CRÍTICO ─────────────────────────────────────
-  const recetasCriticas = db.prepare(`
-    SELECT r.nombre, r.precio_venta,
-           ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1), 4) AS coste_racion
-    FROM escandallo_receta r
-    JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
-    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
-    WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0
-    GROUP BY r.id
-    HAVING CAST(coste_racion AS REAL) / r.precio_venta > 0.33
-       AND CAST(coste_racion AS REAL) / r.precio_venta <= 3
-    ORDER BY CAST(coste_racion AS REAL) / r.precio_venta DESC
-    LIMIT 5
-  `).all(uid) as any[]
-
-  const foodCostCritico = recetasCriticas.map(r => ({
+  // Motor de escandallo (resuelve subrecetas y merma), no SQL suelto.
+  const foodCostCritico = calcularRecetasCriticas(uid, 33, 5).map(r => ({
     nombre: r.nombre,
-    pct: Math.round((r.coste_racion / r.precio_venta) * 100),
+    pct: r.pct,
     coste: r.coste_racion,
     pvp: r.precio_venta,
   }))

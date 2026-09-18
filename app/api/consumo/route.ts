@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
-import { unitFactor, unidadDef } from '@/lib/foodcost'
+import { unidadDef } from '@/lib/foodcost'
+import { costesRecetas, explosionIngredientes } from '@/lib/escandallo'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,31 +19,41 @@ export async function GET(req: NextRequest) {
     ORDER BY r.nombre
   `).all(uid) as any[]
 
+  // El coste sale del motor de escandallo (resuelve elaboraciones y merma por
+  // línea). Antes esta pantalla lo recalculaba por su cuenta y podía dar una
+  // cifra distinta a la del calculador para la misma receta.
+  const costes = costesRecetas(uid)
+
   const recetasConLineas = recetas.map(r => {
-    const lineas = db.prepare(`
-      SELECT el.nombre_libre, el.cantidad, el.unidad, el.coste_unitario, el.ingrediente_id,
-             i.descr as ingrediente_nombre, i.cost as ingrediente_cost, i.unit as ingrediente_unit
-      FROM escandallo_lineas el
-      LEFT JOIN ingredientes i ON el.ingrediente_id = i.id AND i.user_id = el.user_id
-      WHERE el.receta_id = ? AND el.user_id = ?
-    `).all(r.id, uid) as any[]
-
-    const coste_ingredientes = lineas.reduce((sum, l) => {
-      // Coste conectado normalizando unidad de línea vs unidad del ingrediente (g→kg, ml→l)
-      const cost = l.ingrediente_id != null
-        ? (l.ingrediente_cost ?? l.coste_unitario ?? 0)
-        : (l.coste_unitario ?? 0)
-      const factor = l.ingrediente_id != null ? unitFactor(l.unidad, l.ingrediente_unit) : 1
-      return sum + (l.cantidad * factor * cost)
-    }, 0)
-
+    const c = costes.get(r.id)
+    const coste_ingredientes = c?.coste_total ?? 0
+    // Merma general de la receta: pérdidas no imputables a un ingrediente
+    // concreto (roturas, platos devueltos). Se suma a la merma de cada línea.
     const merma_factor = r.merma_pct ? (1 + r.merma_pct / 100) : 1
     const coste_real = coste_ingredientes * merma_factor
-    // Food cost por ración (el escandallo produce `raciones`; el PVP es por ración)
     const raciones = r.raciones && r.raciones > 0 ? r.raciones : 1
     const food_cost_pct = r.precio_venta > 0 ? Math.round(((coste_real / raciones) / r.precio_venta) * 100) : null
 
-    return { ...r, lineas, coste_ingredientes: Math.round(coste_ingredientes * 100) / 100, coste_real: Math.round(coste_real * 100) / 100, food_cost_pct }
+    const lineas = (c?.lineas ?? []).map(l => ({
+      nombre_libre: l.tipo === 'libre' ? l.nombre : null,
+      nombre: l.nombre,
+      tipo: l.tipo,
+      cantidad: l.cantidad,
+      cantidad_bruta: l.cantidad_bruta,
+      unidad: l.unidad,
+      merma_pct: l.merma_pct,
+      ingrediente_id: l.ingrediente_id,
+      subreceta_id: l.subreceta_id,
+      coste: l.coste,
+      aviso: l.aviso,
+    }))
+
+    return {
+      ...r, lineas,
+      coste_ingredientes: Math.round(coste_ingredientes * 100) / 100,
+      coste_real: Math.round(coste_real * 100) / 100,
+      food_cost_pct,
+    }
   })
 
   // Production registered (portions sold/produced)
@@ -60,21 +71,20 @@ export async function GET(req: NextRequest) {
     const receta = recetasConLineas.find(r => r.id === prod.receta_id)
     if (!receta) continue
 
-    // Las cantidades del escandallo son para la receta completa (raciones definidas);
-    // el consumo por ración se obtiene dividiendo entre las raciones de la receta.
+    // Una elaboración no se compra: se compran SUS ingredientes. Por eso la
+    // receta se descompone hasta el último ingrediente antes de proyectar.
     const racionesReceta = receta.raciones && receta.raciones > 0 ? receta.raciones : 1
-    for (const linea of receta.lineas) {
-      const porRacion = linea.cantidad / racionesReceta
+    const mermaGeneral = receta.merma_pct ? (1 + receta.merma_pct / 100) : 1
+    for (const item of explosionIngredientes(uid, receta.id)) {
+      const porRacion = (item.cantidad / racionesReceta) * mermaGeneral
       const consumo_esperado = porRacion * prod.total_raciones
-      const nombre = linea.ingrediente_nombre || linea.nombre_libre
       consumoTeorico.push({
-        ingrediente: nombre,
+        ingrediente: item.nombre,
         receta: receta.nombre,
         raciones_producidas: prod.total_raciones,
         consumo_esperado_por_racion: Math.round(porRacion * 1000) / 1000,
         consumo_esperado_total: Math.round(consumo_esperado * 100) / 100,
-        unidad: linea.unidad || linea.ingrediente_unit,
-        coste_esperado: Math.round(consumo_esperado * (linea.coste_unitario ?? linea.ingrediente_cost ?? 0) * 100) / 100,
+        unidad: item.unidad,
       })
     }
   }

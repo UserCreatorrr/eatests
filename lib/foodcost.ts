@@ -2,10 +2,15 @@
 // Evita food costs absurdos (miles de %) por mezclar g con €/kg, ml con €/l, etc.
 
 // Fragmento SQL reutilizable: coste de una línea de escandallo NORMALIZANDO
-// la unidad de la línea contra la unidad del ingrediente (g↔kg, ml↔l, cl↔l).
+// la unidad de la línea contra la unidad del ingrediente (g↔kg, ml↔l, cl↔l)
+// y aplicando la merma (la cantidad guardada es NETA; el almacén entrega bruta).
 // Requiere los alias: l (escandallo_lineas), i (ingredientes, LEFT JOIN).
+//
+// OJO: este fragmento NO resuelve líneas que son subrecetas (dan 0), porque eso
+// es recursivo. Para el coste TOTAL de una receta usa lib/escandallo.ts.
 export const COSTE_LINEA_SQL = `(
   COALESCE(l.cantidad, 0) *
+  (1.0 / (1.0 - MIN(COALESCE(l.merma_pct, 0), 95) / 100.0)) *
   COALESCE(CASE WHEN l.ingrediente_id IS NOT NULL AND i.cost IS NOT NULL THEN i.cost ELSE l.coste_unitario END, 0) *
   CASE
     WHEN lower(COALESCE(l.unidad,'')) IN ('g','gr','gramo','gramos','grs') AND lower(COALESCE(i.unit,'')) IN ('kg','kilo','kilos','kgs') THEN 0.001

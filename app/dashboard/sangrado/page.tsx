@@ -21,7 +21,10 @@ function fmt(v: number | null) {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
 }
 
-type SelectedReceta = { id: number; nombre: string; precio_venta: number | null; raciones: number | null }
+type SelectedReceta = {
+  id: number; nombre: string; precio_venta: number | null; raciones: number | null
+  es_subreceta?: number | null; cantidad_producida?: number | null; unidad_producida?: string | null
+}
 
 export default function SangradoPage() {
   const [selectedReceta, setSelectedReceta] = useState<SelectedReceta | null>(null)
@@ -41,7 +44,12 @@ export default function SangradoPage() {
   const columns: ColDef[] = [
     { label: 'Receta', render: r => r.nombre || '-', className: 'col-main' },
     { label: 'Categoría', render: r => r.categoria || '-' },
-    { label: 'Raciones', render: r => r.raciones ?? '-' },
+    { label: 'Tipo', render: r => r.es_subreceta
+        ? <span className="badge badge-blue">Elaboración</span>
+        : <span className="badge badge-gray">Plato</span> },
+    { label: 'Raciones', render: r => r.es_subreceta
+        ? (r.cantidad_producida ? `${r.cantidad_producida} ${r.unidad_producida || ''}` : 'sin definir')
+        : (r.raciones ?? '-') },
     { label: 'P. Venta', render: r => fmt(r.precio_venta), className: 'col-amount' },
     { label: 'Merma %', render: r => r.merma_pct != null ? <span className="badge badge-blue">{r.merma_pct}%</span> : '-' },
     { label: 'Activo', render: r => r.activo ? <span className="badge badge-green">Sí</span> : <span className="badge badge-gray">No</span> },
@@ -49,7 +57,7 @@ export default function SangradoPage() {
       label: 'Food Cost',
       render: r => (
         <button
-          onClick={e => { e.stopPropagation(); openCalc({ id: r.id, nombre: r.nombre, precio_venta: r.precio_venta, raciones: r.raciones }) }}
+          onClick={e => { e.stopPropagation(); openCalc({ id: r.id, nombre: r.nombre, precio_venta: r.precio_venta, raciones: r.raciones, es_subreceta: r.es_subreceta, cantidad_producida: r.cantidad_producida, unidad_producida: r.unidad_producida }) }}
           style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, backgroundColor: '#19f973', border: '1.5px solid #3d3834', borderRadius: 0, padding: '4px 10px', cursor: 'pointer', color: '#2a2522', fontWeight: 700 }}
         >
           Calcular
@@ -128,6 +136,9 @@ export default function SangradoPage() {
               recetaNombre={selectedReceta.nombre}
               precioVenta={selectedReceta.precio_venta}
               raciones={selectedReceta.raciones}
+              esSubreceta={selectedReceta.es_subreceta}
+              cantidadProducida={selectedReceta.cantidad_producida}
+              unidadProducida={selectedReceta.unidad_producida}
               onClose={closeCalc}
               onSaved={() => setReloadKey(k => k + 1)}
               embedded

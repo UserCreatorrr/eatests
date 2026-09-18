@@ -2,7 +2,8 @@ import { openai } from '@/lib/openai'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
-import { COSTE_LINEA_SQL, foodCost, unitFactor } from '@/lib/foodcost'
+import { foodCost, unitFactor } from '@/lib/foodcost'
+import { costesRecetas, recetasCriticas as calcularRecetasCriticas } from '@/lib/escandallo'
 import { pickValidColumns, rateLimit } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
@@ -627,23 +628,23 @@ const tools: any[] = [
 ]
 
 function checkFoodCostImpact(userId: string, ingredienteName: string): string {
-  // coste_total = coste por RACIÓN (dividido entre raciones), coherente con el calculador
-  const afectadas = db.prepare(`
-    SELECT r.nombre, r.precio_venta,
-           ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1), 4) AS coste_total
-    FROM escandallo_receta r
-    JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
-    LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
-    WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
-      AND r.id IN (
-        SELECT DISTINCT l2.receta_id FROM escandallo_lineas l2
-        JOIN ingredientes i2 ON i2.id = l2.ingrediente_id AND i2.user_id = l2.user_id
-        WHERE l2.user_id = ? AND i2.descr LIKE ?
-      )
-    GROUP BY r.id
-    HAVING coste_total > 0
-    ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
-  `).all(userId, userId, '%' + ingredienteName + '%') as any[]
+  // Recetas que llevan ese ingrediente, con su coste por RACIÓN resuelto por el
+  // motor de escandallo (incluye subrecetas y merma, igual que el calculador).
+  const conIngrediente = new Set(
+    (db.prepare(`
+      SELECT DISTINCT l.receta_id FROM escandallo_lineas l
+      JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
+      WHERE l.user_id = ? AND i.descr LIKE ?
+    `).all(userId, '%' + ingredienteName + '%') as any[]).map(r => r.receta_id)
+  )
+  const activas = new Set(
+    (db.prepare(`SELECT id FROM escandallo_receta WHERE user_id = ? AND activo = 1`).all(userId) as any[]).map(r => r.id)
+  )
+  const afectadas = Array.from(costesRecetas(userId).values())
+    .filter(r => conIngrediente.has(r.receta_id) && activas.has(r.receta_id)
+                 && (r.precio_venta ?? 0) > 0 && r.coste_racion > 0)
+    .map(r => ({ nombre: r.nombre, precio_venta: r.precio_venta as number, coste_total: r.coste_racion }))
+    .sort((a, b) => (b.coste_total / b.precio_venta) - (a.coste_total / a.precio_venta))
 
   if (!afectadas.length) return ''
 
@@ -1328,7 +1329,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
     }
     const subidas = Object.entries(precMap).filter(([, v]) => v.first > 0 && ((v.last - v.first) / v.first) > 0.05).sort((a, b) => ((b[1].last - b[1].first) / b[1].first) - ((a[1].last - a[1].first) / a[1].first)).slice(0, 4)
 
-    const recetasCrit = db.prepare(`SELECT r.nombre, r.precio_venta, ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1),4) AS coste FROM escandallo_receta r JOIN escandallo_lineas l ON l.receta_id=r.id AND l.user_id=r.user_id LEFT JOIN ingredientes i ON i.id=l.ingrediente_id AND i.user_id = l.user_id WHERE r.user_id=? AND r.activo=1 AND r.precio_venta>0 GROUP BY r.id HAVING CAST(coste AS REAL)/r.precio_venta>0.35 AND CAST(coste AS REAL)/r.precio_venta<=3 ORDER BY CAST(coste AS REAL)/r.precio_venta DESC LIMIT 4`).all(userId) as any[]
+    const recetasCrit = calcularRecetasCriticas(userId, 35, 4)
 
     const semana = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
     return `__INFORME_SEMANAL__${JSON.stringify({
@@ -1337,7 +1338,7 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
       merma: { total: merma.t || 0, eventos: merma.n || 0, top: topMerma },
       facturas: { vencidas_c: facVenc.c, vencidas_t: facVenc.t || 0, pendientes_c: facPend.c, pendientes_t: facPend.t || 0 },
       precios_subida: subidas.map(([n, v]) => ({ nombre: n, diff_pct: Math.round(((v.last - v.first) / v.first) * 100), precio: v.last, vendor: v.vendor })),
-      food_cost_critico: recetasCrit.map(r => ({ nombre: r.nombre, pct: Math.round((r.coste / r.precio_venta) * 100) })),
+      food_cost_critico: recetasCrit.map(r => ({ nombre: r.nombre, pct: r.pct })),
     })}`
   }
 
@@ -1447,16 +1448,14 @@ async function executeTool(name: string, args: any, userId: string): Promise<str
   // ── ANALIZAR FOOD COST RECETAS ────────────────────────────
   if (name === 'analizar_food_cost_recetas') {
     const umbral = (args.umbral_pct || 33) / 100
-    const recetas = db.prepare(`
-      SELECT r.id, r.nombre, r.precio_venta, r.raciones,
-             ROUND(SUM(${COSTE_LINEA_SQL}) / COALESCE(NULLIF(r.raciones, 0), 1), 4) AS coste_total
-      FROM escandallo_receta r
-      JOIN escandallo_lineas l ON l.receta_id = r.id AND l.user_id = r.user_id
-      LEFT JOIN ingredientes i ON i.id = l.ingrediente_id AND i.user_id = l.user_id
-      WHERE r.user_id = ? AND r.activo = 1 AND r.precio_venta > 0
-      GROUP BY r.id
-      ORDER BY CAST(coste_total AS REAL) / r.precio_venta DESC
-    `).all(userId) as any[]
+    const activas = new Set(
+      (db.prepare(`SELECT id FROM escandallo_receta WHERE user_id = ? AND activo = 1`).all(userId) as any[]).map(r => r.id)
+    )
+    const recetas = Array.from(costesRecetas(userId).values())
+      .filter(r => activas.has(r.receta_id) && (r.precio_venta ?? 0) > 0)
+      .map(r => ({ id: r.receta_id, nombre: r.nombre, precio_venta: r.precio_venta as number,
+                   raciones: r.raciones, coste_total: r.coste_racion }))
+      .sort((a, b) => (b.coste_total / b.precio_venta) - (a.coste_total / a.precio_venta))
 
     if (!recetas.length) return 'No hay recetas con precio de venta definido.'
 

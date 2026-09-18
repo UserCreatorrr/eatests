@@ -61,6 +61,7 @@ const COLUMNAS_NO_NEGATIVAS = new Set([
   'cantidad', 'cantidad_neta', 'raciones', 'total', 'total_linea', 'base', 'taxes',
   'iva', 'iva_pct', 'merma_pct', 'sales_net', 'covers', 'orders', 'tickets',
   'rendimiento_neto', 'gramos_porcion', 'contract_hours_week', 'horas_plan', 'horas_real',
+  'cantidad_producida',
 ])
 
 // Techo de cordura: por encima de esto es un error de tecleo, no un dato real.
@@ -69,7 +70,12 @@ const MAXIMO_RAZONABLE = 1e9
 export class ValidationError extends Error {}
 
 // Tablas cuya columna `unit`/`unidad` debe pertenecer al vocabulario cerrado.
-const UNIDAD_COL: Record<string, string> = { ingredientes: 'unit', herramientas: 'unit' }
+const UNIDAD_COL: Record<string, string> = {
+  ingredientes: 'unit',
+  herramientas: 'unit',
+  // Unidad en la que una elaboración declara su producción (2000 "g" de salsa).
+  escandallo_receta: 'unidad_producida',
+}
 
 /** Convierte y valida los campos numéricos según el tipo real de cada columna. */
 export function coerceAndValidate<T extends Record<string, unknown>>(

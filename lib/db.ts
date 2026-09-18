@@ -476,6 +476,33 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE escandallo_lineas ADD COLUMN merma_pct REAL`) } catch {}
   try { db.exec(`ALTER TABLE escandallo_lineas ADD COLUMN cantidad_neta REAL`) } catch {}
   try { db.exec(`ALTER TABLE escandallo_lineas ADD COLUMN nota TEXT`) } catch {}
+
+  // ─── Elaboraciones intermedias (subrecetas) ──────────────────────────────
+  // Una receta puede producir una cantidad concreta (2000 g de salsa) y usarse
+  // como línea de otra. Sin cantidad producida no se puede repartir su coste.
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN cantidad_producida REAL`) } catch {}
+  try { db.exec(`ALTER TABLE escandallo_receta ADD COLUMN unidad_producida TEXT`) } catch {}
+
+  // Data-fix único: las líneas importadas guardaban la cantidad BRUTA y la merma
+  // por separado, así que aplicar la merma las contaría dos veces. Se pasa a
+  // guardar la cantidad NETA y el motor calcula la bruta con la merma
+  // (neta / (1 - merma)), que reproduce exactamente la bruta original.
+  try {
+    const hecho = db.prepare("SELECT value FROM app_settings WHERE key='fix_merma_neta'").get() as any
+    if (!hecho) {
+      // Caso 1: la ficha traía las dos cantidades → la neta pasa a ser la de coste.
+      db.exec(`UPDATE escandallo_lineas
+                  SET cantidad = cantidad_neta
+                WHERE merma_pct > 0 AND cantidad_neta IS NOT NULL AND cantidad_neta > 0`)
+      // Caso 2: solo se guardó la bruta → se deriva la neta a partir de la merma.
+      // En ambos casos el coste resultante es idéntico al de antes del cambio.
+      db.exec(`UPDATE escandallo_lineas
+                  SET cantidad_neta = cantidad * (1 - merma_pct / 100.0),
+                      cantidad      = cantidad * (1 - merma_pct / 100.0)
+                WHERE merma_pct > 0 AND merma_pct < 100 AND cantidad_neta IS NULL AND cantidad > 0`)
+      db.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('fix_merma_neta','1')").run()
+    }
+  } catch {}
   // Merma: campos operativos adicionales (almacén, servicio, tipo, centro)
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN site_id TEXT`) } catch {}
   try { db.exec(`ALTER TABLE merma_registro ADD COLUMN servicio TEXT`) } catch {}

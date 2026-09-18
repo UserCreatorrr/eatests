@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import db from '@/lib/db'
-import { COSTE_LINEA_SQL } from '@/lib/foodcost'
+import { costesRecetas } from '@/lib/escandallo'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,24 +11,21 @@ export async function GET(req: NextRequest) {
 
   const uid = user.id
 
-  // Coste normalizado por unidades (COSTE_LINEA_SQL); food cost por ración.
-  const recetas = db.prepare(`
-    SELECT r.*,
-      (SELECT ROUND(SUM(${COSTE_LINEA_SQL}),4) FROM escandallo_lineas l
-       LEFT JOIN ingredientes i ON l.ingrediente_id = i.id AND i.user_id = l.user_id
-       WHERE l.receta_id = r.id AND l.user_id = ?) as coste_total
-    FROM escandallo_receta r WHERE r.user_id = ? ORDER BY r.nombre
-  `).all(uid, uid) as any[]
+  const filas = db.prepare(`SELECT * FROM escandallo_receta WHERE user_id = ? ORDER BY nombre`).all(uid) as any[]
+  // El motor resuelve subrecetas y merma; el SQL suelto no podía con lo primero.
+  const costes = costesRecetas(uid)
 
-  const result = recetas.map(r => {
-    const raciones = r.raciones && r.raciones > 0 ? r.raciones : 1
-    const costeRacion = r.coste_total != null ? r.coste_total / raciones : null
+  const result = filas.map(r => {
+    const c = costes.get(r.id)
     return {
       ...r,
-      coste_racion: costeRacion != null ? Math.round(costeRacion * 10000) / 10000 : null,
-      food_cost_pct: costeRacion && r.precio_venta
-        ? Math.round((costeRacion / r.precio_venta) * 10000) / 100
-        : null,
+      coste_total: c ? c.coste_total : null,
+      coste_racion: c ? c.coste_racion : null,
+      food_cost_pct: c?.food_cost_pct ?? null,
+      coste_unidad_producida: c?.coste_unidad_producida ?? null,
+      // Para que la lista pueda avisar en vez de mostrar un coste engañoso.
+      lineas_incompletas: c?.incompletas ?? 0,
+      tiene_ciclo: c?.ciclo ?? false,
     }
   })
 

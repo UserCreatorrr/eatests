@@ -5,6 +5,20 @@ import { unidadBaseCompra } from '@/lib/recetaImport'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Cantidad y merma que se guardan en la línea.
+ * El motor de coste parte SIEMPRE de la cantidad neta y le aplica la merma para
+ * recuperar la bruta (1900 g / (1 - 0,05) = 2000 g). Por eso:
+ *   · con neta y merma → se guardan las dos y el coste sale sobre la bruta.
+ *   · con bruta pero sin neta → se guarda la bruta y la merma se anota a 0, o
+ *     el coste la inflaría una segunda vez sobre una cantidad que ya la incluye.
+ */
+function cantidadYMerma(l: LineaRevisada): { cantidad: number; merma: number | null } {
+  const merma = l.merma_pct && l.merma_pct > 0 ? l.merma_pct : null
+  if (merma && l.cantidad_neta && l.cantidad_neta > 0) return { cantidad: l.cantidad_neta, merma }
+  return { cantidad: l.cantidad_bruta ?? l.cantidad_neta ?? 0, merma: null }
+}
+
 interface LineaRevisada {
   nombre: string
   unidad: string | null
@@ -97,6 +111,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        const { cantidad, merma } = cantidadYMerma(l)
         db.prepare(`
           INSERT INTO escandallo_lineas
             (receta_id, user_id, ingrediente_id, nombre_libre, cantidad, unidad, coste_unitario, merma_pct, cantidad_neta, nota)
@@ -105,10 +120,10 @@ export async function POST(req: NextRequest) {
           recetaId, uid,
           ingredienteId,
           ingredienteId ? null : nombreLinea,     // sin ingrediente → queda como línea libre
-          l.cantidad_bruta ?? 0,
+          cantidad,
           l.unidad || null,
           l.coste_efectivo ?? null,
-          l.merma_pct ?? null,
+          merma,
           l.cantidad_neta ?? null,
           l.nota || null,
         )

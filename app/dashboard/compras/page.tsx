@@ -1,3 +1,4 @@
+import { fechaCorta } from '@/lib/fechas'
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
@@ -54,7 +55,7 @@ export default async function ComprasPage() {
                 <tr key={f.id}>
                   <td className="col-mono">{f.invoice_num || '-'}</td>
                   <td className="col-main">{f.vendor || '-'}</td>
-                  <td>{f.date_invoice || '-'}</td>
+                  <td>{fechaCorta(f.date_invoice)}</td>
                   <td className="col-amount">{formatCurrency(f.total)}</td>
                 </tr>
               ))}

@@ -19,8 +19,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     WHERE l.pedido_id=? AND l.user_id=? ORDER BY l.id ASC
   `).all(params.id, user.id) as any[]
 
-  const total_estimado = lineas.reduce((s, l) => s + (l.coste_estimado || 0), 0)
-  return NextResponse.json({ pedido, lineas, total_estimado: Math.round(total_estimado * 100) / 100 })
+  // El coste se recalcula con el precio ACTUAL del ingrediente al abrir el
+  // pedido. Guardado al crearlo se quedaba viejo: 5 kg x 6,20 € cuando la
+  // pechuga ya iba a 8,50 € (bug #4 del 24-sep).
+  const conPrecioActual = lineas.map(l => {
+    if (!l.ingrediente_id || !(l.ing_coste > 0) || !(l.cantidad > 0)) return l
+    const actual = Math.round(lineCost(l.cantidad, l.unidad, l.ing_coste, l.ing_unidad) * 100) / 100
+    return { ...l, coste_estimado: actual, coste_al_crear: l.coste_estimado }
+  })
+  const total_estimado = conPrecioActual.reduce((s, l) => s + (l.coste_estimado || 0), 0)
+  return NextResponse.json({ pedido, lineas: conPrecioActual, total_estimado: Math.round(total_estimado * 100) / 100 })
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {

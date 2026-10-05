@@ -36,6 +36,11 @@ export async function POST(req: NextRequest) {
   // las líneas activas quedan resueltas (mapeadas a ingrediente o creadas).
   // Con líneas pendientes el documento queda en "parcial" y se ve en la ficha.
   const activas = (lineas || []).filter((l: any) => !l.excluida)
+  // Un albarán sin líneas no mueve ni coste ni stock: si se marcara "validado"
+  // daría por buena una entrada que no ha registrado nada (bug #3 del 24-sep).
+  if (resumen.doc_tipo === 'albaran' && activas.length === 0) {
+    return NextResponse.json({ error: 'El albarán no tiene líneas. Añade al menos un producto antes de validarlo.' }, { status: 400 })
+  }
   const sinResolver = activas.filter((l: any) => !l.ingrediente_id && !(l.crear_ingrediente && l.nombre))
   resumen.lineas_sin_mapear = sinResolver.length
   resumen.estado = sinResolver.length === 0 ? 'validado' : 'parcial'

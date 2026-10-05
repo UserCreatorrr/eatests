@@ -507,6 +507,18 @@ function initSchema(db: Database.Database) {
     }
   } catch {}
 
+  // Albaranes que quedaron "validados" sin ninguna línea (antes no había regla):
+  // pasan a "revisar", que es lo que son. Idempotente, se puede repetir.
+  try {
+    db.exec(`UPDATE albaranes_compra SET estado = 'revisar'
+              WHERE estado = 'validado'
+                AND NOT EXISTS (
+                  SELECT 1 FROM lineas_albaran_compra l
+                   WHERE l.user_id = albaranes_compra.user_id
+                     AND ((l.doc_tipo = 'albaran' AND l.doc_id = albaranes_compra.id)
+                          OR l.albaran_id = albaranes_compra.id))`)
+  } catch {}
+
   // Data-fix único: las líneas importadas guardaban la cantidad BRUTA y la merma
   // por separado, así que aplicar la merma las contaría dos veces. Se pasa a
   // guardar la cantidad NETA y el motor calcula la bruta con la merma

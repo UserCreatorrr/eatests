@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
 import { COSTE_LINEA_SQL } from '@/lib/foodcost'
+import { costesRecetas } from '@/lib/escandallo'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +54,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     WHERE l.user_id = ? AND l.ingrediente_id = ? AND r.activo = 1
     ORDER BY r.nombre
   `).all(uid, id) as any[]
+
+  // Todo por RACIÓN (bug #10 del 24-sep): "coste que aporta 17,00 €" era el
+  // lote de 10 raciones y se pintaba al lado del PVP de una ración.
+  const costes = costesRecetas(uid)
+  for (const r of recetas) {
+    const rac = r.raciones && r.raciones > 0 ? r.raciones : 1
+    r.coste_racion_linea = r.coste_linea != null ? Math.round((r.coste_linea / rac) * 10000) / 10000 : null
+    r.food_cost_pct = costes.get(r.id)?.food_cost_pct ?? null
+  }
 
   // Mermas registradas de este ingrediente
   const mermas = db.prepare(`

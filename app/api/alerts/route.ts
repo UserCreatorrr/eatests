@@ -91,8 +91,10 @@ export async function GET(req: NextRequest) {
     alerts.push({
       id: 'reposicion',
       tipo: 'warning',
-      titulo: `${reorderCount} artículo${reorderCount > 1 ? 's' : ''} con reposición pendiente`,
-      detalle: 'Stock bajo según histórico de pedidos',
+      titulo: `${reorderCount} artículo${reorderCount > 1 ? 's' : ''} sin comprar desde hace tiempo`,
+      // Sin control de stock no se puede afirmar que haya poco: solo que hace
+      // días que no se compra. Antes decía "stock bajo" y se lo inventaba.
+      detalle: 'Según la frecuencia habitual de compra, no según existencias',
       chat: 'Quiero hacer un pedido',
       href: '/dashboard/lista-pedidos',
     })
@@ -160,23 +162,35 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // 7a. Ingredientes sin coste o sin proveedor usados en escandallos activos
-  // (diagnóstico: "alerta por ingrediente sin proveedor o sin coste")
-  const ingIncompletos = db.prepare(`
-    SELECT COUNT(DISTINCT i.id) AS c
+  // 7a. Ingredientes de escandallos activos SIN COSTE y SIN PROVEEDOR, por
+  // separado: antes iban en una sola alerta "sin coste o sin proveedor" y casi
+  // todos eran solo sin proveedor (bug #8 del 24-sep). Sin coste falsea el
+  // food cost; sin proveedor solo impide pedir desde la app.
+  const usados = `
     FROM ingredientes i
     JOIN escandallo_lineas l ON l.ingrediente_id = i.id AND l.user_id = i.user_id
     JOIN escandallo_receta r ON r.id = l.receta_id AND r.user_id = i.user_id AND r.activo = 1
-    WHERE i.user_id = ? AND (i.cost IS NULL OR i.cost <= 0 OR i.proveedor_id IS NULL)
-  `).get(userId) as any
-  if (ingIncompletos.c > 0) {
+    WHERE i.user_id = ?`
+  const sinCoste = db.prepare(`SELECT COUNT(DISTINCT i.id) AS c ${usados} AND (i.cost IS NULL OR i.cost <= 0)`).get(userId) as any
+  if (sinCoste.c > 0) {
     alerts.push({
-      id: 'ingredientes_incompletos',
-      tipo: 'warning',
-      titulo: `${ingIncompletos.c} ingrediente${ingIncompletos.c > 1 ? 's' : ''} en escandallos sin coste o sin proveedor`,
-      detalle: 'El food cost de esas recetas no es fiable hasta completarlos',
-      chat: 'Qué ingredientes de mis escandallos no tienen coste o proveedor asignado',
+      id: 'ingredientes_sin_coste',
+      tipo: 'danger',
+      titulo: `${sinCoste.c} ingrediente${sinCoste.c > 1 ? 's' : ''} de tus escandallos sin coste`,
+      detalle: 'Cuentan como 0 €: el food cost de esas recetas sale más bajo del real',
+      chat: 'Qué ingredientes de mis escandallos no tienen coste',
       href: '/dashboard/ingredientes?filtro=sin_coste',
+    })
+  }
+  const sinProv = db.prepare(`SELECT COUNT(DISTINCT i.id) AS c ${usados} AND i.proveedor_id IS NULL AND (i.proveedor_nombre IS NULL OR i.proveedor_nombre = '')`).get(userId) as any
+  if (sinProv.c > 0) {
+    alerts.push({
+      id: 'ingredientes_sin_proveedor',
+      tipo: 'info',
+      titulo: `${sinProv.c} ingrediente${sinProv.c > 1 ? 's' : ''} de tus escandallos sin proveedor`,
+      detalle: 'El coste es correcto, pero no se pueden pedir desde la app',
+      chat: 'Qué ingredientes de mis escandallos no tienen proveedor',
+      href: '/dashboard/ingredientes?filtro=sin_proveedor',
     })
   }
 

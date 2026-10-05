@@ -1,4 +1,5 @@
 'use client'
+import { fechaCorta } from '@/lib/fechas'
 
 export const dynamic = 'force-dynamic'
 
@@ -123,7 +124,7 @@ export default function ProveedorFichaPage() {
           <Tbl head={['Nº', 'Fecha', 'Vence', 'Total', 'Estado']}>
             {data.facturas.map((f: any) => (
               <Row key={f.id} href={`/dashboard/compras/documentos/factura/${f.id}`} cells={[
-                f.invoice_num || '—', f.date_invoice || '—', f.date_due || '—', fmt(f.total || 0),
+                f.invoice_num || '—', fechaCorta(f.date_invoice), fechaCorta(f.date_due), fmt(f.total || 0),
                 f.paid ? 'Pagada' : 'Pendiente',
               ]} rightCols={[3]} colColors={{ 4: f.paid ? tk.appleDeep : tk.clay }} />
             ))}
@@ -136,14 +137,14 @@ export default function ProveedorFichaPage() {
         <Panel title={`Pedidos (${data.pedidos.length})`}>
           {data.pedidos.length === 0 ? <Empty text="Sin pedidos" /> : (
             <Tbl head={['Nº', 'Fecha', 'Total']}>
-              {data.pedidos.map((o: any) => <Row key={o.id} cells={[o.num_order || '—', o.date_order || '—', fmt(o.total || 0)]} rightCols={[2]} />)}
+              {data.pedidos.map((o: any) => <Row key={o.id} cells={[o.num_order || '—', fechaCorta(o.date_order), fmt(o.total || 0)]} rightCols={[2]} />)}
             </Tbl>
           )}
         </Panel>
         <Panel title={`Albaranes (${data.albaranes.length})`}>
           {data.albaranes.length === 0 ? <Empty text="Sin albaranes" /> : (
             <Tbl head={['Nº', 'Fecha', 'Total']}>
-              {data.albaranes.map((a: any) => <Row key={a.id} href={`/dashboard/compras/documentos/albaran/${a.id}`} cells={[a.delivery_num || '—', a.date_delivery || '—', fmt(a.total || 0)]} rightCols={[2]} />)}
+              {data.albaranes.map((a: any) => <Row key={a.id} href={`/dashboard/compras/documentos/albaran/${a.id}`} cells={[a.delivery_num || '—', fechaCorta(a.date_delivery), fmt(a.total || 0)]} rightCols={[2]} />)}
             </Tbl>
           )}
         </Panel>

@@ -26,7 +26,13 @@ type Proveedor = {
 
 function fmt(v: number | null) {
   if (v == null) return '-'
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
+  // Con dos decimales el agua (0,002 €/l) salía como "0,00 €" y parecía no
+  // tener coste, aunque el filtro "Sin coste" acertaba al no contarla.
+  const pequeno = v !== 0 && Math.abs(v) < 0.01
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency', currency: 'EUR',
+    minimumFractionDigits: 2, maximumFractionDigits: pequeno ? 4 : 2,
+  }).format(v)
 }
 
 export default function IngredientesPage() {

@@ -158,7 +158,7 @@ export default function FichaIngredientePage() {
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead><tr>
-              {['Receta', 'Tipo', 'Cantidad', 'Coste que aporta', 'PVP receta'].map((h, i) => (
+              {['Receta', 'Tipo', 'Cantidad', 'Aporta por ración', 'PVP ración', 'Food cost'].map((h, i) => (
                 <th key={h} style={{ ...th, textAlign: i >= 2 ? 'right' : 'left' }}>{h}</th>
               ))}
             </tr></thead>
@@ -168,11 +168,12 @@ export default function FichaIngredientePage() {
                   <td style={td}><Link href="/dashboard/sangrado" style={{ color: tk.appleDeep, textDecoration: 'none', fontWeight: 600 }}>{r.nombre}</Link></td>
                   <td style={td}>{r.es_subreceta ? 'elaboración intermedia' : 'plato final'}</td>
                   <td style={{ ...td, textAlign: 'right' }}>{r.cantidad != null ? `${r.cantidad} ${r.unidad || ''}` : '—'}</td>
-                  <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{fmt(r.coste_linea)}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>{fmt(r.precio_venta)}</td>
+                  <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{fmt(r.coste_racion_linea)}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>{r.es_subreceta ? '—' : fmt(r.precio_venta)}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>{!r.es_subreceta && r.food_cost_pct != null ? `${r.food_cost_pct.toFixed(1)}%` : '—'}</td>
                 </tr>
               ))}
-              {recetas.length === 0 && <tr><td colSpan={5} style={emptyTd}>Ningún escandallo usa este ingrediente.</td></tr>}
+              {recetas.length === 0 && <tr><td colSpan={6} style={emptyTd}>Ningún escandallo usa este ingrediente.</td></tr>}
             </tbody>
           </table>
         </div>

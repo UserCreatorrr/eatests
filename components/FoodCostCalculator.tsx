@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { unidadesCompatibles, unidadesCompatiblesCon, dimensionUnidad } from '@/lib/foodcost'
+import { fechaCorta } from '@/lib/fechas'
 
 type Linea = {
   id: number
@@ -17,6 +18,7 @@ type Linea = {
   ing_unidad: string | null
   sub_nombre: string | null
   sub_unidad_producida: string | null
+  precio_fecha: string | null
   // Calculado en el servidor: es el único que resuelve subrecetas y merma
   cantidad_bruta: number
   coste_calculado: number
@@ -433,6 +435,11 @@ export default function FoodCostCalculator({
                       </td>
                       <td style={tdStyle}>
                         <span>{l.coste_unitario_efectivo ? eur(l.coste_unitario_efectivo) : '-'}</span>
+                        {l.precio_fecha && (
+                          <span style={{ display: 'block', fontFamily: 'DM Mono, monospace', fontSize: 9.5, color: '#6c635a', opacity: 0.8, marginTop: 2 }}>
+                            precio del {fechaCorta(l.precio_fecha)}
+                          </span>
+                        )}
                         {delta !== null && (
                           <span style={{ marginLeft: 6, fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, backgroundColor: delta > 0 ? '#fbeae2' : '#d6f9e0', color: delta > 0 ? '#a83e1e' : '#0fa651' }}>
                             {delta > 0 ? '+' : ''}{delta}%

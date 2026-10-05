@@ -30,7 +30,8 @@ export default function DocumentoDetallePage() {
   const esFactura = tipo === 'factura'
   const backHref = esFactura ? '/dashboard/compras/facturas' : '/dashboard/compras/albaranes'
   const mapeadas = lineas.filter((l: any) => l.ingrediente_id).length
-  const parcial = esFactura ? c.validated === 0 : c.estado === 'parcial'
+  const sinLineas = !esFactura && c.estado === 'revisar'
+  const parcial = esFactura ? c.validated === 0 : (c.estado === 'parcial' || sinLineas)
 
   return (
     <div style={{ padding: '32px 36px 60px' }}>
@@ -48,7 +49,9 @@ export default function DocumentoDetallePage() {
           </p>
         </div>
         <span style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.1em', padding: '5px 12px', background: parcial ? tk.claySoft : tk.appleSoft, border: `1.5px solid ${parcial ? tk.clay : tk.appleDeep}`, color: parcial ? tk.clay : tk.appleDeep, textTransform: 'uppercase' }}>
-          {parcial
+          {sinLineas
+            ? 'Sin líneas · revisar'
+            : parcial
             ? `Validación parcial · ${mapeadas}/${lineas.length} líneas mapeadas`
             : esFactura ? (c.paid ? 'Pagada' : 'Validada · pendiente de pago') : (c.estado || 'Validado')}
         </span>

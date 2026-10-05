@@ -13,6 +13,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const filas = db.prepare(`
     SELECT l.*,
            i.descr AS ing_nombre, i.cost AS ing_coste, i.unit AS ing_unidad,
+           -- De cuándo es el precio con el que se está calculando: un coste de
+           -- hace tres meses no vale lo mismo que uno de ayer (P1, 24-sep).
+           (SELECT MAX(ph.fecha) FROM precio_historial ph
+             WHERE ph.user_id = l.user_id AND ph.ingrediente_id = l.ingrediente_id) AS precio_fecha,
            s.nombre AS sub_nombre, s.cantidad_producida AS sub_cantidad_producida,
            s.unidad_producida AS sub_unidad_producida
     FROM escandallo_lineas l

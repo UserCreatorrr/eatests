@@ -1,271 +1,111 @@
 'use client'
-
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { api, errorMessage } from '@/lib/api'
 import { tk, ff } from '@/lib/design'
-import { ALMACENES } from '@/lib/catalog'
-
-interface Ingrediente { id: number; descr: string; unit: string | null; cost: number | null }
-interface Registro {
-  id: number; nombre: string; cantidad: number | null; unidad: string | null
-  motivo: string | null; coste_estimado: number | null; fecha: string
-  servicio?: string | null; almacen?: string | null; site_id?: string | null; tipo?: string | null; notas?: string | null
-}
+import { eur, fecha, hoyIso, num } from '@/lib/format'
+import { unitsCompatibleWith } from '@/lib/units-ui'
+import { Btn, Empty, Field, Input, Loading, Note, Page, Panel, Select, Stat, Table, Td, Tr } from '@/components/ui'
 
 const MOTIVOS = ['caducidad', 'sobreproducción', 'error cocina', 'devolución', 'mala recepción', 'rotura', 'staff meal', 'otro']
 const SERVICIOS = ['Desayuno', 'Comida', 'Cena', 'Entre servicios', 'Prep']
-const UNIDADES = ['kg', 'g', 'l', 'ml', 'ud']
-
-const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 export default function MermaPage() {
-  const [ingredientes, setIngredientes] = useState<Ingrediente[]>([])
-  const [registros, setRegistros] = useState<Registro[]>([])
-  const [stats, setStats] = useState<{ totalMes: any; topProductos: any[]; statsMes: any[] }>({ totalMes: { t: 0, n: 0 }, topProductos: [], statsMes: [] })
+  const [ings, setIngs] = useState<any[]>([])
+  const [recipes, setRecipes] = useState<any[]>([])
+  const [rows, setRows] = useState<any[]>([])
+  const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [form, setForm] = useState({ kind: 'ingredient' as 'ingredient' | 'dish', ingredientId: '', recipeId: '', description: '', qty: '', unit: '', reason: 'caducidad', service: 'Comida', occurredOn: hoyIso(), notes: '', consumeStock: false })
 
-  const hoy = new Date().toISOString().split('T')[0]
-  const [form, setForm] = useState({
-    tipo: 'ingrediente' as 'ingrediente' | 'receta',
-    ingrediente_id: '' as string,
-    nombre: '', cantidad: '', unidad: '', motivo: 'caducidad',
-    servicio: 'Comida', almacen: '', site_id: '', fecha: hoy, notas: '',
-  })
-
-  async function load() {
-    const [m, ing] = await Promise.all([
-      fetch('/api/merma').then(r => r.json()).catch(() => ({})),
-      fetch('/api/data/ingredientes?limit=500').then(r => r.json()).catch(() => ({ data: [] })),
-    ])
-    setRegistros(m.registros || [])
-    setStats({ totalMes: m.totalMes || { t: 0, n: 0 }, topProductos: m.topProductos || [], statsMes: m.statsMes || [] })
-    setIngredientes(ing.data || [])
+  const load = useCallback(async () => {
+    try {
+      const [w, i, r] = await Promise.all([api.get('/api/waste'), api.get('/api/ingredients'), api.get('/api/recipes')])
+      setRows(w.data); setStats(w.stats); setIngs(i.data); setRecipes(r.data.filter((x: any) => x.kind === 'dish'))
+    } catch (e) { setMsg(errorMessage(e)) }
     setLoading(false)
-  }
-  useEffect(() => { load() }, [])
+  }, [])
+  useEffect(() => { load() }, [load])
 
-  // Coste estimado en vivo
-  const ingSel = ingredientes.find(i => String(i.id) === form.ingrediente_id)
-  const costePreview = (() => {
-    const cant = parseFloat(form.cantidad)
-    if (!cant || !ingSel?.cost) return null
-    const f = unitMini(form.unidad || ingSel.unit, ingSel.unit)
-    return Math.round(cant * f * ingSel.cost * 100) / 100
+  const ing = ings.find(i => String(i.id) === form.ingredientId)
+  const rec = recipes.find(r => String(r.id) === form.recipeId)
+  const preview = (() => {
+    const q = Number(form.qty); if (!q) return null
+    if (form.kind === 'ingredient' && ing?.cost) { const u = unitsCompatibleWith(ing.base_unit).find(x => x.value === form.unit); const base = unitsCompatibleWith(ing.base_unit).find(x => x.value === ing.base_unit); if (!u || !base) return null; const f: Record<string, number> = { kg: 1, g: 0.001, mg: 0.000001, l: 1, cl: 0.01, ml: 0.001, ud: 1, docena: 12 }; return Math.round(q * (f[form.unit] / f[ing.base_unit]) * ing.cost * 100) / 100 }
+    if (form.kind === 'dish' && rec) return Math.round(rec.per_portion * q * 100) / 100
+    return null
   })()
 
-  function onIngSelect(id: string) {
-    const ing = ingredientes.find(i => String(i.id) === id)
-    setForm(s => ({ ...s, ingrediente_id: id, nombre: ing?.descr || s.nombre, unidad: ing?.unit || s.unidad, almacen: s.almacen }))
-  }
-
-  async function guardar() {
-    if (!form.nombre.trim() || !form.cantidad) return
-    setSaving(true)
-    await fetch('/api/merma', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nombre: form.nombre.trim(),
-        ingrediente_id: form.ingrediente_id ? Number(form.ingrediente_id) : null,
-        cantidad: parseFloat(form.cantidad) || null,
-        unidad: form.unidad || null,
-        motivo: form.motivo, servicio: form.servicio, almacen: form.almacen || null,
-        site_id: form.site_id || null, tipo: form.tipo, fecha: form.fecha,
-        notas: form.notas || null,
-      }),
-    })
-    setForm(s => ({ ...s, ingrediente_id: '', nombre: '', cantidad: '', unidad: '', notas: '' }))
-    await load()
+  async function save() {
+    setSaving(true); setMsg('')
+    try {
+      await api.post('/api/waste', { kind: form.kind, ingredientId: form.kind === 'ingredient' && form.ingredientId ? Number(form.ingredientId) : null, recipeId: form.kind === 'dish' && form.recipeId ? Number(form.recipeId) : null,
+        description: form.description || null, qty: Number(form.qty), unit: form.kind === 'dish' ? 'ud' : form.unit, reason: form.reason, service: form.service, occurredOn: form.occurredOn, notes: form.notes || null, consumeStock: form.kind === 'ingredient' && form.consumeStock })
+      setForm(f => ({ ...f, ingredientId: '', recipeId: '', description: '', qty: '', notes: '' })); await load()
+    } catch (e) { setMsg(errorMessage(e)) }
     setSaving(false)
   }
+  async function remove(id: number) { if (!confirm('¿Eliminar este registro de merma?')) return; try { await api.del(`/api/waste/${id}`); await load() } catch (e) { alert(errorMessage(e)) } }
 
-  async function borrar(id: number) {
-    if (!confirm('¿Eliminar este registro de merma?')) return
-    await fetch('/api/merma', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    await load()
-  }
+  const monthCost = stats?.month_total?.cost ?? 0
 
   return (
-    <div style={{ padding: '32px 36px 60px' }}>
-      <div style={{ marginBottom: 24 }}>
-        <p style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.2em', color: tk.appleDeep, textTransform: 'uppercase', margin: '0 0 8px' }}>
-          FOOD COST · MERMA / DESPERDICIO
-        </p>
-        <h1 style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 36, lineHeight: 1.0, letterSpacing: '-0.02em', margin: '0 0 6px', color: tk.iron }}>
-          ¿Qué pérdida tienes que controlar?
-        </h1>
-        <p style={{ fontFamily: ff.mono, fontSize: 12.5, color: tk.iron60, margin: 0 }}>
-          Registra pérdidas de ingredientes o platos. Calcula su coste automáticamente y alimenta el Food Cost real.
-        </p>
+    <Page eyebrow="Food cost · Merma / desperdicio" title="¿Qué pérdida tienes que controlar?" subtitle="Registra pérdidas de ingredientes o platos. El coste sale del catálogo (en su unidad base) o del escandallo, y alimenta el food cost real.">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <Stat label="Merma este mes" value={eur(monthCost)} sub={`${stats?.month_total?.n ?? 0} eventos`} tone={monthCost > 300 ? 'crit' : monthCost > 100 ? 'warn' : undefined} />
+        <Stat label="Top motivo" value={stats?.byReason?.[0] ? cap(stats.byReason[0].reason) : '—'} sub={stats?.byReason?.[0] ? eur(stats.byReason[0].cost) : 'sin datos'} />
+        <Stat label="Acumulado año" value={eur(stats?.year_total?.cost ?? 0)} />
       </div>
-
-      {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', border: `1.5px solid ${tk.iron}`, marginBottom: 20 }}>
-        <Kpi label="MERMA ESTE MES" value={fmt(stats.totalMes?.t || 0)} sub={`${stats.totalMes?.n || 0} eventos`} variant={(stats.totalMes?.t || 0) > 300 ? 'crit' : (stats.totalMes?.t || 0) > 100 ? 'warn' : 'default'} />
-        <Kpi label="TOP MOTIVO" value={stats.statsMes?.[0]?.motivo ? cap(stats.statsMes[0].motivo) : '—'} sub={stats.statsMes?.[0] ? fmt(stats.statsMes[0].coste_total || 0) : 'sin datos'} />
-        <Kpi label="REGISTROS" value={String(registros.length)} sub="histórico reciente" last />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20, alignItems: 'start' }}>
-        {/* FORM registro */}
-        <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}` }}>
-          <div style={panelHead}>Registrar merma</div>
+      {msg && <Note tone="crit">{msg}</Note>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+        <Panel title="Registrar merma">
           <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Tipo */}
-            <div style={{ display: 'flex', gap: 0, border: `1.5px solid ${tk.iron}`, width: 'fit-content' }}>
-              {(['ingrediente', 'receta'] as const).map(t => (
-                <button key={t} onClick={() => setForm(s => ({ ...s, tipo: t }))} style={{
-                  padding: '6px 14px', background: form.tipo === t ? tk.iron : tk.paper, color: form.tipo === t ? tk.cream : tk.iron,
-                  border: 'none', cursor: 'pointer', fontFamily: ff.mono, fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase',
-                  borderLeft: t === 'receta' ? `1.5px solid ${tk.iron}` : 'none',
-                }}>{t === 'ingrediente' ? 'Ingrediente' : 'Plato / receta'}</button>
-              ))}
+            <div style={{ display: 'flex', border: `1.5px solid ${tk.iron}`, width: 'fit-content' }}>
+              {(['ingredient', 'dish'] as const).map(t => <button key={t} onClick={() => setForm(f => ({ ...f, kind: t, unit: '' }))} style={{ padding: '6px 14px', background: form.kind === t ? tk.iron : tk.paper, color: form.kind === t ? tk.cream : tk.iron, border: 'none', cursor: 'pointer', fontFamily: ff.mono, fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{t === 'ingredient' ? 'Ingrediente' : 'Plato / receta'}</button>)}
             </div>
-
-            {form.tipo === 'ingrediente' ? (
-              <Field label="Ingrediente">
-                <select value={form.ingrediente_id} onChange={e => onIngSelect(e.target.value)} style={inputStyle}>
-                  <option value="">— buscar en catálogo —</option>
-                  {ingredientes.map(i => <option key={i.id} value={i.id}>{i.descr}{i.cost ? ` · ${i.cost}€/${i.unit || 'ud'}` : ''}</option>)}
-                </select>
-              </Field>
+            {form.kind === 'ingredient' ? (
+              <Field label="Ingrediente"><Select value={form.ingredientId} onChange={e => { const i = ings.find(x => String(x.id) === e.target.value); setForm(f => ({ ...f, ingredientId: e.target.value, unit: i?.base_unit ?? '' })) }}><option value="">— buscar en catálogo —</option>{ings.map(i => <option key={i.id} value={i.id}>{i.name}{i.cost ? ` · ${eur(i.cost)}/${i.base_unit}` : ''}</option>)}</Select></Field>
             ) : (
-              <Field label="Nombre del plato">
-                <input value={form.nombre} onChange={e => setForm(s => ({ ...s, nombre: e.target.value }))} placeholder="Ej: Salmón a la plancha" style={inputStyle} />
-              </Field>
+              <Field label="Plato"><Select value={form.recipeId} onChange={e => setForm(f => ({ ...f, recipeId: e.target.value }))}><option value="">— elegir receta —</option>{recipes.map(r => <option key={r.id} value={r.id}>{r.name} · {eur(r.per_portion)}/ración</option>)}</Select></Field>
             )}
-
+            {!form.ingredientId && !form.recipeId && <Field label="O descripción libre"><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ej: pan del día" /></Field>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Cantidad"><input type="number" step="0.01" value={form.cantidad} onChange={e => setForm(s => ({ ...s, cantidad: e.target.value }))} style={inputStyle} /></Field>
-              <Field label="Unidad">
-                <select value={form.unidad} onChange={e => setForm(s => ({ ...s, unidad: e.target.value }))} style={inputStyle}>
-                  <option value="">—</option>{UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-              </Field>
+              <Field label={form.kind === 'dish' ? 'Raciones' : 'Cantidad'}><Input type="number" step="any" min={0} value={form.qty} onChange={e => setForm(f => ({ ...f, qty: e.target.value }))} /></Field>
+              {form.kind === 'ingredient' && <Field label="Unidad"><Select value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}><option value="">—</option>{(ing ? unitsCompatibleWith(ing.base_unit) : unitsCompatibleWith(null)).map(u => <option key={u.value} value={u.value}>{u.value}</option>)}</Select></Field>}
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Motivo">
-                <select value={form.motivo} onChange={e => setForm(s => ({ ...s, motivo: e.target.value }))} style={inputStyle}>
-                  {MOTIVOS.map(m => <option key={m} value={m}>{cap(m)}</option>)}
-                </select>
-              </Field>
-              <Field label="Servicio">
-                <select value={form.servicio} onChange={e => setForm(s => ({ ...s, servicio: e.target.value }))} style={inputStyle}>
-                  {SERVICIOS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </Field>
+              <Field label="Motivo"><Select value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}>{MOTIVOS.map(m => <option key={m} value={m}>{cap(m)}</option>)}</Select></Field>
+              <Field label="Servicio"><Select value={form.service} onChange={e => setForm(f => ({ ...f, service: e.target.value }))}>{SERVICIOS.map(s => <option key={s} value={s}>{s}</option>)}</Select></Field>
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Almacén">
-                <select value={form.almacen} onChange={e => setForm(s => ({ ...s, almacen: e.target.value }))} style={inputStyle}>
-                  <option value="">—</option>{ALMACENES.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </Field>
-              <Field label="Fecha"><input type="date" value={form.fecha} onChange={e => setForm(s => ({ ...s, fecha: e.target.value }))} style={inputStyle} /></Field>
+              <Field label="Fecha"><Input type="date" value={form.occurredOn} onChange={e => setForm(f => ({ ...f, occurredOn: e.target.value }))} /></Field>
+              <Field label="Comentario"><Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></Field>
             </div>
-
-            <Field label="Comentario (opcional)"><input value={form.notas} onChange={e => setForm(s => ({ ...s, notas: e.target.value }))} placeholder="Contexto…" style={inputStyle} /></Field>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-              <span style={{ fontFamily: ff.mono, fontSize: 11.5, color: tk.iron60 }}>
-                Coste estimado: <strong style={{ color: costePreview ? tk.iron : tk.iron40, fontFamily: ff.display, fontWeight: 600, fontSize: 15 }}>{costePreview != null ? fmt(costePreview) : '—'}</strong>
-              </span>
-              <button onClick={guardar} disabled={saving || !form.cantidad || (form.tipo === 'ingrediente' ? !form.ingrediente_id : !form.nombre.trim())}
-                style={{ padding: '9px 18px', background: tk.apple, border: `1.5px solid ${tk.iron}`, fontFamily: ff.mono, fontSize: 11, fontWeight: 600, color: tk.iron, letterSpacing: '0.06em', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
-                {saving ? 'GUARDANDO…' : 'REGISTRAR MERMA →'}
-              </button>
+            {form.kind === 'ingredient' && form.ingredientId && <label style={{ fontFamily: ff.mono, fontSize: 11, display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={form.consumeStock} onChange={e => setForm(f => ({ ...f, consumeStock: e.target.checked }))} /> descontar del stock</label>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: ff.mono, fontSize: 11.5, color: tk.iron60 }}>Coste estimado: <strong style={{ color: preview != null ? tk.iron : tk.iron40, fontFamily: ff.display, fontSize: 15 }}>{preview != null ? eur(preview) : '—'}</strong></span>
+              <Btn onClick={save} disabled={saving || !form.qty || (form.kind === 'ingredient' ? (!form.ingredientId && !form.description) || !form.unit : !form.recipeId && !form.description)}>{saving ? 'GUARDANDO…' : 'REGISTRAR MERMA →'}</Btn>
             </div>
           </div>
-        </div>
-
-        {/* Top productos */}
-        <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}` }}>
-          <div style={panelHead}>Top productos con merma · este mes</div>
-          {stats.topProductos.length === 0 ? (
-            <div style={{ padding: '30px 16px', textAlign: 'center', fontFamily: ff.mono, fontSize: 11, color: tk.iron40 }}>SIN MERMA REGISTRADA ESTE MES</div>
-          ) : (
-            <table style={tbl}>
-              <thead><tr><Th>Producto</Th><Th align="right">Eventos</Th><Th align="right">Coste</Th></tr></thead>
-              <tbody>
-                {stats.topProductos.map((p, i) => (
-                  <tr key={i} style={{ borderTop: `1px solid ${tk.iron20}` }}>
-                    <Td>{p.nombre}</Td><Td align="right">{p.eventos}</Td><Td align="right">{fmt(p.coste_total || 0)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        </Panel>
+        <Panel title={`Top productos con merma · ${stats?.month ?? ''}`}>
+          {!stats?.top?.length ? <Empty>Sin merma registrada este mes.</Empty> : (
+            <Table head={['Producto', 'Eventos', 'Coste']} right={[1, 2]}>{stats.top.map((p: any, i: number) => <Tr key={i}><Td>{p.description}</Td><Td right>{p.n}</Td><Td right>{eur(p.cost)}</Td></Tr>)}</Table>
           )}
-        </div>
+          {stats?.byReason?.length > 0 && <div style={{ padding: '10px 16px', borderTop: `1px solid ${tk.iron20}`, fontFamily: ff.mono, fontSize: 11, color: tk.iron60 }}>{stats.byReason.map((r: any) => `${cap(r.reason)} ${eur(r.cost)}`).join(' · ')}</div>}
+        </Panel>
       </div>
-
-      {/* Histórico */}
-      <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}` }}>
-        <div style={panelHead}>Histórico de merma</div>
-        {loading ? (
-          <div style={{ padding: 24, fontFamily: ff.mono, fontSize: 12, color: tk.iron60 }}>Cargando…</div>
-        ) : registros.length === 0 ? (
-          <div style={{ padding: '30px 16px', textAlign: 'center', fontFamily: ff.mono, fontSize: 11, color: tk.iron40 }}>SIN REGISTROS. AÑADE EL PRIMERO ARRIBA.</div>
-        ) : (
-          <table style={tbl}>
-            <thead><tr><Th>Fecha</Th><Th>Producto</Th><Th>Cantidad</Th><Th>Motivo</Th><Th>Servicio</Th><Th>Almacén</Th><Th align="right">Coste</Th><Th align="right"></Th></tr></thead>
-            <tbody>
-              {registros.map(r => (
-                <tr key={r.id} style={{ borderTop: `1px solid ${tk.iron20}` }}>
-                  <Td>{r.fecha}</Td>
-                  <Td>{r.nombre}</Td>
-                  <Td>{r.cantidad ?? '—'} {r.unidad || ''}</Td>
-                  <Td>{r.motivo ? cap(r.motivo) : '—'}</Td>
-                  <Td>{r.servicio || '—'}</Td>
-                  <Td>{r.almacen || '—'}</Td>
-                  <Td align="right">{r.coste_estimado != null ? fmt(r.coste_estimado) : '—'}</Td>
-                  <Td align="right">
-                    <button onClick={() => borrar(r.id)} style={{ padding: '3px 8px', background: tk.terraSoft, border: `1px solid ${tk.terra}`, color: tk.terra, cursor: 'pointer', fontFamily: ff.mono, fontSize: 11 }}>×</button>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Panel title="Histórico de merma">
+        {loading ? <Loading /> : rows.length === 0 ? <Empty>Sin registros. Añade el primero arriba.</Empty> : (
+          <Table head={['Fecha', 'Producto', 'Cantidad', 'Motivo', 'Servicio', 'Coste', '']} right={[2, 5]}>
+            {rows.map(r => <Tr key={r.id}><Td>{fecha(r.occurred_on)}</Td><Td>{r.description}{r.kind === 'dish' && <span style={{ color: tk.iron40, marginLeft: 6, fontSize: 10 }}>plato</span>}</Td><Td right>{num(r.qty)} {r.unit}</Td><Td>{r.reason ? cap(r.reason) : '—'}</Td><Td>{r.service || '—'}</Td><Td right style={{ color: tk.terra, fontWeight: 600 }}>{eur(r.estimated_cost)}</Td><Td right><Btn small kind="danger" onClick={() => remove(r.id)}>×</Btn></Td></Tr>)}
+          </Table>
         )}
-      </div>
-    </div>
+      </Panel>
+    </Page>
   )
 }
-
-// Mini factor de unidad (cliente): g→kg, ml→l
-function unitMini(a: string | null | undefined, b: string | null | undefined): number {
-  const x = (a || '').toLowerCase(), y = (b || '').toLowerCase()
-  if (x === y || !x || !y) return 1
-  if (x === 'g' && y === 'kg') return 0.001
-  if (x === 'ml' && y === 'l') return 0.001
-  if (x === 'kg' && y === 'g') return 1000
-  if (x === 'l' && y === 'ml') return 1000
-  return 1
-}
-function cap(s: string) { return s.charAt(0).toUpperCase() + s.slice(1) }
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><div style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.iron40, marginBottom: 5 }}>{label}</div>{children}</div>
-}
-function Kpi({ label, value, sub, variant = 'default', last }: { label: string; value: string; sub: string; variant?: 'default' | 'warn' | 'crit'; last?: boolean }) {
-  const c = variant === 'crit' ? tk.terra : variant === 'warn' ? tk.clay : tk.iron
-  return (
-    <div style={{ padding: '18px 22px', borderRight: last ? 'none' : `1.5px solid ${tk.iron20}`, background: tk.paper }}>
-      <div style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.15em', color: tk.iron40, textTransform: 'uppercase' }}>{label}</div>
-      <div style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 28, lineHeight: 1.05, color: c, margin: '6px 0 3px', letterSpacing: '-0.015em' }}>{value}</div>
-      <div style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60 }}>{sub}</div>
-    </div>
-  )
-}
-function Th({ children, align = 'left' }: { children?: React.ReactNode; align?: 'left' | 'right' }) {
-  return <th style={{ padding: '8px 14px', textAlign: align, fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', color: tk.iron40, textTransform: 'uppercase', fontWeight: 400, background: tk.creamSoft, borderBottom: `1px solid ${tk.iron20}` }}>{children}</th>
-}
-function Td({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
-  return <td style={{ padding: '8px 14px', textAlign: align, color: tk.iron, fontFamily: ff.mono, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{children}</td>
-}
-
-const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1.5px solid ${tk.iron20}`, background: tk.cream, color: tk.iron, fontFamily: ff.mono, fontSize: 12, outline: 'none' }
-const panelHead: React.CSSProperties = { padding: '10px 16px', borderBottom: `1.5px solid ${tk.iron20}`, fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.16em', color: tk.iron, textTransform: 'uppercase' }
-const tbl: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' }

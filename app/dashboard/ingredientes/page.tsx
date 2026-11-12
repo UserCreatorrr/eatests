@@ -1,421 +1,178 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CATEGORIAS_INGREDIENTE, ALMACENES, TIPOS_IVA, ivaPorCategoria, almacenPorCategoria } from '@/lib/catalog'
-import { UNIDADES, dimensionUnidad } from '@/lib/foodcost'
+import { api, errorMessage } from '@/lib/api'
+import { CATEGORIAS_INGREDIENTE, ivaPorCategoria } from '@/lib/catalog'
+import { tk, ff } from '@/lib/design'
+import { eur } from '@/lib/format'
+import { BASE_UNIT_OPTIONS, IVA_OPTIONS, dimOf } from '@/lib/units-ui'
+import { Badge, Btn, Chip, Empty, Field, Input, Loading, Modal, Page, Panel, SearchBox, Select, Table, Td, Tr } from '@/components/ui'
 
-type Ingrediente = {
-  id: number
-  codi: string | null
-  descr: string | null
-  type: string | null
-  unit: string | null
-  cost: number | null
-  iva: number | null
-  proveedor_id: number | null
-  proveedor_nombre: string | null
-  almacen_principal: string | null
-  almacen_secundario: string | null
-}
+type Ingredient = { id: number; code: string | null; name: string; category: string | null; base_unit: string; cost: number | null; vat_rate: number | null; supplier_id: number | null; supplier_name: string | null; warehouse_id: number | null; warehouse_name: string | null; avg_unit_weight_g: number | null; notes: string | null }
+type Supplier = { id: number; name: string }
+type Warehouse = { id: number; name: string }
+type Filtro = 'todos' | 'sin_proveedor' | 'con_proveedor' | 'sin_coste' | 'sin_almacen'
 
-type Proveedor = {
-  id: number
-  descr: string
-  descr_type: string | null
-}
-
-function fmt(v: number | null) {
-  if (v == null) return '-'
-  // Con dos decimales el agua (0,002 €/l) salía como "0,00 €" y parecía no
-  // tener coste, aunque el filtro "Sin coste" acertaba al no contarla.
-  const pequeno = v !== 0 && Math.abs(v) < 0.01
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency', currency: 'EUR',
-    minimumFractionDigits: 2, maximumFractionDigits: pequeno ? 4 : 2,
-  }).format(v)
-}
+const EMPTY = { code: '', name: '', category: '', baseUnit: 'kg', cost: '', vatRate: '', supplierId: '', warehouseId: '', avgUnitWeightG: '', notes: '' }
 
 export default function IngredientesPage() {
-  const [rows, setRows] = useState<Ingrediente[]>([])
-  const [proveedores, setProveedores] = useState<Proveedor[]>([])
+  const [rows, setRows] = useState<Ingredient[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [form, setForm] = useState<Partial<Ingrediente>>({})
-  const [assigningId, setAssigningId] = useState<number | null>(null)
+  const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [modal, setModal] = useState(false)
+  const [editing, setEditing] = useState<Ingredient | null>(null)
+  const [form, setForm] = useState({ ...EMPTY })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
-  // Filtro por estado (FC-14/RP-03): clicable desde contadores y deep-link (?filtro=)
-  const [filtro, setFiltro] = useState<'todos' | 'sin_proveedor' | 'con_proveedor' | 'sin_coste' | 'sin_almacen'>('todos')
-  // Cambiar la unidad base recalcula TODAS las recetas que usan el ingrediente:
-  // se avisa del impacto antes de guardar en vez de alterarlas en silencio.
-  const [unidadOriginal, setUnidadOriginal] = useState<string | null>(null)
-  const [recetasAfectadas, setRecetasAfectadas] = useState<number | null>(null)
+  const [assigning, setAssigning] = useState<number | null>(null)
 
   useEffect(() => {
     const f = new URLSearchParams(window.location.search).get('filtro')
-    if (f && ['sin_proveedor', 'con_proveedor', 'sin_coste', 'sin_almacen'].includes(f)) setFiltro(f as any)
+    if (f && ['sin_proveedor', 'con_proveedor', 'sin_coste', 'sin_almacen'].includes(f)) setFiltro(f as Filtro)
   }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [ingRes, provRes] = await Promise.all([
-      fetch('/api/data/ingredientes?limit=5000'),
-      fetch('/api/data/proveedores?limit=200'),
-    ])
-    const ingJson = await ingRes.json()
-    const provJson = await provRes.json()
-    setRows(ingJson.data || [])
-    setProveedores(provJson.data || [])
+    try {
+      const [i, s, w] = await Promise.all([api.get('/api/ingredients'), api.get('/api/suppliers'), api.get('/api/warehouses')])
+      setRows(i.data); setSuppliers(s.data); setWarehouses(w.data)
+    } catch (e) { setMsg(errorMessage(e)) }
     setLoading(false)
   }, [])
-
   useEffect(() => { load() }, [load])
 
-  const matchFiltro = (r: Ingrediente) =>
-    filtro === 'todos' ? true
-    : filtro === 'sin_proveedor' ? !r.proveedor_id
-    : filtro === 'con_proveedor' ? !!r.proveedor_id
-    : filtro === 'sin_coste' ? (r.cost == null || r.cost === 0)
-    : filtro === 'sin_almacen' ? !r.almacen_principal?.trim()
-    : true
+  const match = (r: Ingredient) => filtro === 'todos' ? true : filtro === 'sin_proveedor' ? !r.supplier_id : filtro === 'con_proveedor' ? !!r.supplier_id : filtro === 'sin_coste' ? !r.cost : !r.warehouse_id
+  const q = search.toLowerCase()
+  const visible = rows.filter(r => match(r) && (!q || [r.name, r.code, r.category, r.supplier_name].some(v => v?.toLowerCase().includes(q))))
 
-  const filtered = rows.filter(r =>
-    matchFiltro(r) &&
-    (!search || [r.descr, r.codi, r.type, r.proveedor_nombre].some(v => v?.toLowerCase().includes(search.toLowerCase())))
-  )
-
-  async function assignProveedor(ing: Ingrediente, prov: Proveedor | null) {
-    setSaving(true)
-    await fetch(`/api/data/ingredientes/${ing.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proveedor_id: prov?.id ?? null, proveedor_nombre: prov?.descr ?? null }),
-    })
-    setRows(prev => prev.map(r => r.id === ing.id
-      ? { ...r, proveedor_id: prov?.id ?? null, proveedor_nombre: prov?.descr ?? null }
-      : r
-    ))
-    setAssigningId(null)
-    setSaving(false)
-  }
-
-  function openAdd() {
-    setEditingId(null)
-    setUnidadOriginal(null)
-    setRecetasAfectadas(null)
-    setForm({})
-    setMsg('')
-    setModalOpen(true)
-  }
-
-  function openEdit(r: Ingrediente) {
-    setEditingId(r.id)
-    setUnidadOriginal(r.unit || null)
-    setRecetasAfectadas(null)
-    fetch(`/api/ingredientes/${r.id}/ficha`)
-      .then(res => res.json())
-      .then(d => setRecetasAfectadas(Array.isArray(d.recetas) ? d.recetas.length : 0))
-      .catch(() => setRecetasAfectadas(null))
-    setForm({ codi: r.codi || '', descr: r.descr || '', type: r.type || '', unit: r.unit || '', cost: r.cost ?? undefined, iva: r.iva ?? undefined, proveedor_id: r.proveedor_id ?? null, proveedor_nombre: r.proveedor_nombre ?? null, almacen_principal: r.almacen_principal || '', almacen_secundario: r.almacen_secundario || '' })
-    setMsg('')
-    setModalOpen(true)
+  function openNew() { setEditing(null); setForm({ ...EMPTY }); setMsg(''); setModal(true) }
+  function openEdit(r: Ingredient) {
+    setEditing(r); setMsg('')
+    setForm({ code: r.code ?? '', name: r.name, category: r.category ?? '', baseUnit: r.base_unit, cost: r.cost != null ? String(r.cost) : '', vatRate: r.vat_rate != null ? String(r.vat_rate) : '',
+      supplierId: r.supplier_id ? String(r.supplier_id) : '', warehouseId: r.warehouse_id ? String(r.warehouse_id) : '', avgUnitWeightG: r.avg_unit_weight_g != null ? String(r.avg_unit_weight_g) : '', notes: r.notes ?? '' })
+    setModal(true)
   }
 
   async function save() {
-    // Cambio de dimensión (p. ej. kg → ud): el coste de las recetas cambia de
-    // escala. Se pide confirmación explícita con el número de recetas afectadas.
-    if (editingId && unidadOriginal && form.unit && form.unit !== unidadOriginal) {
-      const antes = dimensionUnidad(unidadOriginal)
-      const despues = dimensionUnidad(form.unit as string)
-      if (antes && despues && antes !== despues) {
-        const n = recetasAfectadas ?? 0
-        const aviso = n > 0
-          ? `Vas a cambiar la unidad de ${unidadOriginal} (${antes}) a ${form.unit} (${despues}).
-
-${n} receta(s) usan este ingrediente y su coste se recalculará con la nueva unidad, lo que puede alterar su food cost.
-
-¿Continuar?`
-          : `Vas a cambiar la unidad de ${unidadOriginal} (${antes}) a ${form.unit} (${despues}), que son magnitudes distintas.
-
-¿Continuar?`
-        if (!confirm(aviso)) return
-      }
+    // Cambiar la magnitud (kg → ud) recalcula las recetas que lo usan: se confirma con el número afectado.
+    if (editing && form.baseUnit !== editing.base_unit && dimOf(form.baseUnit) !== dimOf(editing.base_unit)) {
+      let n = 0
+      try { n = (await api.get(`/api/ingredients/${editing.id}`)).usage.length } catch { /* sin dato */ }
+      if (!confirm(`Vas a cambiar la unidad de ${editing.base_unit} a ${form.baseUnit}, que son magnitudes distintas.${n ? `\n\n${n} receta(s) usan este ingrediente y su coste se recalculará.` : ''}\n\n¿Continuar?`)) return
     }
-    setSaving(true)
-    setMsg('')
+    setSaving(true); setMsg('')
     const body = {
-      ...form,
-      cost: form.cost !== undefined && form.cost !== null && (form.cost as any) !== '' ? Number(form.cost) : null,
-      iva: form.iva !== undefined && form.iva !== null && (form.iva as any) !== '' ? Number(form.iva) : null,
+      code: form.code.trim() || null, name: form.name.trim(), category: form.category || null, baseUnit: form.baseUnit, cost: form.cost === '' ? null : Number(form.cost),
+      vatRate: form.vatRate === '' ? null : Number(form.vatRate), supplierId: form.supplierId ? Number(form.supplierId) : null, warehouseId: form.warehouseId ? Number(form.warehouseId) : null,
+      avgUnitWeightG: form.avgUnitWeightG === '' ? null : Number(form.avgUnitWeightG), notes: form.notes.trim() || null,
     }
-    const url = editingId ? `/api/data/ingredientes/${editingId}` : '/api/data/ingredientes'
-    const method = editingId ? 'PUT' : 'POST'
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if (!res.ok) { const j = await res.json(); setMsg(j.error || 'Error'); setSaving(false); return }
-    setModalOpen(false)
-    load()
+    try {
+      if (editing) await api.patch(`/api/ingredients/${editing.id}`, body)
+      else await api.post('/api/ingredients', body)
+      setModal(false); await load()
+    } catch (e) { setMsg(errorMessage(e)) }
     setSaving(false)
   }
 
-  async function del(id: number) {
-    if (!confirm('¿Eliminar este ingrediente?')) return
-    await fetch(`/api/data/ingredientes/${id}`, { method: 'DELETE' })
-    setRows(prev => prev.filter(r => r.id !== id))
+  async function assignSupplier(r: Ingredient, supplierId: number | null) {
+    try {
+      await api.patch(`/api/ingredients/${r.id}`, { supplierId })
+      await load()
+    } catch (e) { alert(errorMessage(e)) }
+    setAssigning(null)
   }
 
-  const sinProveedor = rows.filter(r => !r.proveedor_id).length
-  const conProveedor = rows.filter(r => r.proveedor_id).length
-  const sinCoste = rows.filter(r => r.cost == null || r.cost === 0).length
-  const sinAlmacen = rows.filter(r => !r.almacen_principal?.trim()).length
+  async function remove(r: Ingredient) {
+    if (!confirm(`¿Eliminar "${r.name}"? Si está en recetas o documentos se desactiva en vez de borrarse.`)) return
+    try { await api.del(`/api/ingredients/${r.id}`); await load() } catch (e) { alert(errorMessage(e)) }
+  }
 
-  const chip = (activo: boolean, color: string): React.CSSProperties => ({
-    fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '4px 10px', cursor: 'pointer',
-    border: `1.5px solid ${activo ? color : '#e8e2db'}`, background: activo ? color : 'transparent',
-    color: activo ? '#fff' : color, letterSpacing: '0.02em',
-  })
+  const counts = { sinProv: rows.filter(r => !r.supplier_id).length, conProv: rows.filter(r => r.supplier_id).length, sinCoste: rows.filter(r => !r.cost).length, sinAlm: rows.filter(r => !r.warehouse_id).length }
 
   return (
-    <div className="p-8">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Ingredientes</h1>
-          <p className="page-subtitle">{rows.length} ingredientes en el catálogo</p>
-        </div>
-        <button onClick={openAdd} className="btn-primary">+ Añadir</button>
-      </div>
-
-      {/* Contadores clicables → filtran la lista (FC-14/RP-03) */}
+    <Page eyebrow="Food cost · Catálogo" title="Ingredientes" subtitle={`${rows.length} ingredientes en el catálogo`} actions={<><SearchBox value={search} onChange={setSearch} placeholder="Buscar ingrediente, categoría, proveedor…" /><Btn onClick={openNew}>+ AÑADIR</Btn></>}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        <button onClick={() => setFiltro('todos')} style={chip(filtro === 'todos', '#3d3834')}>Todos · {rows.length}</button>
-        <button onClick={() => setFiltro('con_proveedor')} style={chip(filtro === 'con_proveedor', '#0fa651')}>Con proveedor · {conProveedor}</button>
-        <button onClick={() => setFiltro('sin_proveedor')} style={chip(filtro === 'sin_proveedor', '#c97b3d')}>Sin proveedor · {sinProveedor}</button>
-        <button onClick={() => setFiltro('sin_coste')} style={chip(filtro === 'sin_coste', '#a83e1e')}>Sin coste · {sinCoste}</button>
-        <button onClick={() => setFiltro('sin_almacen')} style={chip(filtro === 'sin_almacen', '#c97b3d')}>Sin almacén · {sinAlmacen}</button>
+        <Chip active={filtro === 'todos'} color={tk.iron} onClick={() => setFiltro('todos')}>Todos · {rows.length}</Chip>
+        <Chip active={filtro === 'con_proveedor'} color={tk.appleDeep} onClick={() => setFiltro('con_proveedor')}>Con proveedor · {counts.conProv}</Chip>
+        <Chip active={filtro === 'sin_proveedor'} color={tk.clay} onClick={() => setFiltro('sin_proveedor')}>Sin proveedor · {counts.sinProv}</Chip>
+        <Chip active={filtro === 'sin_coste'} color={tk.terra} onClick={() => setFiltro('sin_coste')}>Sin coste · {counts.sinCoste}</Chip>
+        <Chip active={filtro === 'sin_almacen'} color={tk.clay} onClick={() => setFiltro('sin_almacen')}>Sin almacén · {counts.sinAlm}</Chip>
       </div>
 
-      {/* Search */}
-      <div style={{ marginBottom: 20 }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar ingrediente, tipo, proveedor..."
-          style={{ width: '100%', maxWidth: 480, padding: '10px 14px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: 'var(--paper)', boxSizing: 'border-box' }}
-          onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
-          onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
-        />
-      </div>
+      <Panel>
+        {loading ? <Loading /> : visible.length === 0 ? <Empty>{rows.length ? 'Sin resultados.' : 'Sin ingredientes. Añade el primero o escanea un albarán.'}</Empty> : (
+          <Table head={['Código', 'Nombre', 'Categoría', 'Unidad', 'Coste', 'IVA', 'Almacén', 'Proveedor', '']} right={[4]}>
+            {visible.map(r => (
+              <Tr key={r.id}>
+                <Td style={{ color: tk.iron40 }}>{r.code || '—'}</Td>
+                <Td><Link href={`/dashboard/ingredientes/${r.id}`} style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 13, color: tk.iron, textDecoration: 'none', borderBottom: `1.5px solid ${tk.apple}` }}>{r.name}</Link></Td>
+                <Td style={{ color: tk.iron60 }}>{r.category || '—'}</Td>
+                <Td>{r.base_unit}</Td>
+                <Td right>{r.cost ? <>{eur(r.cost)}<span style={{ color: tk.iron40 }}>/{r.base_unit}</span></> : <span style={{ color: tk.terra }}>sin coste</span>}</Td>
+                <Td style={{ color: tk.iron60 }}>{r.vat_rate != null ? `${r.vat_rate}%` : '—'}</Td>
+                <Td>{r.warehouse_name ? <Badge>{r.warehouse_name}</Badge> : <span style={{ color: tk.terra, opacity: 0.7, fontSize: 10.5 }}>sin asignar</span>}</Td>
+                <Td style={{ minWidth: 190 }}>
+                  {assigning === r.id ? (
+                    <Select autoFocus defaultValue={r.supplier_id ?? ''} onBlur={() => setAssigning(null)} onChange={e => assignSupplier(r, e.target.value ? Number(e.target.value) : null)} style={{ padding: '5px 8px', fontSize: 11.5, borderColor: tk.apple }}>
+                      <option value="">Sin proveedor</option>
+                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </Select>
+                  ) : (
+                    <button onClick={() => setAssigning(r.id)} title="Clic para asignar proveedor" style={{ width: '100%', textAlign: 'left', padding: '5px 10px', background: r.supplier_id ? tk.appleSoft : tk.creamSoft, border: `1px solid ${r.supplier_id ? tk.appleDeep : tk.iron20}`, cursor: 'pointer', fontFamily: ff.mono, fontSize: 11.5, color: r.supplier_id ? tk.appleDeep : tk.iron60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.supplier_name || '+ Asignar proveedor'}
+                    </button>
+                  )}
+                </Td>
+                <Td right><div style={{ display: 'inline-flex', gap: 6 }}><Btn small kind="ghost" onClick={() => openEdit(r)}>EDITAR</Btn><Btn small kind="danger" onClick={() => remove(r)}>×</Btn></div></Td>
+              </Tr>
+            ))}
+          </Table>
+        )}
+      </Panel>
 
-      {loading ? (
-        <p className="page-subtitle">Cargando...</p>
-      ) : (
-        <div style={{ backgroundColor: 'var(--paper)', borderRadius: 0, border: '1px solid #e8e2db', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#ece4d8' }}>
-                {['Código', 'Nombre', 'Categoría', 'Unidad', 'Coste', 'IVA', 'Almacén', 'Proveedor', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.5, fontWeight: 600, borderBottom: '1px solid #e8e2db', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((ing, idx) => (
-                <tr key={ing.id} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid #e8e2db' : 'none' }}>
-                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.4 }}>{ing.codi || '-'}</td>
-                  <td style={{ padding: '8px 14px', fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13 }}>
-                    <Link href={`/dashboard/ingredientes/${ing.id}`} title="Ver ficha de trazabilidad" style={{ color: '#3d3834', textDecoration: 'none', borderBottom: '1.5px solid #19f973' }}>
-                      {ing.descr || '-'}
-                    </Link>
-                  </td>
-                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45 }}>{ing.type || '-'}</td>
-                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834' }}>{ing.unit || '-'}</td>
-                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', whiteSpace: 'nowrap' }}>{fmt(ing.cost)}</td>
-                  <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#6c635a', whiteSpace: 'nowrap' }}>{ing.iva != null ? `${ing.iva}%` : '-'}</td>
-                  <td style={{ padding: '8px 14px', whiteSpace: 'nowrap' }}>
-                    {ing.almacen_principal ? (
-                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, padding: '2px 8px', backgroundColor: '#ece4d8', color: '#6c635a', border: '1px solid #c4b8a8' }}>{ing.almacen_principal}</span>
-                    ) : (
-                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10.5, color: '#a83e1e', opacity: 0.7 }}>sin asignar</span>
-                    )}
-                  </td>
-
-                  {/* Proveedor selector */}
-                  <td style={{ padding: '6px 14px', minWidth: 200 }}>
-                    {assigningId === ing.id ? (
-                      <select
-                        autoFocus
-                        defaultValue={ing.proveedor_id ?? ''}
-                        onChange={e => {
-                          const pid = e.target.value ? Number(e.target.value) : null
-                          const prov = pid ? proveedores.find(p => p.id === pid) || null : null
-                          assignProveedor(ing, prov)
-                        }}
-                        onBlur={() => setAssigningId(null)}
-                        style={{ width: '100%', padding: '5px 8px', borderRadius: 0, border: '1.5px solid #19f973', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', backgroundColor: 'var(--paper)', outline: 'none', cursor: 'pointer' }}
-                      >
-                        <option value="">Sin proveedor</option>
-                        {proveedores.map(p => (
-                          <option key={p.id} value={p.id}>{p.descr}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <button
-                        onClick={() => setAssigningId(ing.id)}
-                        style={{
-                          width: '100%', textAlign: 'left', padding: '5px 10px',
-                          backgroundColor: ing.proveedor_id ? '#d6f9e0' : '#ece4d8',
-                          border: `1px solid ${ing.proveedor_id ? '#0fa651' : '#e8e2db'}`,
-                          borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12,
-                          color: ing.proveedor_id ? '#0fa651' : '#3d3834',
-                          opacity: ing.proveedor_id ? 1 : 0.45,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}
-                        title="Clic para asignar proveedor"
-                      >
-                        {ing.proveedor_nombre || '+ Asignar proveedor'}
-                      </button>
-                    )}
-                  </td>
-
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
-                    <button onClick={() => openEdit(ing)} style={{ padding: '4px 8px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.4, fontSize: 13 }}>✏️</button>
-                    <button onClick={() => del(ing.id)} style={{ padding: '4px 8px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#a83e1e', opacity: 0.5, fontSize: 13 }}>✕</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', opacity: 0.4, padding: '20px 16px', textAlign: 'center' }}>Sin resultados</p>
-          )}
-        </div>
-      )}
-
-      {/* Modal */}
-      {modalOpen && (
-        <div onMouseDown={e => { if (e.target === e.currentTarget) setModalOpen(false) }} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(61,56,52,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#faf6ec', border: '1.5px solid #3d3834', padding: '28px 32px', width: 480, maxWidth: '90vw' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 24px' }}>
-              <h2 style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 16, color: '#3d3834', margin: 0 }}>
-                {editingId ? 'Editar ingrediente' : 'Nuevo ingrediente'}
-              </h2>
-              <button onClick={() => setModalOpen(false)} aria-label="Cerrar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3d3834', opacity: 0.5, display: 'flex' }}>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {/* Texto: código, nombre */}
-              {[
-                { key: 'codi', label: 'Código' },
-                { key: 'descr', label: 'Nombre' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={labelStyle}>{f.label}</label>
-                  <input
-                    type="text"
-                    value={(form as any)[f.key] ?? ''}
-                    onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={fieldStyle}
-                    onFocus={e => e.currentTarget.style.borderColor = '#3d3834'}
-                    onBlur={e => e.currentTarget.style.borderColor = '#c4b8a8'}
-                  />
-                </div>
-              ))}
-
-              {/* Categoría: desplegable estándar. Al elegir, autocompleta IVA y almacén si están vacíos. */}
-              <div>
-                <label style={labelStyle}>Categoría</label>
-                <select
-                  value={(form as any).type ?? ''}
-                  onChange={e => {
-                    const cat = e.target.value
-                    setForm(prev => ({
-                      ...prev,
-                      type: cat,
-                      iva: (prev as any).iva ?? (cat ? ivaPorCategoria(cat) : undefined),
-                      almacen_principal: (prev as any).almacen_principal || (cat ? almacenPorCategoria(cat) : ''),
-                    }))
-                  }}
-                  style={{ ...fieldStyle, cursor: 'pointer' }}
-                >
-                  <option value="">— seleccionar categoría —</option>
-                  {CATEGORIAS_INGREDIENTE.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-
-              {/* Unidad + Coste + IVA en una fila */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={labelStyle}>Unidad base</label>
-                  <select value={(form as any).unit ?? ''} onChange={e => setForm(prev => ({ ...prev, unit: e.target.value }))}
-                    style={{ ...fieldStyle, cursor: 'pointer' }}>
-                    <option value="">— seleccionar —</option>
-                    {UNIDADES.map(u => <option key={u.code} value={u.code}>{u.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Coste (€)</label>
-                  <input type="number" step="0.0001" value={(form as any).cost ?? ''} onChange={e => setForm(prev => ({ ...prev, cost: e.target.value as any }))}
-                    style={fieldStyle} onFocus={e => e.currentTarget.style.borderColor = '#3d3834'} onBlur={e => e.currentTarget.style.borderColor = '#c4b8a8'} />
-                </div>
-                <div>
-                  <label style={labelStyle}>IVA</label>
-                  <select value={(form as any).iva ?? ''} onChange={e => setForm(prev => ({ ...prev, iva: e.target.value === '' ? undefined : Number(e.target.value) as any }))}
-                    style={{ ...fieldStyle, cursor: 'pointer' }}>
-                    <option value="">—</option>
-                    {TIPOS_IVA.map(v => <option key={v} value={v}>{v}%</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Proveedor (feedback P0: el ingrediente debe conectarse a proveedor) */}
-              <div>
-                <label style={labelStyle}>Proveedor</label>
-                <select
-                  value={(form as any).proveedor_id ?? ''}
-                  onChange={e => {
-                    const pid = e.target.value ? Number(e.target.value) : null
-                    const prov = pid ? proveedores.find(p => p.id === pid) || null : null
-                    setForm(prev => ({ ...prev, proveedor_id: pid, proveedor_nombre: prov?.descr ?? null }))
-                  }}
-                  style={{ ...fieldStyle, cursor: 'pointer' }}
-                >
-                  <option value="">— sin asignar (pendiente) —</option>
-                  {proveedores.map(p => <option key={p.id} value={p.id}>{p.descr}</option>)}
-                </select>
-              </div>
-
-              {/* Almacenes (ubicaciones reales) */}
-              {([['almacen_principal', 'Almacén principal'], ['almacen_secundario', 'Almacén secundario (opcional)']] as const).map(([key, label]) => (
-                <div key={key}>
-                  <label style={labelStyle}>{label}</label>
-                  <select
-                    value={(form as any)[key] ?? ''}
-                    onChange={e => setForm(prev => ({ ...prev, [key]: e.target.value }))}
-                    style={{ ...fieldStyle, cursor: 'pointer' }}
-                  >
-                    <option value="">— sin asignar —</option>
-                    {ALMACENES.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-            {msg && <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#a83e1e', marginTop: 10 }}>{msg}</p>}
-            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-              <button onClick={save} disabled={saving} style={{ flex: 1, padding: '11px', backgroundColor: '#19f973', border: 'none', borderRadius: 0, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 14, color: '#2a2522', opacity: saving ? 0.6 : 1 }}>
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
-              <button onClick={() => setModalOpen(false)} style={{ padding: '11px 20px', backgroundColor: '#f5f2ee', border: '1px solid #e8e2db', borderRadius: 0, cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834' }}>
-                Cancelar
-              </button>
-            </div>
+      {modal && (
+        <Modal title={editing ? 'Editar ingrediente' : 'Nuevo ingrediente'} onClose={() => setModal(false)}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+            <Field label="Código"><Input value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} /></Field>
+            <Field label="Nombre *"><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></Field>
           </div>
-        </div>
+          <div style={{ marginTop: 12 }}>
+            <Field label="Categoría" hint="Al elegirla se propone el IVA habitual.">
+              <Select value={form.category} onChange={e => { const cat = e.target.value; setForm(p => ({ ...p, category: cat, vatRate: p.vatRate || (cat ? String(ivaPorCategoria(cat)) : '') })) }}>
+                <option value="">— seleccionar —</option>
+                {CATEGORIAS_INGREDIENTE.map(c => <option key={c} value={c}>{c}</option>)}
+              </Select>
+            </Field>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
+            <Field label="Unidad base *" hint="En la que se compra y se controla.">
+              <Select value={form.baseUnit} onChange={e => setForm(p => ({ ...p, baseUnit: e.target.value }))}>{BASE_UNIT_OPTIONS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}</Select>
+            </Field>
+            <Field label={`Coste (€/${form.baseUnit})`}><Input type="number" step="0.0001" min={0} value={form.cost} onChange={e => setForm(p => ({ ...p, cost: e.target.value }))} /></Field>
+            <Field label="IVA"><Select value={form.vatRate} onChange={e => setForm(p => ({ ...p, vatRate: e.target.value }))}><option value="">—</option>{IVA_OPTIONS.map(v => <option key={v} value={v}>{v}%</option>)}</Select></Field>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+            <Field label="Proveedor" hint="Con proveedor hace falta precio.">
+              <Select value={form.supplierId} onChange={e => setForm(p => ({ ...p, supplierId: e.target.value }))}><option value="">— sin asignar —</option>{suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>
+            </Field>
+            <Field label="Almacén"><Select value={form.warehouseId} onChange={e => setForm(p => ({ ...p, warehouseId: e.target.value }))}><option value="">— sin asignar —</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</Select></Field>
+          </div>
+          {form.baseUnit === 'kg' && (
+            <div style={{ marginTop: 12 }}>
+              <Field label="Peso medio por unidad (g)" hint="Opcional: permite usar “ud” en recetas de un ingrediente que se compra por kg (p. ej. huevo 60 g)."><Input type="number" step="1" min={0} value={form.avgUnitWeightG} onChange={e => setForm(p => ({ ...p, avgUnitWeightG: e.target.value }))} /></Field>
+            </div>
+          )}
+          <div style={{ marginTop: 12 }}><Field label="Notas"><Input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} /></Field></div>
+          {msg && <p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.terra, margin: '14px 0 0' }}>{msg}</p>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
+            <Btn kind="ghost" onClick={() => setModal(false)}>CANCELAR</Btn>
+            <Btn onClick={save} disabled={saving || !form.name.trim()}>{saving ? 'GUARDANDO…' : 'GUARDAR'}</Btn>
+          </div>
+        </Modal>
       )}
-    </div>
+    </Page>
   )
 }
-
-const labelStyle: React.CSSProperties = { fontFamily: 'DM Mono, monospace', fontSize: 9.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9a8f82', display: 'block', marginBottom: 5 }
-const fieldStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 0, border: '1.5px solid #c4b8a8', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: '#dfd5c9' }

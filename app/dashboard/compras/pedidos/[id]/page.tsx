@@ -1,154 +1,111 @@
 'use client'
-
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
+import { api, errorMessage } from '@/lib/api'
 import { tk, ff } from '@/lib/design'
-import { ALMACENES } from '@/lib/catalog'
-
-interface Ing { id: number; descr: string; unit: string | null; cost: number | null }
-interface Linea {
-  id: number; ingrediente_id: number | null; nombre: string | null
-  cantidad: number | null; unidad: string | null; coste_estimado: number | null; almacen_destino: string | null
-  ing_nombre?: string | null
-}
-
-const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
-const unitMini = (a: string | null, b: string | null) => {
-  const x = (a || '').toLowerCase(), y = (b || '').toLowerCase()
-  if (x === y || !x || !y) return 1
-  if (x === 'g' && y === 'kg') return 0.001
-  if (x === 'ml' && y === 'l') return 0.001
-  return 1
-}
+import { ESTADO_PEDIDO, eur, fecha, num } from '@/lib/format'
+import { UNIT_OPTIONS, unitsCompatibleWith } from '@/lib/units-ui'
+import { Badge, Btn, Empty, Field, Input, Loading, Modal, Note, Page, Panel, Select, Table, Td, Textarea, Tr } from '@/components/ui'
 
 export default function PedidoDetallePage() {
   const { id } = useParams<{ id: string }>()
-  const [pedido, setPedido] = useState<any>(null)
-  const [lineas, setLineas] = useState<Linea[]>([])
-  const [total, setTotal] = useState(0)
-  const [ingredientes, setIngredientes] = useState<Ing[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [nueva, setNueva] = useState({ ingrediente_id: '', nombre: '', cantidad: '', unidad: '', almacen_destino: '' })
+  const router = useRouter()
+  const [o, setO] = useState<any>(null)
+  const [ings, setIngs] = useState<any[]>([])
+  const [supplier, setSupplier] = useState<any>(null)
+  const [err, setErr] = useState('')
+  const [line, setLine] = useState({ ingredientId: '', description: '', qty: '', unit: 'kg' })
+  const [send, setSend] = useState<null | { channel: 'email' | 'whatsapp' }>(null)
+  const [sendForm, setSendForm] = useState({ to: '', subject: '', message: '' })
+  const [busy, setBusy] = useState(false)
 
-  async function load() {
-    const [d, ing] = await Promise.all([
-      fetch(`/api/pedidos/${id}/lineas`).then(r => r.json()).catch(() => null),
-      fetch('/api/data/ingredientes?limit=500').then(r => r.json()).catch(() => ({ data: [] })),
-    ])
-    if (d && !d.error) { setPedido(d.pedido); setLineas(d.lineas || []); setTotal(d.total_estimado || 0) }
-    setIngredientes(ing.data || [])
-    setLoading(false)
+  const load = useCallback(async () => {
+    try {
+      const order = await api.get(`/api/orders/${id}`)
+      setO(order)
+      const [i, s] = await Promise.all([api.get('/api/ingredients'), api.get(`/api/suppliers/${order.supplier_id}`)])
+      setIngs(i.data.filter((x: any) => !x.supplier_id || x.supplier_id === order.supplier_id)); setSupplier(s.supplier)
+    } catch (e) { setErr(errorMessage(e)) }
+  }, [id])
+  useEffect(() => { load() }, [load])
+
+  const run = async (fn: () => Promise<unknown>) => { setBusy(true); try { await fn(); await load() } catch (e) { alert(errorMessage(e)) } setBusy(false) }
+
+  function pickIng(v: string) {
+    const ing = ings.find(x => String(x.id) === v)
+    setLine(l => ({ ...l, ingredientId: v, description: ing?.name ?? l.description, unit: ing?.base_unit ?? l.unit }))
   }
-  useEffect(() => { load() }, [id])
+  const addLine = () => run(async () => { await api.post(`/api/orders/${id}/lines`, { ingredientId: line.ingredientId ? Number(line.ingredientId) : null, description: line.description || null, qty: Number(line.qty), unit: line.unit }); setLine({ ingredientId: '', description: '', qty: '', unit: 'kg' }) })
+  const removeLine = (lid: number) => run(() => api.del(`/api/orders/${id}/lines/${lid}`))
+  const setStatus = (status: string) => run(() => api.post(`/api/orders/${id}/status`, { status, sentVia: status === 'sent' ? 'manual' : undefined }))
+  const receive = () => run(async () => { const dn = await api.post(`/api/orders/${id}/receive`, {}); router.push(`/dashboard/compras/albaranes/${dn.id}`) })
 
-  const ingSel = ingredientes.find(i => String(i.id) === nueva.ingrediente_id)
-  const costePreview = (() => {
-    const c = parseFloat(nueva.cantidad)
-    if (!c || !ingSel?.cost) return null
-    return Math.round(c * unitMini(nueva.unidad || ingSel.unit, ingSel.unit) * ingSel.cost * 100) / 100
-  })()
-
-  function onIng(idv: string) {
-    const ing = ingredientes.find(i => String(i.id) === idv)
-    setNueva(s => ({ ...s, ingrediente_id: idv, nombre: ing?.descr || '', unidad: ing?.unit || s.unidad }))
+  function openSend(channel: 'email' | 'whatsapp') {
+    const items = o.lines.map((l: any) => `• ${l.description}: ${num(l.qty)} ${l.unit}`).join('\n')
+    const date = new Date().toLocaleDateString('es-ES')
+    setSendForm({ to: channel === 'email' ? supplier?.email ?? '' : supplier?.phone ?? '', subject: `Pedido ${o.number}`, message: channel === 'email' ? `Hola,\n\nos pasamos el pedido para la próxima entrega:\n\n${items}\n\nPor favor, confirmad disponibilidad y fecha de entrega.\n\nGracias` : `Hola, pedido para el ${date}:\n\n${items}\n\nGracias` })
+    setSend({ channel })
   }
+  const doSend = () => run(async () => {
+    // El pedido ya existe: se envía por el canal elegido reutilizando sus líneas.
+    const r = await api.post('/api/orders/send', { supplierId: o.supplier_id, channel: send!.channel, to: sendForm.to, subject: sendForm.subject, message: sendForm.message, items: o.lines.map((l: any) => ({ ingredientId: l.ingredient_id, description: l.description, qty: l.qty, unit: l.unit })), expectedDate: o.expected_date, notes: o.notes })
+    await api.post(`/api/orders/${id}/status`, { status: 'cancelled' }).catch(() => {})
+    setSend(null)
+    router.push(`/dashboard/compras/pedidos/${r.order.id}`)
+  })
 
-  async function addLinea() {
-    if (!nueva.cantidad || (!nueva.ingrediente_id && !nueva.nombre.trim())) return
-    setSaving(true)
-    await fetch(`/api/pedidos/${id}/lineas`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ingrediente_id: nueva.ingrediente_id ? Number(nueva.ingrediente_id) : null,
-        nombre: nueva.nombre || null, cantidad: parseFloat(nueva.cantidad) || null,
-        unidad: nueva.unidad || null, almacen_destino: nueva.almacen_destino || null,
-      }),
-    })
-    setNueva({ ingrediente_id: '', nombre: '', cantidad: '', unidad: '', almacen_destino: '' })
-    await load(); setSaving(false)
-  }
-
-  async function delLinea(lid: number) {
-    await fetch(`/api/pedidos/${id}/lineas`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ linea_id: lid }) })
-    await load()
-  }
-
-  if (loading) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.iron60 }}>Cargando…</div>
-  if (!pedido) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.terra }}>Pedido no encontrado</div>
+  if (err) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.terra }}>{err}</div>
+  if (!o) return <Loading />
+  const draft = o.status === 'draft'
 
   return (
-    <div style={{ padding: '32px 36px 60px' }}>
-      <Link href="/dashboard/compras/pedidos" style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, textDecoration: 'none' }}>← Pedidos</Link>
-
-      <div style={{ background: tk.iron, color: tk.cream, padding: '18px 24px', marginTop: 12, marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
-        <div>
-          <p style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.16em', color: tk.apple, margin: '0 0 6px', textTransform: 'uppercase' }}>PEDIDO DE COMPRA</p>
-          <h1 style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 24, margin: 0 }}>{pedido.num_order || '(sin número)'}</h1>
-          <p style={{ fontFamily: ff.mono, fontSize: 11.5, opacity: 0.65, margin: '6px 0 0' }}>
-            {[pedido.vendor, pedido.date_order].filter(Boolean).join(' · ') || 'Sin proveedor / fecha'}
-          </p>
-        </div>
-        <div style={{ textAlign: 'right' as const }}>
-          <p style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', opacity: 0.5, textTransform: 'uppercase', margin: 0 }}>Total estimado</p>
-          <p style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 26, color: tk.apple, margin: '4px 0 0' }}>{fmt(total)}</p>
-          <p style={{ fontFamily: ff.mono, fontSize: 10.5, opacity: 0.5, margin: '2px 0 0' }}>{lineas.length} línea{lineas.length !== 1 ? 's' : ''}</p>
-        </div>
-      </div>
-
-      {/* Líneas */}
-      <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}`, marginBottom: 16 }}>
-        <div style={{ padding: '10px 16px', borderBottom: `1.5px solid ${tk.iron20}`, fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.16em', color: tk.iron, textTransform: 'uppercase' }}>Líneas del pedido</div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: ff.mono, fontSize: 11.5 }}>
-          <thead><tr>
-            {['Producto', 'Cantidad', 'Unidad', 'Almacén destino', 'Coste estimado', ''].map((h, i) => (
-              <th key={h} style={{ padding: '8px 14px', textAlign: i === 4 ? 'right' : 'left', fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.1em', color: tk.iron40, textTransform: 'uppercase', fontWeight: 400, background: tk.creamSoft, borderBottom: `1px solid ${tk.iron20}` }}>{h}</th>
+    <Page back={{ href: '/dashboard/compras/pedidos', label: 'Pedidos' }} eyebrow="Pedido de compra" title={o.number}
+      subtitle={<><Link href={`/dashboard/proveedores/${o.supplier_id}`} style={{ color: tk.appleDeep, textDecoration: 'none', fontWeight: 600 }}>{o.supplier_name}</Link> · {fecha(o.order_date)}{o.expected_date ? ` · entrega prevista ${fecha(o.expected_date)}` : ''}{o.notes ? ` · ${o.notes}` : ''}</>}
+      actions={<>
+        <Badge tone={o.status === 'sent' ? 'warn' : o.status === 'closed' ? 'ok' : o.status === 'cancelled' ? 'crit' : 'neutral'}>{ESTADO_PEDIDO[o.status]}</Badge>
+        {draft && <><Btn kind="ghost" onClick={() => openSend('email')} disabled={busy || !o.lines.length}>ENVIAR POR EMAIL</Btn><Btn kind="ghost" onClick={() => openSend('whatsapp')} disabled={busy || !o.lines.length}>WHATSAPP</Btn><Btn kind="ghost" onClick={() => setStatus('sent')} disabled={busy || !o.lines.length} title="Ya lo has enviado por otro medio">MARCAR ENVIADO</Btn></>}
+        {o.status === 'sent' && <Btn onClick={receive} disabled={busy}>RECIBIR → CREAR ALBARÁN</Btn>}
+        {o.status === 'received' && <Btn kind="ghost" onClick={() => setStatus('closed')} disabled={busy}>CERRAR</Btn>}
+        {(draft || o.status === 'sent') && <Btn kind="danger" onClick={() => confirm('¿Cancelar el pedido?') && setStatus('cancelled')} disabled={busy}>CANCELAR</Btn>}
+      </>}>
+      {o.status === 'received' && <Note tone="ok">Pedido recibido: el albarán está creado en borrador. Revísalo y valídalo para que entren precios y stock.</Note>}
+      <Panel title={`Líneas · ${o.lines.length}`} right={<span style={{ fontFamily: ff.mono, fontSize: 11 }}>Total estimado <strong>{eur(o.total)}</strong></span>}>
+        {o.lines.length === 0 ? <Empty>Sin líneas. Añade el primer producto abajo.</Empty> : (
+          <Table head={['Producto', 'Cantidad', 'Coste estimado', 'Línea', '']} right={[1, 2, 3, 4]}>
+            {o.lines.map((l: any) => (
+              <Tr key={l.id}>
+                <Td>{l.ingredient_id ? <Link href={`/dashboard/ingredientes/${l.ingredient_id}`} style={{ color: tk.iron, textDecoration: 'none', borderBottom: `1px solid ${tk.iron40}` }}>{l.description}</Link> : l.description}</Td>
+                <Td right>{num(l.qty)} {l.unit}</Td>
+                <Td right style={{ color: tk.iron60 }}>{l.current_unit_cost != null ? `${eur(l.current_unit_cost)}/${l.unit}` : '—'}</Td>
+                <Td right style={{ fontWeight: 600 }}>{eur(l.line_total)}</Td>
+                <Td right>{draft && <Btn small kind="danger" onClick={() => removeLine(l.id)} disabled={busy}>×</Btn>}</Td>
+              </Tr>
             ))}
-          </tr></thead>
-          <tbody>
-            {lineas.length === 0 && <tr><td colSpan={6} style={{ padding: '22px', textAlign: 'center', color: tk.iron40, fontFamily: ff.mono, fontSize: 11 }}>Sin líneas. Añade el primer producto abajo.</td></tr>}
-            {lineas.map(l => (
-              <tr key={l.id} style={{ borderTop: `1px solid ${tk.iron20}` }}>
-                <td style={td}>{l.ing_nombre || l.nombre || '—'}</td>
-                <td style={td}>{l.cantidad ?? '—'}</td>
-                <td style={td}>{l.unidad || '—'}</td>
-                <td style={td}>{l.almacen_destino || '—'}</td>
-                <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{l.coste_estimado != null ? fmt(l.coste_estimado) : '—'}</td>
-                <td style={{ ...td, textAlign: 'right' }}><button onClick={() => delLinea(l.id)} style={{ padding: '3px 8px', background: tk.terraSoft, border: `1px solid ${tk.terra}`, color: tk.terra, cursor: 'pointer', fontFamily: ff.mono, fontSize: 11 }}>×</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Añadir línea */}
-      <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}`, padding: 16 }}>
-        <div style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', color: tk.iron40, textTransform: 'uppercase', marginBottom: 10 }}>Añadir producto</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 0.8fr 0.7fr 1.2fr auto', gap: 8, alignItems: 'end' }}>
-          <div>
-            <select value={nueva.ingrediente_id} onChange={e => onIng(e.target.value)} style={inp}>
-              <option value="">— ingrediente del catálogo —</option>
-              {ingredientes.map(i => <option key={i.id} value={i.id}>{i.descr}{i.cost ? ` · ${i.cost}€/${i.unit || 'ud'}` : ''}</option>)}
-            </select>
-          </div>
-          <input type="number" step="0.01" placeholder="Cant." value={nueva.cantidad} onChange={e => setNueva(s => ({ ...s, cantidad: e.target.value }))} style={inp} />
-          <input type="text" placeholder="Ud." value={nueva.unidad} onChange={e => setNueva(s => ({ ...s, unidad: e.target.value }))} style={inp} />
-          <select value={nueva.almacen_destino} onChange={e => setNueva(s => ({ ...s, almacen_destino: e.target.value }))} style={inp}>
-            <option value="">Almacén destino…</option>
-            {ALMACENES.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-          <button onClick={addLinea} disabled={saving || !nueva.cantidad} style={{ padding: '8px 16px', background: tk.apple, border: `1.5px solid ${tk.iron}`, fontFamily: ff.mono, fontSize: 13, fontWeight: 600, color: tk.iron, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>+</button>
-        </div>
-        {costePreview != null && (
-          <p style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, margin: '8px 0 0' }}>Coste estimado de la línea: <strong style={{ color: tk.iron }}>{fmt(costePreview)}</strong></p>
+          </Table>
         )}
-      </div>
-    </div>
+      </Panel>
+      {draft && (
+        <Panel title="Añadir producto">
+          <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '2fr 1.5fr 0.8fr 0.9fr auto', gap: 8, alignItems: 'end' }}>
+            <Field label="Del catálogo"><Select value={line.ingredientId} onChange={e => pickIng(e.target.value)}><option value="">— ingrediente —</option>{ings.map(i => <option key={i.id} value={i.id}>{i.name}{i.cost ? ` · ${eur(i.cost)}/${i.base_unit}` : ''}</option>)}</Select></Field>
+            <Field label="O texto libre"><Input value={line.description} onChange={e => setLine(l => ({ ...l, description: e.target.value }))} placeholder="Descripción" /></Field>
+            <Field label="Cantidad"><Input type="number" step="any" min={0} value={line.qty} onChange={e => setLine(l => ({ ...l, qty: e.target.value }))} /></Field>
+            <Field label="Unidad"><Select value={line.unit} onChange={e => setLine(l => ({ ...l, unit: e.target.value }))}>{(line.ingredientId ? unitsCompatibleWith(ings.find(x => String(x.id) === line.ingredientId)?.base_unit) : UNIT_OPTIONS).map(u => <option key={u.value} value={u.value}>{u.value}</option>)}</Select></Field>
+            <Btn onClick={addLine} disabled={busy || !line.qty || (!line.ingredientId && !line.description)}>+</Btn>
+          </div>
+        </Panel>
+      )}
+      {send && (
+        <Modal title={send.channel === 'email' ? 'Enviar pedido por email' : 'Enviar pedido por WhatsApp'} onClose={() => setSend(null)} width={560}>
+          <Field label={send.channel === 'email' ? 'Para (email)' : 'Para (teléfono con prefijo)'}><Input value={sendForm.to} onChange={e => setSendForm(f => ({ ...f, to: e.target.value }))} /></Field>
+          {send.channel === 'email' && <div style={{ marginTop: 12 }}><Field label="Asunto"><Input value={sendForm.subject} onChange={e => setSendForm(f => ({ ...f, subject: e.target.value }))} /></Field></div>}
+          <div style={{ marginTop: 12 }}><Field label="Mensaje"><Textarea rows={9} value={sendForm.message} onChange={e => setSendForm(f => ({ ...f, message: e.target.value }))} /></Field></div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}><Btn kind="ghost" onClick={() => setSend(null)}>CANCELAR</Btn><Btn onClick={doSend} disabled={busy || !sendForm.to}>ENVIAR</Btn></div>
+        </Modal>
+      )}
+    </Page>
   )
 }
-
-const td: React.CSSProperties = { padding: '8px 14px', color: tk.iron, fontVariantNumeric: 'tabular-nums' }
-const inp: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1.5px solid ${tk.iron20}`, background: tk.cream, color: tk.iron, fontFamily: ff.mono, fontSize: 11.5, outline: 'none' }

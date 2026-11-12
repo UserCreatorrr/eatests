@@ -1,266 +1,167 @@
 'use client'
-
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { api, errorMessage } from '@/lib/api'
+import { CATEGORIAS_INGREDIENTE } from '@/lib/catalog'
 import { tk, ff } from '@/lib/design'
+import { eur, fecha } from '@/lib/format'
+import { IVA_OPTIONS, UNIT_OPTIONS } from '@/lib/units-ui'
+import { Btn, Delta, Field, Input, Note, Page, Panel, Select, Table, Td, Tr } from '@/components/ui'
 
-interface Ing { id: number; descr: string; unit: string | null; cost: number | null; type?: string | null; almacen_principal?: string | null }
-interface Linea {
-  nombre: string; cantidad: number | null; unidad: string | null; precio_unitario: number | null; total_linea: number | null
-  iva_pct: number | null
-  ingrediente_id: number | null; ingrediente_nombre: string | null; ingrediente_unidad: string | null
-  coste_actual: number | null; cambio_pct: number | null; mapeado: boolean; excluida?: boolean
-  crear_ingrediente?: boolean
-  crear_tipo?: string; crear_iva?: number | null; crear_almacen?: string
+type Line = {
+  description: string; qty: number | null; unit: string | null; unitRecognized: boolean; unitPrice: number | null; lineTotal: number | null; vatRate: number | null
+  ingredientId: number | null; ingredientName: string | null; ingredientUnit: string | null; currentCost: number | null; match: string | null; unitPriceInBase: number | null; changePct: number | null; unitMismatch: boolean
+  excluded?: boolean; create?: { category: string; vatRate: number | null; warehouseId: number | null } | null
 }
-
-const IVAS = [0, 4, 10, 21]
-const TIPOS_BASE = ['Carne', 'Pescado', 'Marisco', 'Verdura', 'Fruta', 'Lácteo', 'Seco', 'Bebida', 'Congelado', 'Ingrediente']
-const ALMACENES_BASE = ['Almacén seco', 'Nevera', 'Congelador']
-
-const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
 
 export default function EscaneoPage() {
-  const [tipo, setTipo] = useState<'albaran' | 'factura'>('albaran')
+  const [kind, setKind] = useState<'delivery_note' | 'invoice'>('delivery_note')
   const [image, setImage] = useState<string | null>(null)
-  const [parsing, setParsing] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [data, setData] = useState<any>(null)
-  const [lineas, setLineas] = useState<Linea[]>([])
-  const [ingredientes, setIngredientes] = useState<Ing[]>([])
-  const [actualizarPrecios, setActualizarPrecios] = useState(true)
-  const [crearProveedor, setCrearProveedor] = useState(false)
-  const [resultado, setResultado] = useState<any>(null)
+  const [scan, setScan] = useState<any>(null)
+  const [lines, setLines] = useState<Line[]>([])
+  const [header, setHeader] = useState<any>(null)
+  const [ings, setIngs] = useState<any[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [warehouses, setWarehouses] = useState<any[]>([])
+  const [applyPrices, setApplyPrices] = useState(true)
+  const [createSupplier, setCreateSupplier] = useState(false)
+  const [busy, setBusy] = useState<'' | 'scan' | 'save'>('')
+  const [result, setResult] = useState<any>(null)
+  const [msg, setMsg] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { fetch('/api/data/ingredientes?limit=500').then(r => r.json()).then(d => setIngredientes(d.data || [])).catch(() => {}) }, [])
+  useEffect(() => { Promise.all([api.get('/api/ingredients'), api.get('/api/suppliers'), api.get('/api/warehouses')]).then(([i, s, w]) => { setIngs(i.data); setSuppliers(s.data); setWarehouses(w.data) }).catch(() => {}) }, [])
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
-    const reader = new FileReader()
-    reader.onload = () => { setImage(reader.result as string); setData(null); setResultado(null) }
-    reader.readAsDataURL(f); e.target.value = ''
+    const r = new FileReader(); r.onload = () => { setImage(r.result as string); setScan(null); setResult(null); setMsg('') }; r.readAsDataURL(f); e.target.value = ''
   }
 
-  async function parse() {
+  async function doScan() {
     if (!image) return
-    setParsing(true); setResultado(null)
-    const res = await fetch('/api/compras/escaneo/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image, tipo }) })
-    const d = await res.json()
-    setData(d)
-    setLineas(d.lineas || [])
-    setCrearProveedor(d.warnings?.proveedor_nuevo || false)
-    setParsing(false)
+    setBusy('scan'); setMsg(''); setResult(null)
+    try {
+      const s = await api.post('/api/documents/scan', { image, kind })
+      setScan(s); setLines(s.lines.map((l: Line) => ({ ...l, unit: l.unitRecognized ? l.unit : null }))); setHeader({ ...s.header }); setCreateSupplier(s.warnings.newSupplier)
+    } catch (e) { setMsg(errorMessage(e)) }
+    setBusy('')
   }
 
-  function remap(idx: number, ingId: string) {
-    if (ingId === '__crear__') {
-      setLineas(ls => ls.map((l, i) => i !== idx ? l : {
-        ...l, ingrediente_id: null, ingrediente_nombre: l.nombre, ingrediente_unidad: l.unidad,
-        coste_actual: null, cambio_pct: null, mapeado: true, crear_ingrediente: true,
-        crear_tipo: l.crear_tipo || 'Ingrediente', crear_iva: l.crear_iva ?? 10, crear_almacen: l.crear_almacen || '',
-      }))
-      return
-    }
-    const ing = ingredientes.find(i => String(i.id) === ingId)
-    setLineas(ls => ls.map((l, i) => i !== idx ? l : {
-      ...l, ingrediente_id: ing?.id ?? null, ingrediente_nombre: ing?.descr ?? null, ingrediente_unidad: ing?.unit ?? null,
-      coste_actual: ing?.cost ?? null, mapeado: !!ing, crear_ingrediente: false,
-    }))
-  }
-  function toggleExcl(idx: number) { setLineas(ls => ls.map((l, i) => i === idx ? { ...l, excluida: !l.excluida } : l)) }
-  function setIva(idx: number, valor: string) { setLineas(ls => ls.map((l, i) => i === idx ? { ...l, iva_pct: valor === '' ? null : Number(valor) } : l)) }
-  function setCrearCampo(idx: number, campo: 'crear_tipo' | 'crear_iva' | 'crear_almacen', valor: string) {
-    setLineas(ls => ls.map((l, i) => i !== idx ? l : { ...l, [campo]: campo === 'crear_iva' ? (valor === '' ? null : Number(valor)) : valor }))
+  const setL = (i: number, patch: Partial<Line>) => setLines(ls => ls.map((l, j) => j === i ? { ...l, ...patch } : l))
+  function remap(i: number, v: string) {
+    if (v === '__create__') { setL(i, { ingredientId: null, ingredientName: null, create: { category: '', vatRate: lines[i].vatRate ?? 10, warehouseId: null }, changePct: null }); return }
+    const ing = ings.find(x => String(x.id) === v)
+    setL(i, { ingredientId: ing?.id ?? null, ingredientName: ing?.name ?? null, ingredientUnit: ing?.base_unit ?? null, currentCost: ing?.cost ?? null, create: null, changePct: null })
   }
 
-  // Opciones de categoría y almacén: las del catálogo del usuario + básicas
-  const tipos = Array.from(new Set([...ingredientes.map(i => i.type).filter(Boolean) as string[], ...TIPOS_BASE]))
-  const almacenes = Array.from(new Set([...ingredientes.map(i => i.almacen_principal).filter(Boolean) as string[], ...ALMACENES_BASE]))
-
-  async function guardar() {
-    setSaving(true)
-    const res = await fetch('/api/compras/escaneo/commit', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo, cabecera: data.cabecera, lineas, actualizar_precios: actualizarPrecios, crear_proveedor: crearProveedor, image }),
-    })
-    const d = await res.json()
-    setResultado(d); setSaving(false)
+  async function save() {
+    setBusy('save'); setMsg('')
+    try {
+      const r = await api.post('/api/documents/commit', {
+        kind, image, applyPrices, createSupplier,
+        header: { supplierId: header.supplierId, vendor: header.vendor, vendorTaxId: header.vendorTaxId, number: header.number, date: header.date, dueDate: header.dueDate, base: header.base, vat: header.vat, total: header.total },
+        lines: lines.map(l => ({ excluded: !!l.excluded, description: l.description, qty: l.qty, unit: l.unit, unitPrice: l.unitPrice, lineTotal: l.lineTotal, vatRate: l.vatRate, ingredientId: l.ingredientId, create: l.create ? { category: l.create.category || null, vatRate: l.create.vatRate, warehouseId: l.create.warehouseId } : null })),
+      })
+      setResult(r)
+    } catch (e) { setMsg(errorMessage(e)) }
+    setBusy('')
   }
 
-  const c = data?.cabecera
+  const unresolved = lines.filter(l => !l.excluded && !l.ingredientId && !l.create).length
+  const noUnit = lines.filter(l => !l.excluded && !l.unit).length
+  const sumLines = Math.round(lines.filter(l => !l.excluded).reduce((s, l) => s + (l.lineTotal ?? 0), 0) * 100) / 100
+  const gap = header && header.base != null && header.vat != null && header.total != null ? Math.round((header.base + header.vat - header.total) * 100) / 100 : null
 
   return (
-    <div style={{ padding: '32px 36px 60px' }}>
-      <Link href="/dashboard/compras" style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, textDecoration: 'none' }}>← Compras</Link>
-      <div style={{ margin: '12px 0 22px' }}>
-        <p style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.2em', color: tk.appleDeep, textTransform: 'uppercase', margin: '0 0 8px' }}>FOOD COST · ESCANEO + VALIDACIÓN</p>
-        <h1 style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 32, letterSpacing: '-0.02em', margin: '0 0 6px', color: tk.iron }}>Sube un documento y valídalo</h1>
-        <p style={{ fontFamily: ff.mono, fontSize: 12.5, color: tk.iron60, margin: 0 }}>Foto → detecta proveedor y líneas → mapea ingredientes → revisa cambios de precio → guarda y actualiza costes.</p>
-      </div>
-
-      {/* Upload */}
-      <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}`, padding: 18, marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', border: `1.5px solid ${tk.iron}` }}>
-          {(['albaran', 'factura'] as const).map(t => (
-            <button key={t} onClick={() => setTipo(t)} style={{ padding: '7px 14px', background: tipo === t ? tk.iron : tk.paper, color: tipo === t ? tk.cream : tk.iron, border: 'none', cursor: 'pointer', fontFamily: ff.mono, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', borderLeft: t === 'factura' ? `1.5px solid ${tk.iron}` : 'none' }}>{t === 'albaran' ? 'Albarán' : 'Factura'}</button>
-          ))}
+    <Page back={{ href: '/dashboard/compras', label: 'Compras' }} eyebrow="Food cost · Escaneo + validación" title="Sube un documento y valídalo" subtitle="Foto → la IA extrae proveedor y líneas → tú confirmas el mapeo → se guarda y, si todo está resuelto, se valida: precios, stock y escandallos afectados.">
+      <Panel>
+        <div style={{ padding: 18, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', border: `1.5px solid ${tk.iron}` }}>
+            {(['delivery_note', 'invoice'] as const).map(t => <button key={t} onClick={() => setKind(t)} style={{ padding: '7px 14px', background: kind === t ? tk.iron : tk.paper, color: kind === t ? tk.cream : tk.iron, border: 'none', cursor: 'pointer', fontFamily: ff.mono, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t === 'delivery_note' ? 'Albarán' : 'Factura'}</button>)}
+          </div>
+          <Btn kind="ghost" onClick={() => fileRef.current?.click()}>{image ? 'CAMBIAR IMAGEN' : 'SUBIR FOTO'}</Btn>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onFile} />
+          {image && <img src={image} alt="" style={{ height: 44, border: `1.5px solid ${tk.iron20}` }} />}
+          <Btn onClick={doScan} disabled={!image || busy !== ''}>{busy === 'scan' ? 'ANALIZANDO…' : 'EXTRAER Y VALIDAR →'}</Btn>
         </div>
-        <button onClick={() => fileRef.current?.click()} style={btnGhost}>{image ? 'Cambiar imagen' : 'Subir foto'}</button>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onFile} />
-        {image && <img src={image} alt="" style={{ height: 44, border: `1.5px solid ${tk.iron20}` }} />}
-        <button onClick={parse} disabled={!image || parsing} style={btnPrimary}>{parsing ? 'ANALIZANDO…' : 'EXTRAER Y VALIDAR →'}</button>
-      </div>
+      </Panel>
+      {msg && <Note tone="crit">{msg}</Note>}
 
-      {data && c && (
+      {scan && header && !result && (
         <>
-          {/* Cabecera detectada */}
-          <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}`, marginBottom: 16 }}>
-            <div style={panelHead}>Cabecera detectada</div>
-            <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-              <Info label="Proveedor" value={c.vendor || '—'} extra={c.proveedor_match ? `↳ ${c.proveedor_match}` : (c.vendor ? 'nuevo' : null)} extraColor={c.proveedor_match ? tk.appleDeep : tk.clay} />
-              <Info label="NIF/CIF" value={c.vendor_nif || '—'} />
-              <Info label="Fecha" value={c.fecha || '—'} />
-              <Info label="Total" value={c.total != null ? fmt(c.total) : '—'} />
+          <Panel title="Cabecera detectada">
+            <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+              <Field label="Proveedor" hint={header.supplierId ? `↳ ${scan.header.supplierName}` : header.vendor ? 'no está en el catálogo' : undefined}>
+                <Select value={header.supplierId ?? ''} onChange={e => setHeader((h: any) => ({ ...h, supplierId: e.target.value ? Number(e.target.value) : null }))}><option value="">{header.vendor ? `${header.vendor} (nuevo)` : '— elegir —'}</option>{suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>
+              </Field>
+              <Field label="Nº documento"><Input value={header.number ?? ''} onChange={e => setHeader((h: any) => ({ ...h, number: e.target.value }))} /></Field>
+              <Field label="Fecha"><Input type="date" value={header.date ?? ''} onChange={e => setHeader((h: any) => ({ ...h, date: e.target.value }))} /></Field>
+              {kind === 'invoice' ? <Field label="Vencimiento"><Input type="date" value={header.dueDate ?? ''} onChange={e => setHeader((h: any) => ({ ...h, dueDate: e.target.value }))} /></Field> : <Field label="NIF"><Input value={header.vendorTaxId ?? ''} onChange={e => setHeader((h: any) => ({ ...h, vendorTaxId: e.target.value }))} /></Field>}
+              <Field label="Base (€)"><Input type="number" step="0.01" value={header.base ?? ''} onChange={e => setHeader((h: any) => ({ ...h, base: e.target.value === '' ? null : Number(e.target.value) }))} /></Field>
+              <Field label="IVA (€)"><Input type="number" step="0.01" value={header.vat ?? ''} onChange={e => setHeader((h: any) => ({ ...h, vat: e.target.value === '' ? null : Number(e.target.value) }))} /></Field>
+              <Field label="Total (€)"><Input type="number" step="0.01" value={header.total ?? ''} onChange={e => setHeader((h: any) => ({ ...h, total: e.target.value === '' ? null : Number(e.target.value) }))} /></Field>
+              <div style={{ fontFamily: ff.mono, fontSize: 11, alignSelf: 'end', color: gap != null && Math.abs(gap) > 0.02 ? tk.terra : tk.appleDeep }}>{gap == null ? 'Cuadre: faltan importes' : Math.abs(gap) > 0.02 ? `⚠ Base + IVA − total = ${eur(gap)}` : '✓ Base + IVA = total'}<div style={{ color: tk.iron60 }}>Líneas suman {eur(sumLines)}</div></div>
             </div>
-          </div>
+          </Panel>
 
-          {/* Warnings */}
-          {(data.warnings.sin_mapear > 0 || data.warnings.con_cambio_precio > 0 || data.warnings.proveedor_nuevo || data.warnings.sin_iva > 0) && (
-            <div style={{ background: tk.claySoft, border: `1.5px solid ${tk.clay}`, padding: '10px 14px', marginBottom: 16, fontFamily: ff.mono, fontSize: 11, color: tk.clay }}>
-              {[
-                data.warnings.proveedor_nuevo && 'proveedor no encontrado en el catálogo',
-                data.warnings.sin_mapear > 0 && `${data.warnings.sin_mapear} línea(s) sin ingrediente mapeado`,
-                data.warnings.con_cambio_precio > 0 && `${data.warnings.con_cambio_precio} cambio(s) de precio detectados`,
-                data.warnings.sin_iva > 0 && `${data.warnings.sin_iva} línea(s) sin IVA — revísalo antes de cerrar`,
-              ].filter(Boolean).join(' · ')}
-            </div>
+          {(unresolved > 0 || noUnit > 0 || scan.warnings.priceChanges > 0) && (
+            <Note tone="warn">{[unresolved > 0 && `${unresolved} línea(s) sin ingrediente: mapea o crea; si quedan así el documento se guarda en revisión`, noUnit > 0 && `${noUnit} línea(s) sin unidad reconocida`, scan.warnings.priceChanges > 0 && `${scan.warnings.priceChanges} cambio(s) de precio detectados`].filter(Boolean).join(' · ')}</Note>
           )}
 
-          {/* Cuadre del documento (FC-07): base + IVA vs total detectado */}
-          {data.cuadre && (data.cuadre.base != null || data.cuadre.iva != null || data.cuadre.total != null) && (
-            <div style={{
-              background: data.warnings.descuadre ? tk.terraSoft : tk.appleSoft,
-              border: `1.5px solid ${data.warnings.descuadre ? tk.terra : tk.appleDeep}`,
-              padding: '10px 14px', marginBottom: 16, fontFamily: ff.mono, fontSize: 11.5,
-              color: data.warnings.descuadre ? tk.terra : tk.iron, display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center',
-            }}>
-              <span style={{ fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', fontSize: 10 }}>Cuadre</span>
-              <span>Base {data.cuadre.base != null ? fmt(data.cuadre.base) : '—'}</span>
-              <span>+ IVA {data.cuadre.iva != null ? fmt(data.cuadre.iva) : '—'}</span>
-              <span>= Total {data.cuadre.total != null ? fmt(data.cuadre.total) : '—'}</span>
-              {data.warnings.descuadre
-                ? <strong style={{ marginLeft: 'auto' }}>⚠ Descuadre de {fmt(Math.abs(data.cuadre.descuadre))} — revisa base/IVA/total antes de cerrar.</strong>
-                : (data.cuadre.descuadre != null && <span style={{ marginLeft: 'auto', color: tk.appleDeep, fontWeight: 600 }}>✓ Cuadra</span>)}
-            </div>
-          )}
+          <Panel title="Líneas extraídas · valida el mapeo">
+            <Table head={['Producto detectado', 'Cant.', 'Ud.', '€/ud', 'IVA', 'Ingrediente del catálogo', 'Cambio', '']} right={[1, 3, 6]}>
+              {lines.map((l, i) => (
+                <Tr key={i}>
+                  <Td style={{ opacity: l.excluded ? 0.4 : 1 }}>{l.description}</Td>
+                  <Td right><Input type="number" step="any" value={l.qty ?? ''} onChange={e => setL(i, { qty: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 80, padding: '4px 6px', textAlign: 'right' }} /></Td>
+                  <Td><Select value={l.unit ?? ''} onChange={e => setL(i, { unit: e.target.value || null })} style={{ width: 80, padding: '4px 6px', borderColor: l.unit ? tk.iron20 : tk.clay }}><option value="">—</option>{UNIT_OPTIONS.map(u => <option key={u.value} value={u.value}>{u.value}</option>)}</Select></Td>
+                  <Td right><Input type="number" step="0.0001" value={l.unitPrice ?? ''} onChange={e => setL(i, { unitPrice: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 90, padding: '4px 6px', textAlign: 'right' }} /></Td>
+                  <Td><Select value={l.vatRate ?? ''} onChange={e => setL(i, { vatRate: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 70, padding: '4px 6px', borderColor: l.vatRate == null ? tk.clay : tk.iron20 }}><option value="">—</option>{IVA_OPTIONS.map(v => <option key={v} value={v}>{v}%</option>)}</Select></Td>
+                  <Td style={{ minWidth: 220 }}>
+                    <Select value={l.create ? '__create__' : (l.ingredientId ?? '')} onChange={e => remap(i, e.target.value)} style={{ padding: '4px 6px', borderColor: l.ingredientId ? (l.match === 'partial' ? tk.clay : tk.iron20) : l.create ? tk.appleDeep : tk.terra }}>
+                      <option value="">— sin mapear —</option>
+                      <option value="__create__">+ Crear «{l.description.slice(0, 40)}» como ingrediente nuevo</option>
+                      {ings.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    </Select>
+                    {l.match === 'partial' && l.ingredientId && <div style={{ fontFamily: ff.mono, fontSize: 10, color: tk.clay, marginTop: 2 }}>coincidencia aproximada: confirma</div>}
+                    {l.unitMismatch && <div style={{ fontFamily: ff.mono, fontSize: 10, color: tk.terra, marginTop: 2 }}>unidad incompatible con el ingrediente ({l.ingredientUnit})</div>}
+                    {l.create && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
+                        <Select value={l.create.category} onChange={e => setL(i, { create: { ...l.create!, category: e.target.value } })} style={{ padding: '3px 6px', fontSize: 10 }}><option value="">Categoría</option>{CATEGORIAS_INGREDIENTE.map(c => <option key={c} value={c}>{c}</option>)}</Select>
+                        <Select value={l.create.warehouseId ?? ''} onChange={e => setL(i, { create: { ...l.create!, warehouseId: e.target.value ? Number(e.target.value) : null } })} style={{ padding: '3px 6px', fontSize: 10 }}><option value="">Almacén</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</Select>
+                      </div>
+                    )}
+                  </Td>
+                  <Td right><Delta pct={l.changePct} />{l.unitPriceInBase != null && l.currentCost != null && <div style={{ fontFamily: ff.mono, fontSize: 10, color: tk.iron40 }}>{eur(l.currentCost)} → {eur(l.unitPriceInBase)}/{l.ingredientUnit}</div>}</Td>
+                  <Td right><button onClick={() => setL(i, { excluded: !l.excluded })} title={l.excluded ? 'Incluir' : 'Excluir'} style={{ padding: '2px 8px', background: l.excluded ? tk.creamSoft : tk.terraSoft, border: `1px solid ${l.excluded ? tk.iron20 : tk.terra}`, color: l.excluded ? tk.iron60 : tk.terra, cursor: 'pointer', fontFamily: ff.mono, fontSize: 11 }}>{l.excluded ? '+' : '×'}</button></Td>
+                </Tr>
+              ))}
+              {lines.length === 0 && <Tr><Td colSpan={8}><div style={{ padding: 20, textAlign: 'center', color: tk.iron40, fontFamily: ff.mono, fontSize: 11 }}>No se detectaron líneas.</div></Td></Tr>}
+            </Table>
+          </Panel>
 
-          {/* Líneas */}
-          <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}`, marginBottom: 16 }}>
-            <div style={panelHead}>Líneas extraídas · valida el mapeo de ingredientes</div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: ff.mono, fontSize: 11 }}>
-              <thead><tr>
-                {['Producto detectado', 'Cant.', 'Ud.', '€/ud', 'IVA', 'Ingrediente (catálogo)', 'Cambio', ''].map((h, i) => (
-                  <th key={h} style={{ ...th, textAlign: i === 1 || i === 3 || i === 6 ? 'right' : i === 4 ? 'center' : 'left' }}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {lineas.map((l, idx) => (
-                  <tr key={idx} style={{ borderTop: `1px solid ${tk.iron20}`, opacity: l.excluida ? 0.4 : 1, background: !l.mapeado ? tk.claySoft : 'transparent' }}>
-                    <td style={td}>{l.nombre || '—'}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{l.cantidad ?? '—'}</td>
-                    <td style={td}>{l.unidad || '—'}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{l.precio_unitario != null ? fmt(l.precio_unitario) : '—'}</td>
-                    <td style={{ ...td, textAlign: 'center' }}>
-                      <select value={l.iva_pct ?? ''} onChange={e => setIva(idx, e.target.value)} title="IVA de la línea" style={{ ...sel, width: 62, padding: '4px 4px', borderColor: l.iva_pct == null ? tk.clay : tk.iron20 }}>
-                        <option value="">—</option>
-                        {IVAS.map(v => <option key={v} value={v}>{v}%</option>)}
-                      </select>
-                    </td>
-                    <td style={{ ...td, whiteSpace: 'normal' }}>
-                      <select value={l.crear_ingrediente ? '__crear__' : (l.ingrediente_id ?? '')} onChange={e => remap(idx, e.target.value)} style={{ ...sel, borderColor: l.mapeado ? (l.crear_ingrediente ? tk.appleDeep : tk.iron20) : tk.clay }}>
-                        <option value="">— sin mapear —</option>
-                        <option value="__crear__">+ Crear "{(l.nombre || 'ingrediente').slice(0, 40)}" como ingrediente nuevo</option>
-                        {ingredientes.map(i => <option key={i.id} value={i.id}>{i.descr}</option>)}
-                      </select>
-                      {l.crear_ingrediente && (
-                        <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
-                          <select value={l.crear_tipo || 'Ingrediente'} onChange={e => setCrearCampo(idx, 'crear_tipo', e.target.value)} title="Categoría" style={{ ...sel, fontSize: 10 }}>
-                            {tipos.map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
-                          <select value={l.crear_iva ?? ''} onChange={e => setCrearCampo(idx, 'crear_iva', e.target.value)} title="IVA" style={{ ...sel, fontSize: 10, width: 76 }}>
-                            <option value="">IVA —</option>
-                            {IVAS.map(v => <option key={v} value={v}>IVA {v}%</option>)}
-                          </select>
-                          <select value={l.crear_almacen || ''} onChange={e => setCrearCampo(idx, 'crear_almacen', e.target.value)} title="Almacén" style={{ ...sel, fontSize: 10 }}>
-                            <option value="">Almacén —</option>
-                            {almacenes.map(a => <option key={a} value={a}>{a}</option>)}
-                          </select>
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', color: l.cambio_pct == null ? tk.iron40 : l.cambio_pct > 0 ? tk.terra : tk.appleDeep, fontWeight: 600 }}>
-                      {l.cambio_pct == null ? '—' : `${l.cambio_pct > 0 ? '+' : ''}${l.cambio_pct}%`}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right' }}>
-                      <button onClick={() => toggleExcl(idx)} title={l.excluida ? 'Incluir' : 'Excluir'} style={{ padding: '2px 8px', background: l.excluida ? tk.creamSoft : tk.terraSoft, border: `1px solid ${l.excluida ? tk.iron20 : tk.terra}`, color: l.excluida ? tk.iron60 : tk.terra, cursor: 'pointer', fontFamily: ff.mono, fontSize: 11 }}>{l.excluida ? '+' : '×'}</button>
-                    </td>
-                  </tr>
-                ))}
-                {lineas.length === 0 && <tr><td colSpan={8} style={{ padding: 22, textAlign: 'center', color: tk.iron40 }}>No se detectaron líneas.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Opciones + guardar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 18, fontFamily: ff.mono, fontSize: 11.5, color: tk.iron }}>
-              <label style={{ display: 'flex', gap: 6, cursor: 'pointer' }}><input type="checkbox" checked={actualizarPrecios} onChange={e => setActualizarPrecios(e.target.checked)} /> Actualizar costes + historial de precios</label>
-              {data.warnings.proveedor_nuevo && <label style={{ display: 'flex', gap: 6, cursor: 'pointer' }}><input type="checkbox" checked={crearProveedor} onChange={e => setCrearProveedor(e.target.checked)} /> Crear proveedor "{c.vendor}"</label>}
+            <div style={{ display: 'flex', gap: 18, fontFamily: ff.mono, fontSize: 11.5 }}>
+              <label style={{ display: 'flex', gap: 6, cursor: 'pointer' }}><input type="checkbox" checked={applyPrices} onChange={e => setApplyPrices(e.target.checked)} /> Actualizar costes de los ingredientes</label>
+              {!header.supplierId && header.vendor && <label style={{ display: 'flex', gap: 6, cursor: 'pointer' }}><input type="checkbox" checked={createSupplier} onChange={e => setCreateSupplier(e.target.checked)} /> Crear proveedor «{header.vendor}»</label>}
             </div>
-            <button onClick={guardar} disabled={saving} style={btnPrimary}>{saving ? 'GUARDANDO…' : `GUARDAR ${tipo === 'factura' ? 'FACTURA' : 'ALBARÁN'} →`}</button>
+            <Btn onClick={save} disabled={busy !== '' || (!header.supplierId && !createSupplier)}>{busy === 'save' ? 'GUARDANDO…' : `GUARDAR ${kind === 'invoice' ? 'FACTURA' : 'ALBARÁN'} →`}</Btn>
           </div>
-
-          {resultado?.ok && (
-            <div style={{ marginTop: 16, background: tk.appleSoft, border: `1.5px solid ${tk.appleDeep}`, padding: '12px 16px', fontFamily: ff.mono, fontSize: 12, color: tk.iron, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-              <span>
-                ✓ Guardado <strong>{resultado.resumen.documento}</strong> · {resultado.resumen.lineas} líneas · {resultado.resumen.precios_actualizados} precios actualizados
-                {resultado.resumen.ingredientes_creados > 0 ? ` · ${resultado.resumen.ingredientes_creados} ingrediente(s) nuevo(s) en el catálogo` : ''}
-                {resultado.resumen.recetas_afectadas > 0 ? ` · ${resultado.resumen.recetas_afectadas} escandallo(s) afectado(s)` : ''}.
-                {resultado.resumen.estado === 'parcial' && (
-                  <strong style={{ color: tk.clay }}> Documento en estado PARCIAL: {resultado.resumen.lineas_sin_mapear} línea(s) sin mapear no actualizan costes.</strong>
-                )}
-              </span>
-              <Link
-                href={`/dashboard/compras/documentos/${resultado.resumen.doc_tipo}/${resultado.resumen.doc_id}`}
-                style={{ fontFamily: ff.mono, fontSize: 11, fontWeight: 600, padding: '7px 14px', background: tk.apple, border: `1.5px solid ${tk.iron}`, color: tk.iron, textDecoration: 'none', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}
-              >
-                VER DOCUMENTO →
-              </Link>
-            </div>
-          )}
-          {resultado?.error && <div style={{ marginTop: 16, background: tk.terraSoft, border: `1.5px solid ${tk.terra}`, padding: '12px 16px', fontFamily: ff.mono, fontSize: 12, color: tk.terra }}>{resultado.error}</div>}
         </>
       )}
-    </div>
+
+      {result && (
+        <Note tone={result.status === 'review' ? 'warn' : 'ok'}>
+          ✓ Guardado <strong>{result.number}</strong> · {result.lines} líneas{result.ingredientsCreated ? ` · ${result.ingredientsCreated} ingrediente(s) nuevo(s)` : ''}
+          {result.validation ? ` · ${result.validation.pricesUpdated} precio(s) actualizados · ${result.validation.stockMovements} entrada(s) de stock${result.validation.affectedRecipes.length ? ` · ${result.validation.affectedRecipes.length} escandallo(s) afectado(s)` : ''}` : ''}
+          {result.status === 'review' && <strong> · en REVISIÓN: {result.pendingLines} línea(s) sin mapear no actualizan costes ni stock.</strong>}
+          {' '}<Link href={result.kind === 'invoice' && result.invoiceId ? `/dashboard/compras/facturas/${result.invoiceId}` : `/dashboard/compras/albaranes/${result.deliveryNoteId}`} style={{ color: tk.appleDeep, fontWeight: 600 }}>Ver documento →</Link>
+          {' · '}<button onClick={() => { setImage(null); setScan(null); setResult(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: ff.mono, fontSize: 11.5, color: tk.appleDeep, fontWeight: 600, padding: 0 }}>Escanear otro</button>
+          <div style={{ fontSize: 10.5, color: tk.iron60, marginTop: 4 }}>{fecha(header?.date)}</div>
+        </Note>
+      )}
+    </Page>
   )
 }
-
-function Info({ label, value, extra, extraColor }: { label: string; value: string; extra?: string | null; extraColor?: string }) {
-  return (
-    <div>
-      <div style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', color: tk.iron40, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontFamily: ff.mono, fontSize: 13, color: tk.iron, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
-      {extra && <div style={{ fontFamily: ff.mono, fontSize: 10, color: extraColor || tk.iron40, marginTop: 2 }}>{extra}</div>}
-    </div>
-  )
-}
-
-const panelHead: React.CSSProperties = { padding: '10px 16px', borderBottom: `1.5px solid ${tk.iron20}`, fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.16em', color: tk.iron, textTransform: 'uppercase' }
-const th: React.CSSProperties = { padding: '8px 12px', fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.1em', color: tk.iron40, textTransform: 'uppercase', fontWeight: 400, background: tk.creamSoft, borderBottom: `1px solid ${tk.iron20}` }
-const td: React.CSSProperties = { padding: '7px 12px', color: tk.iron, fontVariantNumeric: 'tabular-nums', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-const sel: React.CSSProperties = { width: '100%', padding: '5px 8px', border: `1.5px solid ${tk.iron20}`, background: tk.cream, color: tk.iron, fontFamily: ff.mono, fontSize: 11, outline: 'none' }
-const btnPrimary: React.CSSProperties = { padding: '9px 18px', background: tk.apple, border: `1.5px solid ${tk.iron}`, fontFamily: ff.mono, fontSize: 11, fontWeight: 600, color: tk.iron, letterSpacing: '0.06em', cursor: 'pointer' }
-const btnGhost: React.CSSProperties = { padding: '9px 16px', background: tk.paper, border: `1.5px solid ${tk.iron}`, fontFamily: ff.mono, fontSize: 11, fontWeight: 600, color: tk.iron, letterSpacing: '0.06em', cursor: 'pointer' }

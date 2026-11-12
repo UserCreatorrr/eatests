@@ -1,42 +1,20 @@
 'use client'
-import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
+import CRUDPage, { F, type ColDef, type FieldDef } from '@/components/CRUDPage'
+import { Badge } from '@/components/ui'
+import { eur, fecha } from '@/lib/format'
 
 const fields: FieldDef[] = [
-  { key: 'invoice_num', label: 'Nº Factura' },
-  { key: 'document_num', label: 'Nº Documento' },
-  { key: 'customer', label: 'Cliente' },
-  { key: 'code_customer', label: 'Cod. Cliente' },
-  { key: 'nif', label: 'NIF' },
-  { key: 'account_customer', label: 'Cuenta cliente' },
-  { key: 'date_invoice', label: 'Fecha Factura' },
-  { key: 'date_accounting', label: 'Fecha Contable' },
-  { key: 'date_due', label: 'Vencimiento' },
-  { key: 'code_payment_type', label: 'Tipo pago' },
-  { key: 'base', label: 'Base (EUR)', type: 'number' },
-  { key: 'taxes', label: 'IVA (EUR)', type: 'number' },
-  { key: 'total', label: 'Total (EUR)', type: 'number' },
-  { key: 'paid', label: 'Pagada (1=sí, 0=no)', type: 'number' },
-  { key: 'comment', label: 'Comentario' },
+  { key: 'number', label: 'Nº factura' }, { key: 'customerName', label: 'Cliente' }, { key: 'customerTaxId', label: 'NIF' }, { key: 'customerType', label: 'Tipo de cliente' },
+  { key: 'docDate', label: 'Fecha', type: 'date' }, { key: 'dueDate', label: 'Vencimiento', type: 'date' }, { key: 'base', label: 'Base (€)', type: 'number' }, { key: 'vat', label: 'IVA (€)', type: 'number' }, { key: 'total', label: 'Total (€)', type: 'number' },
+  { key: 'paid', label: 'Cobrada', type: 'checkbox' }, { key: 'notes', label: 'Notas' },
 ]
-
-function fmt(v: number | null) {
-  if (v == null) return '-'
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
-}
-
 const columns: ColDef[] = [
-  { label: 'Nº Factura', render: r => r.invoice_num || '-', className: 'col-mono' },
-  { label: 'Nº Doc', render: r => r.document_num || '-', className: 'col-mono' },
-  { label: 'Cliente', render: r => r.customer || '-', className: 'col-main' },
-  { label: 'NIF', render: r => r.nif || '-', className: 'col-mono' },
-  { label: 'Fecha', render: r => r.date_invoice || '-' },
-  { label: 'Vencimiento', render: r => r.date_due || '-' },
-  { label: 'Base', render: r => fmt(r.base) },
-  { label: 'IVA', render: r => fmt(r.taxes) },
-  { label: 'Total', render: r => fmt(r.total), className: 'col-amount' },
-  { label: 'Pagada', render: r => r.paid ? <span className="badge badge-green">Sí</span> : <span className="badge badge-red">No</span> },
+  { label: 'Nº', render: r => r.number || '—' }, { label: 'Cliente', render: r => r.customer_name || '—' }, { label: 'NIF', render: r => r.customer_tax_id || '—' },
+  { label: 'Fecha', render: r => fecha(r.doc_date) }, { label: 'Vence', render: r => fecha(r.due_date) }, { label: 'Base', render: r => eur(r.base), right: true }, { label: 'IVA', render: r => eur(r.vat), right: true }, { label: 'Total', render: r => eur(r.total), right: true },
+  { label: 'Cobro', render: r => <Badge tone={r.paid ? 'ok' : 'warn'}>{r.paid ? 'Cobrada' : 'Pendiente'}</Badge> },
 ]
-
 export default function FacturasVentaPage() {
-  return <CRUDPage title="Facturas de Venta" entity="facturas-venta" fields={fields} columns={columns} />
+  return <CRUDPage title="Facturas de venta" eyebrow="Ventas" endpoint="/api/sales-documents" query="kind=invoice" fields={fields} columns={columns} singular="factura de venta"
+    fromRow={r => ({ number: r.number ?? '', customerName: r.customer_name ?? '', customerTaxId: r.customer_tax_id ?? '', customerType: r.customer_type ?? '', docDate: r.doc_date ?? '', dueDate: r.due_date ?? '', base: String(r.base ?? ''), vat: String(r.vat ?? ''), total: String(r.total ?? ''), paid: r.paid ? '1' : '0', notes: r.notes ?? '' })}
+    toBody={f => ({ kind: 'invoice', number: F.str(f.number), customerName: F.str(f.customerName), customerTaxId: F.str(f.customerTaxId), customerType: F.str(f.customerType), docDate: F.str(f.docDate), dueDate: F.str(f.dueDate), base: F.num(f.base), vat: F.num(f.vat), total: F.num(f.total), paid: F.bool(f.paid), notes: F.str(f.notes) })} />
 }

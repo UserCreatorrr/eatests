@@ -54,8 +54,7 @@ const sidebarGroups: NavGroup[] = [
     title: 'FOOD COST',
     items: [
       { href: '/dashboard/ingredientes', label: 'Ingredientes', icon: I.ingr },
-      { href: '/dashboard/almacenes', label: 'Almacenes', icon: I.almacen },
-      { href: '/dashboard/lista-pedidos', label: 'Plantillas de pedido', icon: I.list },
+      { href: '/dashboard/almacenes', label: 'Almacenes y stock', icon: I.almacen },
       {
         href: '/dashboard/compras', label: 'Compras', icon: I.cart,
         children: [

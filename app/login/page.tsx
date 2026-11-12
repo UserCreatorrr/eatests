@@ -36,7 +36,7 @@ function LoginForm() {
     const data = await res.json()
 
     if (!res.ok) {
-      setMsg(data.error || 'Error al procesar la solicitud')
+      setMsg(data?.error?.message || (typeof data?.error === 'string' ? data.error : 'Error al procesar la solicitud'))
       setIsError(true)
     } else {
       router.push('/dashboard')

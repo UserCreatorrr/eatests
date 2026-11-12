@@ -1,201 +1,87 @@
 'use client'
-import { fechaCorta } from '@/lib/fechas'
-
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import { api, errorMessage } from '@/lib/api'
 import { tk, ff } from '@/lib/design'
-
-const fmt = (v: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
+import { ESTADO_ALBARAN, ESTADO_FACTURA, ESTADO_PEDIDO, eur, fecha } from '@/lib/format'
+import { Badge, Btn, Delta, Empty, Loading, Page, Panel, Table, Td, Tr } from '@/components/ui'
 
 export default function ProveedorFichaPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  useEffect(() => { api.get(`/api/suppliers/${id}`).then(setData).catch(e => setErr(errorMessage(e))) }, [id])
 
-  useEffect(() => {
-    fetch(`/api/proveedores/${id}`)
-      .then(r => r.json())
-      .then(d => { if (d.error) setErr(d.error); else setData(d) })
-      .finally(() => setLoading(false))
-  }, [id])
-
-  if (loading) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.iron60 }}>Cargando…</div>
-  if (err || !data) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.terra }}>{err || 'No encontrado'}</div>
-
-  const p = data.proveedor
-  const t = data.totals
+  if (err) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.terra }}>{err}</div>
+  if (!data) return <Loading />
+  const { supplier: p, ingredients, invoices, deliveryNotes, orders, prices, totals: t } = data
 
   return (
-    <div style={{ padding: '32px 36px 60px' }}>
-      {/* Volver */}
-      <Link href="/dashboard/proveedores" style={{ fontFamily: ff.mono, fontSize: 11, color: tk.iron60, textDecoration: 'none', letterSpacing: '0.04em' }}>← Proveedores</Link>
-
-      {/* Header ficha */}
-      <div style={{ background: tk.iron, color: tk.cream, padding: '22px 26px', marginTop: 12, marginBottom: 18, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: `linear-gradient(to right, rgba(223,213,201,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(223,213,201,0.06) 1px, transparent 1px)`, backgroundSize: '14px 14px' }} />
-        <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' }}>
-          <div>
-            <p style={{ fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.18em', color: tk.apple, margin: '0 0 6px', textTransform: 'uppercase' }}>
-              FICHA DE PROVEEDOR{p.descr_type ? ` · ${p.descr_type}` : ''}
-            </p>
-            <h1 style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 28, margin: 0, letterSpacing: '-0.02em' }}>{p.descr}</h1>
-            <p style={{ fontFamily: ff.mono, fontSize: 11.5, opacity: 0.65, margin: '8px 0 0' }}>
-              {[p.nif && `NIF ${p.nif}`, p.contact, p.phone, p.mail].filter(Boolean).join(' · ') || 'Sin datos de contacto'}
-            </p>
-            {(p.address || p.city) && (
-              <p style={{ fontFamily: ff.mono, fontSize: 10.5, opacity: 0.45, margin: '4px 0 0' }}>
-                {[p.address, p.city, p.cp].filter(Boolean).join(', ')}{p.web ? ` · ${p.web}` : ''}
-              </p>
-            )}
-          </div>
-          <div style={{ textAlign: 'right' as const }}>
-            <p style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', opacity: 0.5, textTransform: 'uppercase', margin: 0 }}>
-              {t.base_calculo === 'albaranes' ? 'Gasto (albaranes)' : 'Gasto facturado'}
-            </p>
-            <p style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 26, color: tk.apple, margin: '4px 0 0' }}>{fmt(t.gasto_total || 0)}</p>
-            {/* Se explica siempre sobre qué documentos está calculado, y el otro
-                importe se muestra como referencia, nunca sumado (evita duplicar). */}
-            <p style={{ fontFamily: ff.mono, fontSize: 10, opacity: 0.5, margin: '2px 0 0' }}>
-              {t.base_calculo === 'facturas'
-                ? `Suma de facturas${t.gasto_albaranes > 0 ? ` · ${fmt(t.gasto_albaranes)} entregado en albaranes` : ''}`
-                : t.base_calculo === 'albaranes'
-                  ? 'Aún sin facturas: calculado sobre albaranes recibidos'
-                  : 'Sin documentos de compra todavía'}
-            </p>
-            {t.facturas_pendientes > 0 && (
-              <p style={{ fontFamily: ff.mono, fontSize: 11, color: '#fca5a5', margin: '4px 0 0' }}>
-                {t.facturas_pendientes} factura{t.facturas_pendientes !== 1 ? 's' : ''} sin pagar · {fmt(t.importe_pendiente || 0)}
-              </p>
-            )}
-          </div>
-        </div>
+    <Page back={{ href: '/dashboard/proveedores', label: 'Proveedores' }} eyebrow="Ficha de proveedor" title={p.name}
+      subtitle={<>{[p.tax_id && `NIF ${p.tax_id}`, p.contact_name, p.phone, p.email].filter(Boolean).join(' · ') || 'Sin datos de contacto'}{(p.address || p.city) && <><br />{[p.address, p.city, p.postal_code].filter(Boolean).join(', ')}</>}</>}
+      actions={<Btn kind="ghost" href={`/dashboard/compras/pedidos?nuevo=${p.id}`}>HACER PEDIDO</Btn>}>
+      <div style={{ background: tk.iron, color: tk.cream, padding: '18px 24px', marginBottom: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16 }}>
+        <Big label={t.invoices_cents > 0 ? 'Gasto facturado' : 'Gasto en albaranes'} value={eur(t.spend_cents / 100)} sub={t.invoices_cents > 0 ? (t.delivery_notes_cents > 0 ? `${eur(t.delivery_notes_cents / 100)} entregado en albaranes` : 'Suma de facturas') : t.delivery_notes_cents > 0 ? 'Aún sin facturas: albaranes validados' : 'Sin documentos de compra'} />
+        <Big label="Pendiente de pago" value={eur(t.pending_cents / 100)} sub={`${invoices.filter((v: any) => v.status === 'pending').length} factura(s)`} warn={t.pending_cents > 0} />
+        <Big label="Ingredientes" value={ingredients.length} />
+        <Big label="Pedidos · Albaranes · Facturas" value={`${orders.length} · ${deliveryNotes.length} · ${invoices.length}`} />
       </div>
 
-      {/* Resumen contadores */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', border: `1.5px solid ${tk.iron}`, marginBottom: 18 }}>
-        {[
-          ['INGREDIENTES', t.ingredientes],
-          ['PEDIDOS', t.pedidos],
-          ['ALBARANES', t.albaranes],
-          ['FACTURAS', t.facturas],
-        ].map(([l, v], i) => (
-          <div key={i} style={{ padding: '16px 20px', borderRight: i < 3 ? `1.5px solid ${tk.iron20}` : 'none', background: tk.paper }}>
-            <div style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.14em', color: tk.iron40, textTransform: 'uppercase' }}>{l as string}</div>
-            <div style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 28, color: tk.iron, margin: '4px 0 0' }}>{v as number}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Ingredientes asociados + últimos precios */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18, alignItems: 'start' }}>
-        <Panel title={`Ingredientes asociados (${data.ingredientes.length})`}>
-          {data.ingredientes.length === 0 ? <Empty text="Sin ingredientes asignados a este proveedor" /> : (
-            <Tbl head={['Ingrediente', 'Almacén', 'Coste']}>
-              {data.ingredientes.slice(0, 30).map((i: any) => (
-                <Row key={i.id} cells={[i.descr, i.almacen_principal || '—', i.cost != null ? `${fmt(i.cost)}/${i.unit || 'ud'}` : '—']} rightCols={[2]} />
-              ))}
-            </Tbl>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+        <Panel title={`Ingredientes (${ingredients.length})`}>
+          {ingredients.length === 0 ? <Empty>Sin ingredientes asignados.</Empty> : (
+            <Table head={['Ingrediente', 'Coste']} right={[1]}>
+              {ingredients.map((i: any) => <Tr key={i.id}><Td><Link href={`/dashboard/ingredientes/${i.id}`} style={{ color: tk.iron, textDecoration: 'none', borderBottom: `1px solid ${tk.iron40}` }}>{i.name}</Link></Td><Td right>{i.cost != null ? `${eur(i.cost)}/${i.base_unit}` : '—'}</Td></Tr>)}
+            </Table>
           )}
         </Panel>
-
-        <Panel title="Últimos precios y cambios">
-          {data.ultimos_precios.length === 0 ? <Empty text="Sin histórico de precios" /> : (
-            <Tbl head={['Ingrediente', 'Precio', 'Cambio']}>
-              {data.ultimos_precios.map((u: any, idx: number) => (
-                <Row key={idx} cells={[
-                  u.nombre,
-                  fmt(u.precio),
-                  u.cambio_pct === 0 ? '—' : `${u.cambio_pct > 0 ? '+' : ''}${u.cambio_pct}%`,
-                ]} rightCols={[1, 2]} colColors={{ 2: u.cambio_pct > 0 ? tk.terra : u.cambio_pct < 0 ? tk.appleDeep : tk.iron40 }} />
-              ))}
-            </Tbl>
+        <Panel title="Últimos precios">
+          {prices.length === 0 ? <Empty>Sin histórico de precios.</Empty> : (
+            <Table head={['Ingrediente', 'Fecha', 'Precio', 'Cambio']} right={[2, 3]}>
+              {prices.map((u: any, i: number) => <Tr key={i}><Td>{u.name}</Td><Td>{fecha(u.observed_on)}</Td><Td right>{eur(u.unit_price)}</Td><Td right><Delta pct={u.previous_price > 0 ? Math.round(((u.unit_price - u.previous_price) / u.previous_price) * 1000) / 10 : null} /></Td></Tr>)}
+            </Table>
           )}
         </Panel>
       </div>
 
-      {/* Facturas */}
-      <Panel title={`Facturas (${data.facturas.length})`}>
-        {data.facturas.length === 0 ? <Empty text="Sin facturas registradas" /> : (
-          <Tbl head={['Nº', 'Fecha', 'Vence', 'Total', 'Estado']}>
-            {data.facturas.map((f: any) => (
-              <Row key={f.id} href={`/dashboard/compras/documentos/factura/${f.id}`} cells={[
-                f.invoice_num || '—', fechaCorta(f.date_invoice), fechaCorta(f.date_due), fmt(f.total || 0),
-                f.paid ? 'Pagada' : 'Pendiente',
-              ]} rightCols={[3]} colColors={{ 4: f.paid ? tk.appleDeep : tk.clay }} />
-            ))}
-          </Tbl>
+      <Panel title={`Facturas (${invoices.length})`}>
+        {invoices.length === 0 ? <Empty>Sin facturas registradas.</Empty> : (
+          <Table head={['Nº', 'Fecha', 'Vence', 'Total', 'Estado']} right={[3]}>
+            {invoices.map((f: any) => <Tr key={f.id}><Td><Link href={`/dashboard/compras/facturas/${f.id}`} style={{ color: tk.appleDeep, fontWeight: 600, textDecoration: 'none' }}>{f.number}</Link></Td><Td>{fecha(f.invoice_date)}</Td><Td>{fecha(f.due_date)}</Td><Td right>{eur(f.total_cents / 100)}</Td><Td><Badge tone={f.status === 'paid' ? 'ok' : 'warn'}>{ESTADO_FACTURA[f.status]}</Badge></Td></Tr>)}
+          </Table>
         )}
       </Panel>
 
-      {/* Pedidos + Albaranes */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 18, alignItems: 'start' }}>
-        <Panel title={`Pedidos (${data.pedidos.length})`}>
-          {data.pedidos.length === 0 ? <Empty text="Sin pedidos" /> : (
-            <Tbl head={['Nº', 'Fecha', 'Total']}>
-              {data.pedidos.map((o: any) => <Row key={o.id} cells={[o.num_order || '—', fechaCorta(o.date_order), fmt(o.total || 0)]} rightCols={[2]} />)}
-            </Tbl>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+        <Panel title={`Pedidos (${orders.length})`}>
+          {orders.length === 0 ? <Empty>Sin pedidos.</Empty> : (
+            <Table head={['Nº', 'Fecha', 'Estado', 'Total']} right={[3]}>
+              {orders.map((o: any) => <Tr key={o.id}><Td><Link href={`/dashboard/compras/pedidos/${o.id}`} style={{ color: tk.appleDeep, fontWeight: 600, textDecoration: 'none' }}>{o.number}</Link></Td><Td>{fecha(o.order_date)}</Td><Td><Badge>{ESTADO_PEDIDO[o.status]}</Badge></Td><Td right>{eur(o.total)}</Td></Tr>)}
+            </Table>
           )}
         </Panel>
-        <Panel title={`Albaranes (${data.albaranes.length})`}>
-          {data.albaranes.length === 0 ? <Empty text="Sin albaranes" /> : (
-            <Tbl head={['Nº', 'Fecha', 'Total']}>
-              {data.albaranes.map((a: any) => <Row key={a.id} href={`/dashboard/compras/documentos/albaran/${a.id}`} cells={[a.delivery_num || '—', fechaCorta(a.date_delivery), fmt(a.total || 0)]} rightCols={[2]} />)}
-            </Tbl>
+        <Panel title={`Albaranes (${deliveryNotes.length})`}>
+          {deliveryNotes.length === 0 ? <Empty>Sin albaranes.</Empty> : (
+            <Table head={['Nº', 'Fecha', 'Estado', 'Total']} right={[3]}>
+              {deliveryNotes.map((a: any) => <Tr key={a.id}><Td><Link href={`/dashboard/compras/albaranes/${a.id}`} style={{ color: tk.appleDeep, fontWeight: 600, textDecoration: 'none' }}>{a.number}</Link></Td><Td>{fecha(a.delivery_date)}</Td><Td><Badge tone={a.status === 'validated' || a.status === 'invoiced' ? 'ok' : 'warn'}>{ESTADO_ALBARAN[a.status]}</Badge></Td><Td right>{eur(a.total_cents / 100)}</Td></Tr>)}
+            </Table>
           )}
         </Panel>
       </div>
-
-      {p.comment && (
-        <div style={{ marginTop: 18, background: tk.creamSoft, border: `1.5px solid ${tk.iron20}`, padding: '14px 18px' }}>
-          <p style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.14em', color: tk.iron40, textTransform: 'uppercase', margin: '0 0 6px' }}>Notas / incidencias</p>
-          <p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.iron, margin: 0, lineHeight: 1.6 }}>{p.comment}</p>
-        </div>
-      )}
-    </div>
+      {p.notes && <Panel title="Notas"><div style={{ padding: 16, fontFamily: ff.mono, fontSize: 12, lineHeight: 1.6 }}>{p.notes}</div></Panel>}
+    </Page>
   )
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+function Big({ label, value, sub, warn }: { label: string; value: string | number; sub?: string; warn?: boolean }) {
   return (
-    <div style={{ background: tk.paper, border: `1.5px solid ${tk.iron}` }}>
-      <div style={{ padding: '10px 16px', borderBottom: `1.5px solid ${tk.iron20}`, fontFamily: ff.mono, fontSize: 10, letterSpacing: '0.16em', color: tk.iron, textTransform: 'uppercase' }}>{title}</div>
-      {children}
+    <div>
+      <p style={{ fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.12em', opacity: 0.55, textTransform: 'uppercase', margin: 0 }}>{label}</p>
+      <p style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 24, color: warn ? '#fca5a5' : tk.apple, margin: '4px 0 0' }}>{value}</p>
+      {sub && <p style={{ fontFamily: ff.mono, fontSize: 10, opacity: 0.5, margin: '2px 0 0' }}>{sub}</p>}
     </div>
-  )
-}
-function Empty({ text }: { text: string }) {
-  return <div style={{ padding: '24px 16px', textAlign: 'center', fontFamily: ff.mono, fontSize: 11, color: tk.iron40 }}>{text}</div>
-}
-function Tbl({ head, children }: { head: string[]; children: React.ReactNode }) {
-  return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: ff.mono, fontSize: 11.5 }}>
-      <thead><tr>{head.map((h, i) => (
-        <th key={i} style={{ padding: '8px 14px', textAlign: i === 0 ? 'left' : 'right', fontFamily: ff.mono, fontSize: 9.5, letterSpacing: '0.1em', color: tk.iron40, textTransform: 'uppercase', fontWeight: 400, background: tk.creamSoft, borderBottom: `1px solid ${tk.iron20}` }}>{h}</th>
-      ))}</tr></thead>
-      <tbody>{children}</tbody>
-    </table>
-  )
-}
-function Row({ cells, rightCols = [], colColors = {}, href }: { cells: (string | number)[]; rightCols?: number[]; colColors?: Record<number, string>; href?: string }) {
-  return (
-    <tr style={{ borderTop: `1px solid ${tk.iron20}` }}>
-      {cells.map((c, i) => (
-        <td key={i} style={{
-          padding: '7px 14px',
-          textAlign: i === 0 ? 'left' : (rightCols.includes(i) ? 'right' : 'left'),
-          color: colColors[i] || tk.iron, fontVariantNumeric: 'tabular-nums',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220,
-        }}>
-          {i === 0 && href
-            ? <Link href={href} style={{ color: tk.iron, textDecoration: 'underline', textDecorationColor: tk.iron40, textUnderlineOffset: 3 }}>{c}</Link>
-            : c}
-        </td>
-      ))}
-    </tr>
   )
 }

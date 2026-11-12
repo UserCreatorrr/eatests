@@ -1,65 +1,31 @@
-export const dynamic = 'force-dynamic'
-
+'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { requireServerUser } from '@/lib/auth'
-import db from '@/lib/db'
+import { api } from '@/lib/api'
+import { tk } from '@/lib/design'
+import { eur, fecha } from '@/lib/format'
+import { Badge, Empty, Loading, Page, Panel, Stat, Table, Td, Tr } from '@/components/ui'
 
-function formatCurrency(amount: number | null) {
-  if (amount === null || amount === undefined) return '-'
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
-}
-
-type Factura = { id: number; invoice_num: string | null; customer: string | null; date_invoice: string | null; total: number | null }
-
-export default async function VentasPage() {
-  const user = await requireServerUser()
-  const deliveries = (db.prepare('SELECT COUNT(*) as n FROM albaranes_venta WHERE user_id = ?').get(user.id) as { n: number }).n
-  const invoices = (db.prepare('SELECT COUNT(*) as n FROM facturas_venta WHERE user_id = ?').get(user.id) as { n: number }).n
-  const recentFacturas = db.prepare('SELECT id, invoice_num, customer, date_invoice, total FROM facturas_venta WHERE user_id = ? ORDER BY date_invoice DESC LIMIT 10').all(user.id) as Factura[]
-
-  const sections = [
-    { label: 'Albaranes', count: deliveries, href: '/dashboard/ventas/albaranes' },
-    { label: 'Facturas', count: invoices, href: '/dashboard/ventas/facturas' },
-  ]
-
+export default function VentasPage() {
+  const [rows, setRows] = useState<any[] | null>(null)
+  useEffect(() => { api.get('/api/sales-documents').then(r => setRows(r.data)).catch(() => setRows([])) }, [])
+  if (!rows) return <Loading />
+  const notes = rows.filter(r => r.kind === 'delivery_note'), invoices = rows.filter(r => r.kind === 'invoice')
   return (
-    <div className="p-8">
-      <div className="page-header">
-        <h1 className="page-title">Ventas</h1>
-        <p className="page-subtitle">Gestión de albaranes y facturas de venta</p>
+    <Page eyebrow="Analytics" title="Ventas" subtitle="Albaranes y facturas emitidas. Las ventas por franja para labor y productividad se cargan en Labor › Horarios.">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <Link href="/dashboard/ventas/albaranes" style={{ textDecoration: 'none' }}><Stat label="Albaranes de venta" value={notes.length} /></Link>
+        <Link href="/dashboard/ventas/facturas" style={{ textDecoration: 'none' }}><Stat label="Facturas de venta" value={invoices.length} sub={`${invoices.filter(i => !i.paid).length} sin cobrar`} /></Link>
+        <Stat label="Facturado" value={eur(invoices.reduce((s, i) => s + i.total, 0))} />
       </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16, marginBottom: 32 }}>
-        {sections.map(s => (
-          <Link key={s.href} href={s.href} className="stat-card" style={{ textDecoration: 'none', display: 'block' }}>
-            <p style={{ fontFamily: 'Chillax,sans-serif', fontSize: 36, fontWeight: 600, color: '#3d3834', marginBottom: 4 }}>{s.count.toLocaleString('es-ES')}</p>
-            <p style={{ fontFamily: 'DM Mono,monospace', fontSize: 13, color: '#3d3834', opacity: 0.6 }}>{s.label}</p>
-          </Link>
-        ))}
-      </div>
-
-      <div className="table-wrap">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <span className="page-title" style={{ fontSize: '1rem' }}>Ultimas facturas de venta</span>
-        </div>
-        {recentFacturas.length === 0 ? (
-          <div className="empty-state"><p className="page-subtitle">Sin datos importados</p></div>
-        ) : (
-          <table className="data-table">
-            <thead><tr><th>Nº Factura</th><th>Cliente</th><th>Fecha</th><th>Total</th></tr></thead>
-            <tbody>
-              {recentFacturas.map(f => (
-                <tr key={f.id}>
-                  <td className="col-mono">{f.invoice_num || '-'}</td>
-                  <td className="col-main">{f.customer || '-'}</td>
-                  <td>{f.date_invoice || '-'}</td>
-                  <td className="col-amount">{formatCurrency(f.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Panel title="Últimas facturas de venta">
+        {invoices.length === 0 ? <Empty>Sin facturas de venta.</Empty> : (
+          <Table head={['Nº', 'Cliente', 'Fecha', 'Total', 'Cobro']} right={[3]}>
+            {invoices.slice(0, 10).map(f => <Tr key={f.id}><Td>{f.number || '—'}</Td><Td>{f.customer_name || '—'}</Td><Td>{fecha(f.doc_date)}</Td><Td right>{eur(f.total)}</Td><Td><Badge tone={f.paid ? 'ok' : 'warn'}>{f.paid ? 'Cobrada' : 'Pendiente'}</Badge></Td></Tr>)}
+          </Table>
         )}
-      </div>
-    </div>
+      </Panel>
+      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: tk.iron40 }}>Registro simple: no llevan líneas ni afectan al stock.</p>
+    </Page>
   )
 }

@@ -7,6 +7,7 @@ import { MbCard, MbRow, MbBadge, MbSparkline, MbBar, MbSection, MbTimeline } fro
 
 interface EmailProposal {
   proveedor: string
+  proveedor_id?: number | null
   to: string
   subject: string
   body: string
@@ -30,6 +31,7 @@ interface BriefData {
 
 interface WhatsAppProposal {
   proveedor: string
+  proveedor_id?: number | null
   phone: string
   message: string
   items?: { nombre: string; cantidad?: number; unidad?: string }[]
@@ -373,14 +375,15 @@ function WhatsAppCard({ proposal, onDiscard }: { proposal: WhatsAppProposal; onD
     setSending(true)
     setError('')
     try {
-      const res = await fetch('/api/whatsapp/send', {
+      if (!proposal.proveedor_id) { setError('El proveedor no está en el catálogo: créalo primero'); setSending(false); return }
+      const res = await fetch('/api/orders/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, message, proveedor: proposal.proveedor, items: proposal.items }),
+        body: JSON.stringify({ supplierId: proposal.proveedor_id, channel: 'whatsapp', to: phone, message, items: (proposal.items || []).map(i => ({ description: i.nombre, qty: i.cantidad || 1, unit: i.unidad || 'ud' })) }),
       })
       const json = await res.json()
-      if (json.ok) setSentInfo({ num_order: json.num_order })
-      else setError(json.error || 'Error al enviar')
+      if (res.ok) setSentInfo({ num_order: json.order?.number })
+      else setError(json.error?.message || 'Error al enviar')
     } catch { setError('Error de conexión') }
     finally { setSending(false) }
   }
@@ -739,14 +742,14 @@ function FacturasCard({ data }: { data: FacturasPagarData }) {
 
   async function pagarUna(id: number) {
     setPaying(prev => ({ ...prev, [id]: true }))
-    await fetch(`/api/facturas/${id}/pay`, { method: 'PATCH' })
+    await fetch(`/api/invoices/${id}/paid`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paid: true }) })
     setPendientes(prev => prev.filter(f => f.id !== id))
     setPaying(prev => { const n = { ...prev }; delete n[id]; return n })
   }
 
   async function pagarTodas() {
     setPayingAll(true)
-    await Promise.all(pendientes.map(f => fetch(`/api/facturas/${f.id}/pay`, { method: 'PATCH' })))
+    await Promise.all(pendientes.map(f => fetch(`/api/invoices/${f.id}/paid`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paid: true }) })))
     setPendientes([])
     setPayingAll(false)
   }
@@ -1534,14 +1537,15 @@ function EmailCard({ proposal, onDiscard }: { proposal: EmailProposal; onDiscard
     setSending(true)
     setError('')
     try {
-      const res = await fetch('/api/email/send', {
+      if (!proposal.proveedor_id) { setError('El proveedor no está en el catálogo: créalo primero'); setSending(false); return }
+      const res = await fetch('/api/orders/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: proposal.to, subject, body, proveedor: proposal.proveedor, items: proposal.items }),
+        body: JSON.stringify({ supplierId: proposal.proveedor_id, channel: 'email', to: proposal.to, subject, message: body, items: (proposal.items || []).map(i => ({ description: i.nombre, qty: i.cantidad || 1, unit: i.unidad || 'ud' })) }),
       })
       const json = await res.json()
-      if (json.ok) setSentInfo({ to: proposal.to, num_order: json.num_order })
-      else setError(json.error || 'Error al enviar')
+      if (res.ok) setSentInfo({ to: proposal.to, num_order: json.order?.number })
+      else setError(json.error?.message || 'Error al enviar')
     } catch { setError('Error de conexión') }
     finally { setSending(false) }
   }

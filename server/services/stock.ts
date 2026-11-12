@@ -124,3 +124,32 @@ export function ensureWarehouse(ctx: Ctx, name: string, kind: 'refrigerated' | '
 }
 
 export const _internal = { insert, nowIso }
+
+// ─── Almacenes ──────────────────────────────────────────────────────────
+
+export const warehouseSchema = z.object({
+  name: z.string().trim().min(1, 'Falta el nombre').max(80),
+  kind: z.enum(['refrigerated', 'frozen', 'dry', 'other']).optional(),
+  locationId: z.number().int().positive().optional().nullable(),
+})
+
+export interface Warehouse { id: number; name: string; kind: string; location_id: number | null; active: number; ingredients: number }
+
+export function listWarehouses(ctx: Ctx): Warehouse[] {
+  return ctx.db.prepare(`SELECT w.id, w.name, w.kind, w.location_id, w.active, (SELECT COUNT(*) FROM ingredients i WHERE i.org_id = w.org_id AND i.warehouse_id = w.id AND i.active = 1) AS ingredients
+                         FROM warehouses w WHERE w.org_id = ? AND w.active = 1 ORDER BY w.name`).all(ctx.orgId) as Warehouse[]
+}
+
+export function createWarehouse(ctx: Ctx, input: unknown): Warehouse {
+  const d = warehouseSchema.parse(input)
+  const id = ensureWarehouse(ctx, d.name, d.kind ?? 'other')
+  if (d.locationId != null) ctx.db.prepare('UPDATE warehouses SET location_id = ? WHERE org_id = ? AND id = ?').run(d.locationId, ctx.orgId, id)
+  return listWarehouses(ctx).find(w => w.id === id)!
+}
+
+export function deactivateWarehouse(ctx: Ctx, id: number): void {
+  const w = warehouseById(ctx, id)
+  if (!w) throw new NotFoundError('Almacén no encontrado')
+  ctx.db.prepare('UPDATE ingredients SET warehouse_id = NULL WHERE org_id = ? AND warehouse_id = ?').run(ctx.orgId, id)
+  ctx.db.prepare('UPDATE warehouses SET active = 0 WHERE org_id = ? AND id = ?').run(ctx.orgId, id)
+}

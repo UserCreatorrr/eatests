@@ -1,188 +1,139 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { api, errorMessage } from '@/lib/api'
+import { tk, ff } from '@/lib/design'
+import { eur, fecha, num } from '@/lib/format'
+import { Btn, Empty, Field, Input, Loading, Modal, Note, Page, Panel, Select, Stat, Table, Td, Tr } from '@/components/ui'
 
-type Ingrediente = {
-  id: number
-  codi: string | null
-  descr: string | null
-  type: string | null
-  unit: string | null
-  cost: number | null
-  proveedor_nombre: string | null
-  almacen_principal: string | null
-  almacen_secundario: string | null
-}
+type Level = { ingredient_id: number; name: string; base_unit: string; warehouse_id: number | null; warehouse_name: string | null; qty: number; value: number; last_movement: string }
+type Warehouse = { id: number; name: string; kind: string; ingredients: number }
+type Ing = { id: number; name: string; base_unit: string; cost: number | null; warehouse_id: number | null; warehouse_name: string | null; supplier_name: string | null; category: string | null }
 
-const SIN_ASIGNAR = 'Sin asignar'
-
-// Color por almacén para identificarlos de un vistazo
-const ALMACEN_COLOR: Record<string, string> = {
-  'Nevera': '#3d7ea6',
-  'Nevera pescado': '#3d7ea6',
-  'Nevera lácteos': '#5a9bbf',
-  'Congelador': '#5e8ca8',
-  'Seco / Despensa': '#b08348',
-  'Despensa seca': '#b08348',
-  'Barra': '#8a6d3b',
-  'Cocina caliente': '#a83e1e',
-  'Cocina fría': '#0fa651',
-  'Bodega': '#7a4a6b',
-  [SIN_ASIGNAR]: '#a83e1e',
-}
-
-function fmt(v: number | null) {
-  if (v == null) return '-'
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
-}
-
-const ghostBtn: React.CSSProperties = {
-  fontFamily: 'DM Mono, monospace', fontSize: 11, padding: '8px 12px', cursor: 'pointer',
-  background: 'var(--paper)', border: '1.5px solid #c4b8a8', color: '#3d3834', letterSpacing: '0.04em',
-}
+const KIND: Record<string, string> = { refrigerated: 'Refrigerado', frozen: 'Congelado', dry: 'Seco', other: 'Otro' }
 
 export default function AlmacenesPage() {
-  const [rows, setRows] = useState<Ingrediente[]>([])
+  const [levels, setLevels] = useState<Level[]>([])
+  const [totalValue, setTotalValue] = useState(0)
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [ings, setIngs] = useState<Ing[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  // Acordeones plegables (FC-13): estado de apertura por almacén, persistido
-  const [colapsados, setColapsados] = useState<Record<string, boolean>>({})
+  const [tab, setTab] = useState<'stock' | 'ubicaciones'>('stock')
+  const [modal, setModal] = useState<null | 'almacen' | 'ajuste' | 'recuento'>(null)
+  const [form, setForm] = useState<Record<string, string>>({})
+  const [count, setCount] = useState<Record<number, string>>({})
+  const [msg, setMsg] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await fetch('/api/data/ingredientes?limit=5000')
-    const json = await res.json()
-    setRows(json.data || [])
+    try {
+      const [s, w, i] = await Promise.all([api.get('/api/stock'), api.get('/api/warehouses'), api.get('/api/ingredients')])
+      setLevels(s.data); setTotalValue(s.totalValue); setWarehouses(w.data); setIngs(i.data)
+    } catch (e) { setMsg(errorMessage(e)) }
     setLoading(false)
   }, [])
-
   useEffect(() => { load() }, [load])
-  useEffect(() => {
-    try { const s = localStorage.getItem('mb_almacenes_colapsados'); if (s) setColapsados(JSON.parse(s)) } catch {}
-  }, [])
 
-  function toggle(almacen: string) {
-    setColapsados(prev => {
-      const next = { ...prev, [almacen]: !prev[almacen] }
-      try { localStorage.setItem('mb_almacenes_colapsados', JSON.stringify(next)) } catch {}
-      return next
-    })
+  async function submit() {
+    setSaving(true); setMsg('')
+    try {
+      if (modal === 'almacen') await api.post('/api/warehouses', { name: form.name, kind: form.kind || 'other' })
+      if (modal === 'ajuste') await api.post('/api/stock/adjustments', { ingredientId: Number(form.ingredientId), qty: Number(form.qty), unit: form.unit, note: form.note || null, warehouseId: form.warehouseId ? Number(form.warehouseId) : null })
+      if (modal === 'recuento') {
+        const lines = Object.entries(count).filter(([, v]) => v !== '').map(([id, v]) => ({ ingredientId: Number(id), qty: Number(v), unit: ings.find(i => i.id === Number(id))!.base_unit }))
+        if (!lines.length) throw new Error('No has introducido ningún recuento')
+        const r = await api.post('/api/stock/counts', { lines, warehouseId: form.warehouseId ? Number(form.warehouseId) : null })
+        alert(`Recuento registrado: ${r.results.length} ingrediente(s). Desviación total ${eur(r.results.reduce((s: number, x: any) => s + x.deviationValue, 0))}.`)
+      }
+      setModal(null); setForm({}); setCount({}); await load()
+    } catch (e) { setMsg(errorMessage(e)) }
+    setSaving(false)
   }
 
-  const filtered = rows.filter(r =>
-    !search || [r.descr, r.codi, r.type, r.proveedor_nombre, r.almacen_principal].some(v => v?.toLowerCase().includes(search.toLowerCase()))
-  )
-
-  // Agrupa por almacén principal
-  const grupos = new Map<string, Ingrediente[]>()
-  for (const r of filtered) {
-    const key = r.almacen_principal?.trim() || SIN_ASIGNAR
-    if (!grupos.has(key)) grupos.set(key, [])
-    grupos.get(key)!.push(r)
-  }
-  // Orden: almacenes con nombre primero (alfabético), "Sin asignar" al final
-  const ordenados = Array.from(grupos.entries()).sort((a, b) => {
-    if (a[0] === SIN_ASIGNAR) return 1
-    if (b[0] === SIN_ASIGNAR) return -1
-    return a[0].localeCompare(b[0])
-  })
-
-  const sinAsignar = rows.filter(r => !r.almacen_principal?.trim()).length
+  const byWarehouse = new Map<string, Ing[]>()
+  for (const i of ings) { const k = i.warehouse_name || 'Sin asignar'; (byWarehouse.get(k) ?? byWarehouse.set(k, []).get(k)!).push(i) }
+  const groups = Array.from(byWarehouse.entries()).sort((a, b) => a[0] === 'Sin asignar' ? 1 : b[0] === 'Sin asignar' ? -1 : a[0].localeCompare(b[0]))
 
   return (
-    <div className="p-8">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Almacenes</h1>
-          <p className="page-subtitle">
-            {grupos.size} ubicaciones · {rows.length} ingredientes
-            {sinAsignar > 0 && <> · <span style={{ color: '#a83e1e' }}>{sinAsignar} sin almacén</span></>}
-          </p>
-          {/* Decir lo que esta pantalla es y lo que no, en vez de aparentar
-              un inventario: aquí se organiza dónde vive cada ingrediente, pero
-              no hay existencias ni movimientos, así que no se puede valorar. */}
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#6c635a', margin: '4px 0 0', maxWidth: 620, lineHeight: 1.5 }}>
-            Esta pantalla organiza dónde se guarda cada ingrediente. No lleva existencias ni entradas y salidas, así que todavía no valora el stock.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={() => { const all: Record<string, boolean> = {}; ordenados.forEach(([a]) => all[a] = true); setColapsados(all); try { localStorage.setItem('mb_almacenes_colapsados', JSON.stringify(all)) } catch {} }}
-            style={ghostBtn} title="Plegar todos los almacenes">Plegar todo</button>
-          <button onClick={() => { setColapsados({}); try { localStorage.setItem('mb_almacenes_colapsados', '{}') } catch {} }}
-            style={ghostBtn} title="Desplegar todos los almacenes">Desplegar todo</button>
-          <Link href="/dashboard/ingredientes" className="btn-primary" style={{ textDecoration: 'none' }}>Gestionar ingredientes →</Link>
-        </div>
+    <Page eyebrow="Food cost · Almacén" title="Almacenes y stock" subtitle="El stock es la suma de movimientos: entra con los albaranes validados y sale con mermas, producción y recuentos."
+      actions={<><Btn kind="ghost" onClick={() => { setForm({}); setMsg(''); setModal('almacen') }}>+ ALMACÉN</Btn><Btn kind="ghost" onClick={() => { setForm({ unit: 'kg' }); setMsg(''); setModal('ajuste') }}>AJUSTE</Btn><Btn onClick={() => { setForm({}); setCount({}); setMsg(''); setModal('recuento') }}>RECUENTO FÍSICO</Btn></>}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <Stat label="Valor del stock" value={eur(totalValue)} sub="existencias × coste actual" />
+        <Stat label="Referencias con stock" value={levels.length} />
+        <Stat label="Almacenes" value={warehouses.length} />
+        <Stat label="Sin almacén asignado" value={ings.filter(i => !i.warehouse_id).length} tone={ings.some(i => !i.warehouse_id) ? 'warn' : 'ok'} />
       </div>
-
-      {/* Search */}
-      <div style={{ marginBottom: 20 }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar ingrediente, tipo, proveedor o almacén..."
-          style={{ width: '100%', maxWidth: 480, padding: '10px 14px', borderRadius: 0, border: '1.5px solid #e8e2db', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#3d3834', outline: 'none', backgroundColor: 'var(--paper)', boxSizing: 'border-box' }}
-          onFocus={e => e.currentTarget.style.borderColor = '#19f973'}
-          onBlur={e => e.currentTarget.style.borderColor = '#e8e2db'}
-        />
+      <div style={{ display: 'flex', gap: 0, marginBottom: 14, border: `1.5px solid ${tk.iron}`, width: 'fit-content' }}>
+        {(['stock', 'ubicaciones'] as const).map(t => <button key={t} onClick={() => setTab(t)} style={{ padding: '7px 16px', background: tab === t ? tk.iron : tk.paper, color: tab === t ? tk.cream : tk.iron, border: 'none', cursor: 'pointer', fontFamily: ff.mono, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t === 'stock' ? 'Existencias' : 'Ubicaciones'}</button>)}
       </div>
+      {msg && !modal && <Note tone="crit">{msg}</Note>}
 
-      {loading ? (
-        <p className="page-subtitle">Cargando...</p>
-      ) : ordenados.length === 0 ? (
-        <div style={{ backgroundColor: 'var(--paper)', border: '1px solid #e8e2db', padding: 40, textAlign: 'center' }}>
-          <p style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 16, color: '#3d3834', margin: '0 0 6px' }}>Sin ingredientes</p>
-          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#6c635a', margin: 0 }}>Añade ingredientes y asígnales un almacén para verlos agrupados aquí.</p>
-        </div>
+      {loading ? <Loading /> : tab === 'stock' ? (
+        <Panel title="Existencias teóricas">
+          {levels.length === 0 ? <Empty>Sin movimientos de stock todavía. Valida un albarán para que entren las primeras existencias.</Empty> : (
+            <Table head={['Ingrediente', 'Almacén', 'Existencias', 'Valor', 'Último movimiento']} right={[2, 3]}>
+              {levels.map((l, i) => (
+                <Tr key={i}>
+                  <Td><Link href={`/dashboard/ingredientes/${l.ingredient_id}`} style={{ color: tk.iron, textDecoration: 'none', borderBottom: `1px solid ${tk.iron40}` }}>{l.name}</Link></Td>
+                  <Td style={{ color: tk.iron60 }}>{l.warehouse_name || '—'}</Td>
+                  <Td right style={{ fontWeight: 600, color: l.qty < 0 ? tk.terra : tk.iron }}>{num(l.qty)} {l.base_unit}</Td>
+                  <Td right>{eur(l.value)}</Td>
+                  <Td style={{ color: tk.iron60 }}>{fecha(l.last_movement)}</Td>
+                </Tr>
+              ))}
+            </Table>
+          )}
+        </Panel>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {ordenados.map(([almacen, items]) => {
-            const color = ALMACEN_COLOR[almacen] ?? '#6c635a'
-            // Antes se sumaba i.cost y se llamaba "valor de coste". No lo era:
-            // sumaba €/kg con €/l y con €/ud, magnitudes distintas, y sin saber
-            // cuántas unidades hay en el almacén. Valorar existencias exige stock,
-            // que todavía no existe, así que se muestra lo que sí se sabe.
-            const conPrecio = items.filter((i: Ingrediente) => (i.cost || 0) > 0).length
-            // Buscando → forzar abierto para que los resultados se vean
-            const abierto = search.trim() ? true : !colapsados[almacen]
-            return (
-              <div key={almacen} style={{ backgroundColor: 'var(--paper)', border: '1px solid #e8e2db', overflow: 'hidden' }}>
-                {/* Cabecera del almacén — clicable (acordeón) */}
-                <button
-                  onClick={() => toggle(almacen)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', backgroundColor: '#faf6ec', width: '100%', cursor: 'pointer', textAlign: 'left', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: abierto ? '1px solid #e8e2db' : '1px solid transparent' }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6c635a" strokeWidth={2.5} style={{ transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform .18s', flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, flexShrink: 0 }} />
-                  <span style={{ fontFamily: 'Chillax, sans-serif', fontWeight: 700, fontSize: 15, color: almacen === SIN_ASIGNAR ? '#a83e1e' : '#3d3834' }}>{almacen}</span>
-                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#6c635a', marginLeft: 'auto' }}>
-                    {items.length} referencia{items.length !== 1 ? 's' : ''} · {conPrecio} con precio
-                  </span>
-                </button>
-                {/* Tabla de ingredientes del almacén */}
-                {abierto && (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <tbody>
-                    {items.map((ing: Ingrediente, idx: number) => (
-                      <tr key={ing.id} style={{ borderBottom: idx < items.length - 1 ? '1px solid #f0ebe2' : 'none' }}>
-                        <td style={{ padding: '8px 16px', fontFamily: 'Chillax, sans-serif', fontWeight: 600, fontSize: 13, color: '#3d3834' }}>{ing.descr || '-'}</td>
-                        <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.45 }}>{ing.type || '-'}</td>
-                        <td style={{ padding: '8px 14px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#3d3834', opacity: 0.55 }}>{ing.proveedor_nombre || 'sin proveedor'}</td>
-                        <td style={{ padding: '8px 14px', whiteSpace: 'nowrap' }}>
-                          {ing.almacen_secundario ? (
-                            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 7px', backgroundColor: '#ece4d8', color: '#6c635a', border: '1px solid #d8cdbb' }}>2ª: {ing.almacen_secundario}</span>
-                          ) : null}
-                        </td>
-                        <td style={{ padding: '8px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#3d3834', whiteSpace: 'nowrap' }}>{fmt(ing.cost)} <span style={{ opacity: 0.4 }}>/{ing.unit || 'ud'}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                )}
-              </div>
-            )
-          })}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {groups.map(([name, items]) => (
+            <Panel key={name} title={<span style={{ color: name === 'Sin asignar' ? tk.terra : tk.iron }}>{name} · {items.length} referencia{items.length !== 1 ? 's' : ''}</span>} right={warehouses.find(w => w.name === name) ? <span style={{ fontFamily: ff.mono, fontSize: 10, color: tk.iron40 }}>{KIND[warehouses.find(w => w.name === name)!.kind]}</span> : undefined}>
+              <Table head={['Ingrediente', 'Categoría', 'Proveedor', 'Coste']} right={[3]}>
+                {items.map(i => <Tr key={i.id}><Td style={{ fontFamily: ff.display, fontWeight: 600, fontSize: 12.5 }}>{i.name}</Td><Td style={{ color: tk.iron60 }}>{i.category || '—'}</Td><Td style={{ color: tk.iron60 }}>{i.supplier_name || 'sin proveedor'}</Td><Td right>{i.cost != null ? `${eur(i.cost)}/${i.base_unit}` : '—'}</Td></Tr>)}
+              </Table>
+            </Panel>
+          ))}
+          {groups.length === 0 && <Empty>Sin ingredientes.</Empty>}
         </div>
       )}
-    </div>
+
+      {modal === 'almacen' && (
+        <Modal title="Nuevo almacén" onClose={() => setModal(null)} width={420}>
+          <Field label="Nombre"><Input value={form.name ?? ''} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} autoFocus /></Field>
+          <div style={{ marginTop: 12 }}><Field label="Tipo"><Select value={form.kind ?? 'other'} onChange={e => setForm(p => ({ ...p, kind: e.target.value }))}>{Object.entries(KIND).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></Field></div>
+          {msg && <p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.terra, margin: '14px 0 0' }}>{msg}</p>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}><Btn kind="ghost" onClick={() => setModal(null)}>CANCELAR</Btn><Btn onClick={submit} disabled={saving || !form.name}>GUARDAR</Btn></div>
+        </Modal>
+      )}
+      {modal === 'ajuste' && (
+        <Modal title="Ajuste de stock" onClose={() => setModal(null)} width={460}>
+          <Note>Un ajuste corrige las existencias sin tocar el pasado: positivo entra, negativo sale.</Note>
+          <Field label="Ingrediente"><Select value={form.ingredientId ?? ''} onChange={e => { const ing = ings.find(i => String(i.id) === e.target.value); setForm(p => ({ ...p, ingredientId: e.target.value, unit: ing?.base_unit ?? p.unit, warehouseId: ing?.warehouse_id ? String(ing.warehouse_id) : '' })) }}><option value="">— elegir —</option>{ings.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</Select></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+            <Field label="Cantidad (±)"><Input type="number" step="any" value={form.qty ?? ''} onChange={e => setForm(p => ({ ...p, qty: e.target.value }))} /></Field>
+            <Field label="Unidad"><Input value={form.unit ?? ''} onChange={e => setForm(p => ({ ...p, unit: e.target.value }))} /></Field>
+          </div>
+          <div style={{ marginTop: 12 }}><Field label="Motivo"><Input value={form.note ?? ''} onChange={e => setForm(p => ({ ...p, note: e.target.value }))} /></Field></div>
+          {msg && <p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.terra, margin: '14px 0 0' }}>{msg}</p>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}><Btn kind="ghost" onClick={() => setModal(null)}>CANCELAR</Btn><Btn onClick={submit} disabled={saving || !form.ingredientId || !form.qty}>REGISTRAR</Btn></div>
+        </Modal>
+      )}
+      {modal === 'recuento' && (
+        <Modal title="Recuento físico" onClose={() => setModal(null)} width={620}>
+          <Note>Escribe lo que hay de verdad. La diferencia con el teórico queda como movimiento de recuento; lo que dejes en blanco no se toca.</Note>
+          <div style={{ maxHeight: '50vh', overflowY: 'auto', border: `1px solid ${tk.iron20}` }}>
+            <Table head={['Ingrediente', 'Teórico', 'Contado']} right={[1]}>
+              {ings.map(i => {
+                const th = levels.filter(l => l.ingredient_id === i.id).reduce((s, l) => s + l.qty, 0)
+                return <Tr key={i.id}><Td>{i.name}</Td><Td right style={{ color: tk.iron60 }}>{num(th)} {i.base_unit}</Td><Td><Input type="number" step="any" min={0} placeholder={i.base_unit} value={count[i.id] ?? ''} onChange={e => setCount(p => ({ ...p, [i.id]: e.target.value }))} style={{ width: 120, padding: '5px 8px' }} /></Td></Tr>
+              })}
+            </Table>
+          </div>
+          {msg && <p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.terra, margin: '14px 0 0' }}>{msg}</p>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}><Btn kind="ghost" onClick={() => setModal(null)}>CANCELAR</Btn><Btn onClick={submit} disabled={saving}>REGISTRAR RECUENTO</Btn></div>
+        </Modal>
+      )}
+    </Page>
   )
 }

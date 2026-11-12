@@ -10,7 +10,7 @@ type Notification = {
   body: string | null
   urgency: 'alta' | 'media' | 'baja'
   link: string | null
-  read: number
+  read_at: string | null
   created_at: string
 }
 
@@ -97,7 +97,7 @@ export default function NotificationBell() {
   }
 
   useEffect(() => {
-    fetch('/api/notifications', { method: 'POST' }).catch(() => {}).finally(() => load())
+    fetch('/api/notifications/generate', { method: 'POST' }).catch(() => {}).finally(() => load())
     registerPush()
     const interval = setInterval(load, 5 * 60 * 1000)
     return () => clearInterval(interval)
@@ -115,18 +115,18 @@ export default function NotificationBell() {
 
   async function markRead(id: number) {
     await fetch(`/api/notifications/${id}`, { method: 'PATCH' }).catch(() => {})
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: 1 } : n))
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
     setUnread(prev => Math.max(0, prev - 1))
   }
 
   async function markAllRead() {
     await fetch('/api/notifications/read-all', { method: 'PATCH' }).catch(() => {})
-    setNotifications(prev => prev.map(n => ({ ...n, read: 1 })))
+    setNotifications(prev => prev.map(n => ({ ...n, read_at: new Date().toISOString() })))
     setUnread(0)
   }
 
   async function handleNotificationClick(n: Notification) {
-    if (!n.read) await markRead(n.id)
+    if (!n.read_at) await markRead(n.id)
     if (n.link) {
       setOpen(false)
       window.location.href = n.link
@@ -217,7 +217,7 @@ export default function NotificationBell() {
                   onClick={() => handleNotificationClick(n)}
                   style={{
                     padding: '12px 16px',
-                    backgroundColor: n.read ? tk.paper : tk.cream,
+                    backgroundColor: n.read_at ? tk.paper : tk.cream,
                     borderLeft: `3px solid ${urgencyColor[n.urgency] || tk.clay}`,
                     borderBottom: `1px solid ${tk.iron20}`,
                     cursor: 'pointer',
@@ -231,7 +231,7 @@ export default function NotificationBell() {
                     }}>
                       {n.title}
                     </span>
-                    {!n.read && (
+                    {!n.read_at && (
                       <span style={{ width: 6, height: 6, backgroundColor: urgencyColor[n.urgency], flexShrink: 0, marginTop: 4 }} />
                     )}
                   </div>

@@ -109,13 +109,13 @@ export default function OnboardingPage() {
   async function procesarCarta() {
     setLoading(true); setError('')
     try {
-      const res = await fetch('/api/onboarding/parse-carta', {
+      const res = await fetch('/api/onboarding/menu', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ images: cartaImages }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error')
-      setPlatos(data.platos || [])
+      if (!res.ok) throw new Error(data.error?.message || 'Error')
+      setPlatos((data.dishes || []).map((d: any) => ({ nombre: d.name, categoria: d.category ?? undefined, precio_venta: d.salePrice, descripcion: d.description ?? '' })))
       setPaso(2)
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
@@ -124,14 +124,14 @@ export default function OnboardingPage() {
   async function procesarFacturas() {
     setLoading(true); setError('')
     try {
-      const res = await fetch('/api/onboarding/parse-facturas', {
+      const res = await fetch('/api/onboarding/invoices', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ images: facturaImages }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error')
-      setIngredientes(data.ingredientes || [])
-      setProveedores(data.proveedores || [])
+      if (!res.ok) throw new Error(data.error?.message || 'Error')
+      setIngredientes((data.ingredients || []).map((i: any) => ({ nombre: i.name, unidad: i.unit, precio_unitario: i.unitPrice, vendor: i.vendor })))
+      setProveedores((data.suppliers || []).map((p: any) => ({ nombre: p.name, nif: p.taxId })))
       setPaso(3)
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
@@ -142,14 +142,17 @@ export default function OnboardingPage() {
     try {
       const res = await fetch('/api/onboarding/match', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platos, ingredientes }),
+        body: JSON.stringify({
+          dishes: platos.map(p => ({ name: p.nombre, category: p.categoria ?? null, salePrice: p.precio_venta, description: p.descripcion ?? '' })),
+          ingredients: ingredientes.map(i => ({ name: i.nombre, unit: i.unidad, unitPrice: i.precio_unitario, vendor: i.vendor })),
+        }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error')
-      const enriched: RecetaPropuesta[] = (data.propuestas || []).map((p: any) => ({
-        ...p,
-        incluida: p.lineas.length > 0,
-        lineas: p.lineas.map((l: any) => ({ ...l, incluida: l.confianza !== 'baja' })),
+      if (!res.ok) throw new Error(data.error?.message || 'Error')
+      const enriched: RecetaPropuesta[] = (data.proposals || []).map((p: any) => ({
+        plato: p.dish, precio_venta: p.salePrice, raciones_estimadas: p.portions, coste_total: p.total, food_cost_pct: p.foodCostPct,
+        incluida: p.lines.length > 0,
+        lineas: p.lines.map((l: any) => ({ ingrediente: l.ingredient, cantidad: l.qty, unidad: l.unit, precio_unitario: l.unitPrice, coste: l.cost, confianza: l.confidence, incluida: l.confidence !== 'baja' })),
       }))
       setRecetas(enriched)
       setPaso(4)
@@ -174,11 +177,15 @@ export default function OnboardingPage() {
 
       const res = await fetch('/api/onboarding/commit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proveedores, ingredientes, recetas: recetasFinal }),
+        body: JSON.stringify({
+          suppliers: proveedores.map(p => ({ name: p.nombre, taxId: p.nif })),
+          ingredients: ingredientes.map(i => ({ name: i.nombre, unit: i.unidad, unitPrice: i.precio_unitario, vendor: i.vendor })),
+          recipes: recetasFinal.map(r => ({ dish: r.plato, salePrice: r.precio_venta, portions: r.raciones_estimadas, lines: r.lineas.map(l => ({ ingredient: l.ingrediente, qty: l.cantidad, unit: l.unidad, unitPrice: l.precio_unitario })) })),
+        }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error')
-      setResumen(data.resumen)
+      if (!res.ok) throw new Error(data.error?.message || 'Error')
+      setResumen({ proveedores: { creados: data.suppliers.created, existentes: data.suppliers.existing }, ingredientes: { creados: data.ingredients.created, actualizados: data.ingredients.updated }, recetas_creadas: data.recipes, lineas_escandallo: data.lines })
       setPaso(5)
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }

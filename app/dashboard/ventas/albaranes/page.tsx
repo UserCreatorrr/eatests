@@ -1,38 +1,17 @@
 'use client'
-import CRUDPage, { FieldDef, ColDef } from '@/components/CRUDPage'
+import CRUDPage, { F, type ColDef, type FieldDef } from '@/components/CRUDPage'
+import { eur, fecha } from '@/lib/format'
 
 const fields: FieldDef[] = [
-  { key: 'invoice_num', label: 'Nº Albaran' },
-  { key: 'customer', label: 'Cliente' },
-  { key: 'customer_code', label: 'Cod. Cliente' },
-  { key: 'customer_type', label: 'Tipo cliente' },
-  { key: 'nif', label: 'NIF' },
-  { key: 'contact', label: 'Contacto' },
-  { key: 'phone', label: 'Teléfono' },
-  { key: 'mail', label: 'Email' },
-  { key: 'address', label: 'Direccion' },
-  { key: 'cp', label: 'CP' },
-  { key: 'city', label: 'Ciudad' },
-  { key: 'date_delivery', label: 'Fecha Entrega' },
-  { key: 'base', label: 'Base (EUR)', type: 'number' },
+  { key: 'number', label: 'Nº albarán' }, { key: 'customerName', label: 'Cliente' }, { key: 'customerType', label: 'Tipo de cliente' }, { key: 'customerTaxId', label: 'NIF' },
+  { key: 'docDate', label: 'Fecha de entrega', type: 'date' }, { key: 'base', label: 'Base (€)', type: 'number' }, { key: 'vat', label: 'IVA (€)', type: 'number' }, { key: 'total', label: 'Total (€)', type: 'number' }, { key: 'notes', label: 'Notas' },
 ]
-
-function fmt(v: number | null) {
-  if (v == null) return '-'
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
-}
-
 const columns: ColDef[] = [
-  { label: 'Nº Albaran', render: r => r.invoice_num || '-', className: 'col-mono' },
-  { label: 'Cliente', render: r => r.customer || '-', className: 'col-main' },
-  { label: 'Tipo', render: r => r.customer_type || '-' },
-  { label: 'NIF', render: r => r.nif || '-', className: 'col-mono' },
-  { label: 'Contacto', render: r => r.contact || '-' },
-  { label: 'Ciudad', render: r => [r.city, r.cp].filter(Boolean).join(' ') || '-' },
-  { label: 'Fecha Entrega', render: r => r.date_delivery || '-' },
-  { label: 'Base', render: r => fmt(r.base), className: 'col-amount' },
+  { label: 'Nº', render: r => r.number || '—' }, { label: 'Cliente', render: r => r.customer_name || '—' }, { label: 'Tipo', render: r => r.customer_type || '—' }, { label: 'NIF', render: r => r.customer_tax_id || '—' },
+  { label: 'Fecha', render: r => fecha(r.doc_date) }, { label: 'Base', render: r => eur(r.base), right: true }, { label: 'Total', render: r => eur(r.total), right: true },
 ]
-
 export default function AlbaranesVentaPage() {
-  return <CRUDPage title="Albaranes de Venta" entity="albaranes-venta" fields={fields} columns={columns} />
+  return <CRUDPage title="Albaranes de venta" eyebrow="Ventas" endpoint="/api/sales-documents" query="kind=delivery_note" fields={fields} columns={columns} singular="albarán de venta"
+    fromRow={r => ({ number: r.number ?? '', customerName: r.customer_name ?? '', customerType: r.customer_type ?? '', customerTaxId: r.customer_tax_id ?? '', docDate: r.doc_date ?? '', base: String(r.base ?? ''), vat: String(r.vat ?? ''), total: String(r.total ?? ''), notes: r.notes ?? '' })}
+    toBody={f => ({ kind: 'delivery_note', number: F.str(f.number), customerName: F.str(f.customerName), customerType: F.str(f.customerType), customerTaxId: F.str(f.customerTaxId), docDate: F.str(f.docDate), base: F.num(f.base), vat: F.num(f.vat), total: F.num(f.total), notes: F.str(f.notes) })} />
 }

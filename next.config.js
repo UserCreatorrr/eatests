@@ -3,9 +3,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['better-sqlite3'],
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // v2: los errores de tipos paran el build. Antes se ignoraban y llegaban a producción.
   eslint: {
     ignoreDuringBuilds: true,
   },

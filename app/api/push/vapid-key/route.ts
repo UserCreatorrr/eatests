@@ -1,8 +1,5 @@
-import { NextResponse } from 'next/server'
+import { route } from '@/server/http/route'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
-  const key = process.env.VAPID_PUBLIC_KEY || ''
-  return NextResponse.json({ publicKey: key })
-}
+export const GET = route({}, () => ({ publicKey: process.env.VAPID_PUBLIC_KEY || '' }))

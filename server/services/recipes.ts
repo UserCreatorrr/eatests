@@ -224,6 +224,9 @@ function loadRefs(ctx: Ctx) {
   return { recipes, lines: allLineRefs(ctx), ingredients }
 }
 
+/** Referencias crudas para otros servicios (consumo teórico). */
+export const _refs = loadRefs
+
 /** Coste de todas las recetas de la organización en una pasada. */
 export function recipeCosts(ctx: Ctx): Map<number, RecipeCost> {
   const { recipes, lines, ingredients } = loadRefs(ctx)

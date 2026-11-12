@@ -34,6 +34,6 @@ describe('estados', () => {
     expect(() => assertOrderTransition('closed', 'draft')).toThrow(ConflictError)
     expect(() => assertDeliveryNoteTransition('validated', 'invoiced')).not.toThrow()
     expect(() => assertDeliveryNoteTransition('invoiced', 'draft')).toThrow(ConflictError)
-    expect(() => assertDeliveryNoteTransition('draft', 'draft')).not.toThrow()
+    expect(() => assertDeliveryNoteTransition('draft', 'draft')).toThrow(ConflictError)
   })
 })

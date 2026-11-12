@@ -27,7 +27,9 @@ const INVOICE: Record<InvoiceStatus, InvoiceStatus[]> = {
 }
 
 function assertTransition<S extends string>(table: Record<S, S[]>, entity: string, from: S, to: S): void {
-  if (from === to) return
+  // Repetir un estado no es "no hacer nada": validar dos veces un albarán
+  // duplicaría precios y stock. Es un conflicto.
+  if (from === to) throw new ConflictError(`${entity}: ya está en "${to}"`, { from, to })
   if (!table[from]?.includes(to)) {
     throw new ConflictError(`${entity}: no se puede pasar de "${from}" a "${to}"`, { from, to })
   }

@@ -1,27 +1,15 @@
-import { openai } from '@/lib/openai'
-import { NextRequest } from 'next/server'
-import { getUserFromRequest } from '@/lib/auth'
-import { rateLimit } from '@/lib/security'
+import { openaiTranscribe } from '@/server/adapters/openai'
+import { ValidationError } from '@/server/domain/errors'
+import { route } from '@/server/http/route'
+import { rateLimit } from '@/server/http/ratelimit'
 
-export async function POST(req: NextRequest) {
-  const user = await getUserFromRequest(req)
-  if (!user) return Response.json({ error: 'No autenticado' }, { status: 401 })
-  if (!rateLimit(`voice:${user.id}`, 20, 60_000)) {
-    return Response.json({ error: 'Demasiadas peticiones' }, { status: 429 })
-  }
-  const formData = await req.formData()
-  const audio = formData.get('audio') as File
-  if (!audio) return Response.json({ error: 'No audio' }, { status: 400 })
+export const dynamic = 'force-dynamic'
 
-  const transcription = await openai.audio.transcriptions.create({
-    file: audio,
-    model: 'whisper-1',
-    language: 'es',
-  })
-  const text = transcription.text
-    .replace(/subtítulos realizados por la comunidad de amara\.org/gi, '')
-    .replace(/subtitulos realizados por la comunidad de amara\.org/gi, '')
-    .replace(/amara\.org/gi, '')
-    .trim()
-  return Response.json({ text })
-}
+export const POST = route({}, async ({ ctx, req }) => {
+  rateLimit(`voice:${ctx.userId}`, 20, 60_000, 'Demasiadas transcripciones seguidas')
+  const form = await req.formData()
+  const audio = form.get('audio')
+  if (!(audio instanceof File) || audio.size === 0) throw new ValidationError('No llega audio')
+  if (audio.size > 10_000_000) throw new ValidationError('El audio supera los 10 MB')
+  return { text: await openaiTranscribe(audio) }
+})

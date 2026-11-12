@@ -37,3 +37,17 @@ describe('estados', () => {
     expect(() => assertDeliveryNoteTransition('draft', 'draft')).toThrow(ConflictError)
   })
 })
+
+import { matchByName as matchNames } from '@/server/domain/text'
+describe('cruce por nombre', () => {
+  const cat = [{ name: 'Pechuga de pollo' }, { name: 'Tomate' }, { name: 'Tomate pera rama' }, { name: 'Aceite de oliva virgen' }, { name: 'Pollo entero' }]
+  it('exacto, por palabras y el mejor entre varios parciales', () => {
+    expect(matchNames('pechuga pollo', cat)).toEqual({ item: { name: 'Pechuga de pollo' }, kind: 'partial' })
+    expect(matchNames('TOMATE', cat)).toEqual({ item: { name: 'Tomate' }, kind: 'exact' })
+    expect(matchNames('tomates pera', cat)?.item.name).toBe('Tomate pera rama')
+    expect(matchNames('aceite oliva', cat)?.item.name).toBe('Aceite de oliva virgen')
+    expect(matchNames('pollo', cat)?.item.name).toBe('Pollo entero')
+    expect(matchNames('sal', cat)).toBeNull()
+    expect(matchNames('', cat)).toBeNull()
+  })
+})

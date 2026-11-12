@@ -1,45 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
-import db from '@/lib/db'
-import { signJwt, setSessionCookie } from '@/lib/auth'
-import { rateLimit, getClientIp } from '@/lib/security'
+import { NextResponse } from 'next/server'
+import { getDb } from '@/server/db/connection'
+import { clientIp, route } from '@/server/http/route'
+import { rateLimit } from '@/server/http/ratelimit'
+import { COOKIE_NAME, SESSION_DAYS, cookieOptions, login } from '@/server/services/auth'
 
-export async function POST(req: NextRequest) {
-  try {
-    // Anti fuerza bruta: 10 intentos/min por IP.
-    if (!rateLimit(`login:${getClientIp(req)}`, 10, 60_000)) {
-      return NextResponse.json({ error: 'Demasiados intentos. Espera un minuto.' }, { status: 429 })
-    }
-    const { email, password } = await req.json()
-    // Segundo límite por CUENTA: rotar la IP declarada (X-Forwarded-For) no sirve
-    // para machacar un email concreto. 10 intentos/5 min por email.
-    if (email && !rateLimit(`login-acct:${String(email).toLowerCase().trim()}`, 10, 300_000)) {
-      return NextResponse.json({ error: 'Demasiados intentos para esta cuenta. Espera unos minutos.' }, { status: 429 })
-    }
+export const dynamic = 'force-dynamic'
 
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email y contraseña requeridos' }, { status: 400 })
-    }
-
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim()) as {
-      id: string; email: string; password_hash: string | null; name: string | null
-    } | undefined
-
-    if (!user || !user.password_hash) {
-      return NextResponse.json({ error: 'Credenciales incorrectas' }, { status: 401 })
-    }
-
-    const valid = bcrypt.compareSync(password, user.password_hash)
-    if (!valid) {
-      return NextResponse.json({ error: 'Credenciales incorrectas' }, { status: 401 })
-    }
-
-    const token = await signJwt({ id: user.id, email: user.email, name: user.name })
-    setSessionCookie(token)
-
-    return NextResponse.json({ ok: true, user: { id: user.id, email: user.email, name: user.name } })
-  } catch (err) {
-    console.error('Login error:', err)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
-  }
-}
+export const POST = route({ public: true }, async ({ req }) => {
+  // Dos frenos: por IP y por cuenta, para que rotar la IP no sirva para
+  // machacar un email concreto.
+  rateLimit(`login:${clientIp(req)}`, 10, 60_000, 'Demasiados intentos. Espera un minuto')
+  let body: any
+  try { body = await req.json() } catch { body = {} }
+  if (typeof body?.email === 'string') rateLimit(`login-acct:${body.email.toLowerCase().trim()}`, 10, 300_000, 'Demasiados intentos para esta cuenta. Espera unos minutos')
+  const s = await login(getDb(), body, { ua: req.headers.get('user-agent') ?? undefined, ip: clientIp(req) })
+  const res = NextResponse.json({ ok: true, user: { id: s.userId, orgId: s.orgId, role: s.role } })
+  res.cookies.set(COOKIE_NAME, s.token, { ...cookieOptions(), maxAge: SESSION_DAYS * 86400 })
+  return res
+})

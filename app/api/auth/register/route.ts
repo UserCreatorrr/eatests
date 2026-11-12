@@ -1,54 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
-import { randomUUID } from 'crypto'
-import db from '@/lib/db'
-import { signJwt, setSessionCookie } from '@/lib/auth'
-import { rateLimit, getClientIp } from '@/lib/security'
+import { NextResponse } from 'next/server'
+import { getDb } from '@/server/db/connection'
+import { clientIp, route } from '@/server/http/route'
+import { rateLimit } from '@/server/http/ratelimit'
+import { COOKIE_NAME, SESSION_DAYS, cookieOptions, register } from '@/server/services/auth'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest) {
-  try {
-    // Anti spam de registro: 5 cuentas/10 min por IP.
-    if (!rateLimit(`register:${getClientIp(req)}`, 5, 600_000)) {
-      return NextResponse.json({ error: 'Demasiados registros. Inténtalo más tarde.' }, { status: 429 })
-    }
-    let parsed: any
-    try { parsed = await req.json() } catch { return NextResponse.json({ error: 'Petición no válida' }, { status: 400 }) }
-    const email = parsed?.email
-    const password = parsed?.password == null ? '' : String(parsed.password)
-    const name = parsed?.name
-
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email y contraseña requeridos' }, { status: 400 })
-    }
-    if (typeof email !== 'string') {
-      return NextResponse.json({ error: 'Email no válido' }, { status: 400 })
-    }
-    if (!EMAIL_RE.test(String(email).trim())) {
-      return NextResponse.json({ error: 'Email no válido' }, { status: 400 })
-    }
-    if (password.length < 8) {
-      return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })
-    }
-
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim())
-    if (existing) {
-      return NextResponse.json({ error: 'Este email ya está registrado' }, { status: 409 })
-    }
-
-    const id = randomUUID()
-    const hash = bcrypt.hashSync(password, 10)
-    db.prepare('INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)').run(
-      id, email.toLowerCase().trim(), hash, name || null
-    )
-
-    const token = await signJwt({ id, email: email.toLowerCase().trim(), name: name || null })
-    setSessionCookie(token)
-
-    return NextResponse.json({ ok: true, user: { id, email, name } })
-  } catch (err) {
-    console.error('Register error:', err)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
-  }
-}
+export const POST = route({ public: true }, async ({ req }) => {
+  rateLimit(`register:${clientIp(req)}`, 5, 600_000, 'Demasiados registros. Inténtalo más tarde')
+  let body: unknown
+  try { body = await req.json() } catch { body = {} }
+  const s = await register(getDb(), body, { ua: req.headers.get('user-agent') ?? undefined, ip: clientIp(req) })
+  const res = NextResponse.json({ ok: true, user: { id: s.userId, orgId: s.orgId, role: s.role } })
+  res.cookies.set(COOKIE_NAME, s.token, { ...cookieOptions(), maxAge: SESSION_DAYS * 86400 })
+  return res
+})

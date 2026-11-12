@@ -1,33 +1,15 @@
 import { NextResponse } from 'next/server'
-import db from '@/lib/db'
+import { getDb } from '@/server/db/connection'
 
-const TABLE_MAP: Record<string, string> = {
-  tspoonlab_proveedores: 'proveedores',
-  tspoonlab_pedidos_compra: 'pedidos_compra',
-  tspoonlab_albaranes_compra: 'albaranes_compra',
-  tspoonlab_facturas_compra: 'facturas_compra',
-  tspoonlab_albaranes_venta: 'albaranes_venta',
-  tspoonlab_facturas_venta: 'facturas_venta',
-  tspoonlab_ingredientes: 'ingredientes',
-  tspoonlab_herramientas: 'herramientas',
-  tspoonlab_lista_pedidos: 'lista_pedidos',
-}
+export const dynamic = 'force-dynamic'
 
+// Sin datos de negocio: solo si la app responde y la BD contesta.
 export async function GET() {
-  const counts: Record<string, number | string> = {}
-
-  for (const [key, table] of Object.entries(TABLE_MAP)) {
-    try {
-      const row = db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get() as any
-      counts[key] = row?.c ?? 0
-    } catch (e: any) {
-      counts[key] = `ERROR: ${e.message}`
-    }
+  try {
+    const db = getDb()
+    const m = db.prepare('SELECT MAX(id) AS v FROM schema_migrations').get() as any
+    return NextResponse.json({ ok: true, schema: m?.v ?? 0, version: process.env.GIT_SHA?.slice(0, 7) ?? 'dev', time: new Date().toISOString() })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e.message }, { status: 503 })
   }
-
-  return NextResponse.json({
-    status: 'ok',
-    backend: 'sqlite',
-    tables: counts,
-  })
 }

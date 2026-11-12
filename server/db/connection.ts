@@ -32,3 +32,8 @@ export function getDb(): DB {
   if (!globalThis.__mbdb) globalThis.__mbdb = openDatabase(DB_PATH)
   return globalThis.__mbdb
 }
+
+/** Solo tests: sustituye la conexión compartida por una BD en memoria. */
+export function useDatabase(db: DB | undefined): void {
+  globalThis.__mbdb = db
+}

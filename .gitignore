@@ -37,3 +37,8 @@ next-env.d.ts
 marginbites.db
 marginbites.db-shm
 marginbites.db-wal
+
+# copia local de la BD v2 (dev)
+marginbite-v2.db
+marginbite-v2.db-shm
+marginbite-v2.db-wal

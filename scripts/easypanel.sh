@@ -9,6 +9,9 @@
 #   scripts/easypanel.sh ref <rama>        cambia la rama de GitHub que se despliega
 #   (logs: por ssh, docker service logs marginbites_marginbites)
 set -euo pipefail
+# Git Bash en Windows convierte '/data/x' en 'C:/Program Files/Git/data/x' al pasarlo a
+# programas nativos (python, curl). Ya rompió DB_PATH una vez: desactivado.
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 PANEL="${EASYPANEL_URL:-http://72.62.237.66:3000}"
 PROJECT="${EASYPANEL_PROJECT:-marginbites}"
 SERVICE="${EASYPANEL_SERVICE:-marginbites}"

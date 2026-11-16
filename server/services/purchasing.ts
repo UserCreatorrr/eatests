@@ -380,6 +380,63 @@ export function setDeliveryNoteStatus(ctx: Ctx, id: number, to: 'draft' | 'revie
   return getDeliveryNote(ctx, id)
 }
 
+export const deliveryNoteHeaderSchema = z.object({
+  number: z.string().trim().min(1, 'Falta el número').max(60).optional(),
+  deliveryDate: dateField.optional(),
+  base: money.optional().nullable(),
+  vat: money.optional().nullable(),
+  total: money.optional().nullable(),
+  receivedBy: z.string().trim().max(120).optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+})
+
+/** Corrige la cabecera (número, fecha, importes) mientras no esté validado. */
+export function updateDeliveryNote(ctx: Ctx, id: number, input: unknown): DeliveryNote & { lines: DeliveryNoteLine[] } {
+  const dn = getDeliveryNote(ctx, id)
+  if (dn.status === 'validated' || dn.status === 'invoiced') throw new ConflictError('El albarán está validado y no se puede modificar')
+  const d = deliveryNoteHeaderSchema.parse(input)
+  const number = d.number ?? dn.number
+  if (number !== dn.number) {
+    const dup = ctx.db.prepare('SELECT id FROM delivery_notes WHERE org_id = ? AND supplier_id = ? AND number = ? AND id <> ?').get(ctx.orgId, dn.supplier_id, number, id) as any
+    if (dup) throw new ConflictError(`Ya existe el albarán ${number} de ${dn.supplier_name}`, { deliveryNoteId: dup.id, duplicate: true })
+  }
+  const base = d.base !== undefined ? toCents(d.base) : dn.base_cents
+  const vat = d.vat !== undefined ? toCents(d.vat) : dn.vat_cents
+  const total = d.total !== undefined ? (d.total != null ? toCents(d.total) : base + vat) : (d.base !== undefined || d.vat !== undefined ? base + vat : dn.total_cents)
+  if ((base || vat) && !amountsReconcile(base, vat, total)) throw new ValidationError(`Base (${eurTxt(base)}) + IVA (${eurTxt(vat)}) no cuadra con el total (${eurTxt(total)})`)
+  ctx.db.prepare(`UPDATE delivery_notes SET number = ?, delivery_date = ?, base_cents = ?, vat_cents = ?, total_cents = ?, received_by = ?, notes = ?, updated_at = ? WHERE org_id = ? AND id = ?`)
+    .run(number, d.deliveryDate ?? dn.delivery_date, base, vat, total, d.receivedBy !== undefined ? d.receivedBy : dn.received_by, d.notes !== undefined ? d.notes : dn.notes, nowIso(), ctx.orgId, id)
+  return getDeliveryNote(ctx, id)
+}
+
+/**
+ * Borra un albarán que no ha llegado a validarse (duplicado, escaneo erróneo).
+ * Uno validado ya movió precios y stock: eso no se borra, se corrige con ajustes.
+ */
+export function deleteDeliveryNote(ctx: Ctx, id: number): void {
+  const dn = getDeliveryNote(ctx, id)
+  if (dn.status === 'validated' || dn.status === 'invoiced') throw new ConflictError('Un albarán validado no se borra: ya ha movido precios y stock')
+  const moved = ctx.db.prepare(`SELECT 1 FROM stock_movements WHERE org_id = ? AND source_type = 'delivery_note' AND source_id = ?`).get(ctx.orgId, id)
+  if (moved) throw new ConflictError('Este albarán tiene movimientos de stock: corrígelo con un ajuste')
+  ctx.db.transaction(() => {
+    ctx.db.prepare('DELETE FROM delivery_note_lines WHERE org_id = ? AND delivery_note_id = ?').run(ctx.orgId, id)
+    ctx.db.prepare('DELETE FROM delivery_notes WHERE org_id = ? AND id = ?').run(ctx.orgId, id)
+    dropImageIfOrphan(ctx, dn.image_id)
+    audit(ctx, 'delete', 'delivery_note', id, { number: dn.number, supplier: dn.supplier_name, total_cents: dn.total_cents })
+  })()
+}
+
+function dropImageIfOrphan(ctx: Ctx, imageId: number | null) {
+  if (!imageId) return
+  const used = ctx.db.prepare('SELECT 1 FROM delivery_notes WHERE org_id = ? AND image_id = ? UNION SELECT 1 FROM invoices WHERE org_id = ? AND image_id = ?').get(ctx.orgId, imageId, ctx.orgId, imageId)
+  if (!used) ctx.db.prepare('DELETE FROM document_images WHERE org_id = ? AND id = ?').run(ctx.orgId, imageId)
+}
+
+export function audit(ctx: Ctx, action: string, entity: string, entityId: number | string, data: unknown) {
+  ctx.db.prepare('INSERT INTO audit_log (org_id, user_id, action, entity, entity_id, data_json) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(ctx.orgId, ctx.userId, action, entity, String(entityId), JSON.stringify(data))
+}
+
 // ─── Facturas ───────────────────────────────────────────────────────────
 
 export const invoiceSchema = z.object({
@@ -403,6 +460,16 @@ export interface Invoice {
   id: number; supplier_id: number; supplier_name: string; number: string; invoice_date: string; due_date: string | null; accounting_date: string | null
   base_cents: number; vat_cents: number; total_cents: number; status: 'pending' | 'paid'; paid_on: string | null; image_id: number | null; source: string
   notes: string | null; delivery_note_count: number; delivery_notes_base_cents: number; created_at: string; updated_at: string
+  /** Por qué hay que revisarla (null = conciliada): sin albaranes, o sus albaranes no suman la base. */
+  review: string | null
+}
+
+const eurTxt = (c: number) => (c / 100).toFixed(2).replace('.', ',') + ' €'
+function withReview(v: Omit<Invoice, 'review'>): Invoice {
+  let review: string | null = null
+  if (v.delivery_note_count === 0) review = 'Sin albaranes vinculados'
+  else if (v.base_cents > 0 && !amountsReconcile(v.delivery_notes_base_cents, 0, v.base_cents)) review = `Los albaranes suman ${eurTxt(v.delivery_notes_base_cents)} de ${eurTxt(v.base_cents)}`
+  return { ...v, review }
 }
 
 const INV_SELECT = `SELECT v.id, v.supplier_id, s.name AS supplier_name, v.number, v.invoice_date, v.due_date, v.accounting_date, v.base_cents, v.vat_cents, v.total_cents,
@@ -416,14 +483,14 @@ export function listInvoices(ctx: Ctx, opts: { status?: 'pending' | 'paid'; supp
   if (opts.status) { where.push('v.status = ?'); vals.push(opts.status) }
   if (opts.supplierId) { where.push('v.supplier_id = ?'); vals.push(opts.supplierId) }
   if (opts.dueBefore) { where.push('v.due_date < ?'); vals.push(opts.dueBefore) }
-  return ctx.db.prepare(`${INV_SELECT} WHERE ${where.join(' AND ')} ORDER BY v.invoice_date DESC, v.id DESC`).all(...vals) as Invoice[]
+  return (ctx.db.prepare(`${INV_SELECT} WHERE ${where.join(' AND ')} ORDER BY v.invoice_date DESC, v.id DESC`).all(...vals) as Omit<Invoice, 'review'>[]).map(withReview)
 }
 
 export function getInvoice(ctx: Ctx, id: number): Invoice & { deliveryNotes: DeliveryNote[] } {
-  const v = ctx.db.prepare(`${INV_SELECT} WHERE v.org_id = ? AND v.id = ?`).get(ctx.orgId, id) as Invoice | undefined
+  const v = ctx.db.prepare(`${INV_SELECT} WHERE v.org_id = ? AND v.id = ?`).get(ctx.orgId, id) as Omit<Invoice, 'review'> | undefined
   if (!v) throw new NotFoundError('Factura no encontrada')
   const deliveryNotes = ctx.db.prepare(`${DN_SELECT} WHERE d.org_id = ? AND d.invoice_id = ? ORDER BY d.delivery_date`).all(ctx.orgId, id) as DeliveryNote[]
-  return { ...v, deliveryNotes }
+  return { ...withReview(v), deliveryNotes }
 }
 
 /** Albaranes validados y sin facturar del proveedor, los candidatos a entrar en una factura. */
@@ -454,8 +521,9 @@ export function createInvoice(ctx: Ctx, input: unknown): Invoice & { deliveryNot
 
 /**
  * Vincula albaranes validados a la factura. Un albarán solo puede estar en
- * una factura, del mismo proveedor, y no anterior a él. Se comprueba que la
- * base de la factura cuadre con la suma de sus albaranes.
+ * una factura, del mismo proveedor, y no anterior a él. Se pueden añadir de
+ * uno en uno: mientras sumen menos que la base, la factura queda "por
+ * revisar"; lo que no se permite es que la superen.
  */
 export function attachDeliveryNotes(ctx: Ctx, invoiceId: number, noteIds: number[]): Invoice & { deliveryNotes: DeliveryNote[] } {
   return ctx.db.transaction(() => {
@@ -469,8 +537,9 @@ export function attachDeliveryNotes(ctx: Ctx, invoiceId: number, noteIds: number
       ctx.db.prepare(`UPDATE delivery_notes SET invoice_id = ?, status = 'invoiced', updated_at = ? WHERE org_id = ? AND id = ?`).run(invoiceId, nowIso(), ctx.orgId, nid)
     }
     const after = getInvoice(ctx, invoiceId)
-    if (after.base_cents > 0 && after.delivery_note_count > 0 && !amountsReconcile(after.delivery_notes_base_cents, 0, after.base_cents)) {
-      throw new ConflictError(`La suma de los albaranes (${(after.delivery_notes_base_cents / 100).toFixed(2)} €) no cuadra con la base de la factura (${(after.base_cents / 100).toFixed(2)} €)`,
+    const tolerance = Math.max(2, Math.round(after.base_cents * 0.01))
+    if (after.base_cents > 0 && after.delivery_notes_base_cents - after.base_cents > tolerance) {
+      throw new ConflictError(`Los albaranes (${eurTxt(after.delivery_notes_base_cents)}) superan la base de la factura (${eurTxt(after.base_cents)})`,
         { deliveryNotesBase: after.delivery_notes_base_cents, base: after.base_cents })
     }
     return after
@@ -489,4 +558,20 @@ export function setInvoicePaid(ctx: Ctx, id: number, paid: boolean, paidOn?: str
   const on = paid ? (paidOn && isIsoDate(paidOn) ? paidOn : today()) : null
   ctx.db.prepare(`UPDATE invoices SET status = ?, paid_on = ?, updated_at = ? WHERE org_id = ? AND id = ?`).run(paid ? 'paid' : 'pending', on, nowIso(), ctx.orgId, id)
   return getInvoice(ctx, id)
+}
+
+/**
+ * Borra una factura metida por error. Solo pendiente y sin albaranes: para
+ * borrar una pagada, primero se marca como pendiente (queda registro).
+ */
+export function deleteInvoice(ctx: Ctx, id: number): void {
+  const v = getInvoice(ctx, id)
+  if (v.status === 'paid') throw new ConflictError('La factura está pagada: márcala como pendiente antes de borrarla')
+  if (v.deliveryNotes.length) throw new ConflictError('La factura agrupa albaranes: quítalos antes de borrarla')
+  ctx.db.transaction(() => {
+    ctx.db.prepare('DELETE FROM invoice_lines WHERE org_id = ? AND invoice_id = ?').run(ctx.orgId, id)
+    ctx.db.prepare('DELETE FROM invoices WHERE org_id = ? AND id = ?').run(ctx.orgId, id)
+    dropImageIfOrphan(ctx, v.image_id)
+    audit(ctx, 'delete', 'invoice', id, { number: v.number, supplier: v.supplier_name, total_cents: v.total_cents })
+  })()
 }

@@ -1,19 +1,34 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { api, errorMessage } from '@/lib/api'
 import { tk, ff } from '@/lib/design'
 import { ESTADO_ALBARAN, ESTADO_FACTURA, ESTADO_PEDIDO, eur, fecha } from '@/lib/format'
-import { Badge, Btn, Delta, Empty, Loading, Page, Panel, Table, Td, Tr } from '@/components/ui'
+import { Badge, Btn, Delta, Empty, Field, Loading, Modal, Note, Page, Panel, Select, Table, Td, Tr } from '@/components/ui'
 
 export default function ProveedorFichaPage() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<any>(null)
   const [err, setErr] = useState('')
-  useEffect(() => { api.get(`/api/suppliers/${id}`).then(setData).catch(e => setErr(errorMessage(e))) }, [id])
+  const [merge, setMerge] = useState<null | { options: any[]; fromId: string; msg: string; busy: boolean }>(null)
+  const load = useCallback(() => { api.get(`/api/suppliers/${id}`).then(setData).catch(e => setErr(errorMessage(e))) }, [id])
+  useEffect(() => { load() }, [load])
+
+  async function openMerge() {
+    const r = await api.get('/api/suppliers').catch(() => ({ data: [] }))
+    setMerge({ options: r.data.filter((s: any) => String(s.id) !== String(id)), fromId: '', msg: '', busy: false })
+  }
+  async function doMerge() {
+    if (!merge?.fromId) return
+    const other = merge.options.find(o => String(o.id) === merge.fromId)
+    if (!confirm(`Todo lo de «${other?.name}» (ingredientes, pedidos, albaranes, facturas y precios) pasa a esta ficha y «${other?.name}» desaparece. ¿Seguir?`)) return
+    setMerge(m => m && { ...m, busy: true, msg: '' })
+    try { await api.post(`/api/suppliers/${id}/merge`, { fromId: Number(merge.fromId) }); setMerge(null); load() }
+    catch (e) { setMerge(m => m && { ...m, busy: false, msg: errorMessage(e) }) }
+  }
 
   if (err) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.terra }}>{err}</div>
   if (!data) return <Loading />
@@ -22,7 +37,15 @@ export default function ProveedorFichaPage() {
   return (
     <Page back={{ href: '/dashboard/proveedores', label: 'Proveedores' }} eyebrow="Ficha de proveedor" title={p.name}
       subtitle={<>{[p.tax_id && `NIF ${p.tax_id}`, p.contact_name, p.phone, p.email].filter(Boolean).join(' · ') || 'Sin datos de contacto'}{(p.address || p.city) && <><br />{[p.address, p.city, p.postal_code].filter(Boolean).join(', ')}</>}</>}
-      actions={<Btn kind="ghost" href={`/dashboard/compras/pedidos?nuevo=${p.id}`}>HACER PEDIDO</Btn>}>
+      actions={<><Btn kind="ghost" onClick={openMerge}>FUSIONAR CON OTRA FICHA</Btn><Btn kind="ghost" href={`/dashboard/compras/pedidos?nuevo=${p.id}`}>HACER PEDIDO</Btn></>}>
+      {merge && (
+        <Modal title={`Fusionar en «${p.name}»`} onClose={() => setMerge(null)} width={500}>
+          <Note>Para cuando el mismo proveedor está dado de alta dos veces (por ejemplo, un NIF mal leído en un escaneo). La otra ficha se borra y todo lo suyo pasa a esta.</Note>
+          <Field label="Ficha que se absorbe"><Select value={merge.fromId} onChange={e => setMerge(m => m && { ...m, fromId: e.target.value })}><option value="">— elegir —</option>{merge.options.map(o => <option key={o.id} value={o.id}>{o.name}{o.tax_id ? ` · ${o.tax_id}` : ''}</option>)}</Select></Field>
+          {merge.msg && <p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.terra, margin: '14px 0 0' }}>{merge.msg}</p>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}><Btn kind="ghost" onClick={() => setMerge(null)}>CANCELAR</Btn><Btn onClick={doMerge} disabled={merge.busy || !merge.fromId}>FUSIONAR</Btn></div>
+        </Modal>
+      )}
       <div style={{ background: tk.iron, color: tk.cream, padding: '18px 24px', marginBottom: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16 }}>
         <Big label={t.invoices_cents > 0 ? 'Gasto facturado' : 'Gasto en albaranes'} value={eur(t.spend_cents / 100)} sub={t.invoices_cents > 0 ? (t.delivery_notes_cents > 0 ? `${eur(t.delivery_notes_cents / 100)} entregado en albaranes` : 'Suma de facturas') : t.delivery_notes_cents > 0 ? 'Aún sin facturas: albaranes validados' : 'Sin documentos de compra'} />
         <Big label="Pendiente de pago" value={eur(t.pending_cents / 100)} sub={`${invoices.filter((v: any) => v.status === 'pending').length} factura(s)`} warn={t.pending_cents > 0} />

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { api, errorMessage } from '@/lib/api'
 import { tk, ff } from '@/lib/design'
 import { ESTADO_ALBARAN, ESTADO_FACTURA, eur, fecha } from '@/lib/format'
@@ -11,6 +11,7 @@ import { Badge, Btn, Empty, Loading, Note, Page, Panel, Table, Td, Tr } from '@/
 
 export default function FacturaDetallePage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const [f, setF] = useState<any>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -18,6 +19,11 @@ export default function FacturaDetallePage() {
   const load = useCallback(async () => { try { setF(await api.get(`/api/invoices/${id}`)) } catch (e) { setErr(errorMessage(e)) } }, [id])
   useEffect(() => { load() }, [load])
   const run = async (fn: () => Promise<unknown>) => { setBusy(true); setMsg(''); try { await fn(); await load() } catch (e) { setMsg(errorMessage(e)) } setBusy(false) }
+
+  async function remove() {
+    if (!confirm(`¿Borrar la factura ${f.number}? Úsalo solo para facturas duplicadas o metidas por error.`)) return
+    try { await api.del(`/api/invoices/${id}`); router.push('/dashboard/compras/facturas') } catch (e) { setMsg(errorMessage(e)) }
+  }
 
   if (err) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.terra }}>{err}</div>
   if (!f) return <Loading />
@@ -27,8 +33,9 @@ export default function FacturaDetallePage() {
   return (
     <Page back={{ href: '/dashboard/compras/facturas', label: 'Facturas' }} eyebrow="Factura de compra" title={f.number}
       subtitle={<><Link href={`/dashboard/proveedores/${f.supplier_id}`} style={{ color: tk.appleDeep, textDecoration: 'none', fontWeight: 600 }}>{f.supplier_name}</Link> · {fecha(f.invoice_date)}{f.due_date ? ` · vence ${fecha(f.due_date)}` : ''}{f.paid_on ? ` · pagada el ${fecha(f.paid_on)}` : ''}</>}
-      actions={<><Badge tone={f.status === 'paid' ? 'ok' : 'warn'}>{ESTADO_FACTURA[f.status]}</Badge>{f.status === 'pending' ? <Btn onClick={() => run(() => api.post(`/api/invoices/${id}/paid`, { paid: true }))} disabled={busy}>MARCAR PAGADA</Btn> : <Btn kind="ghost" onClick={() => run(() => api.post(`/api/invoices/${id}/paid`, { paid: false }))} disabled={busy}>MARCAR PENDIENTE</Btn>}</>}>
+      actions={<><Badge tone={f.status === 'paid' ? 'ok' : 'warn'}>{ESTADO_FACTURA[f.status]}</Badge>{f.status === 'pending' ? <Btn onClick={() => run(() => api.post(`/api/invoices/${id}/paid`, { paid: true }))} disabled={busy}>MARCAR PAGADA</Btn> : <Btn kind="ghost" onClick={() => run(() => api.post(`/api/invoices/${id}/paid`, { paid: false }))} disabled={busy}>MARCAR PENDIENTE</Btn>}{f.status === 'pending' && f.deliveryNotes.length === 0 && <Btn kind="danger" onClick={remove} disabled={busy}>ELIMINAR</Btn>}</>}>
       {msg && <Note tone="crit">{msg}</Note>}
+      {f.review && <Note tone="warn"><strong>Por revisar:</strong> {f.review}. La factura concilia lo que se ha recibido: añade los albaranes validados que cubre{f.candidates.length ? ' (abajo tienes los pendientes de este proveedor)' : ''}.</Note>}
       <div style={{ display: 'grid', gridTemplateColumns: f.image ? '1fr 300px' : '1fr', gap: 16, alignItems: 'start' }}>
         <div>
           <Panel title="Importes">

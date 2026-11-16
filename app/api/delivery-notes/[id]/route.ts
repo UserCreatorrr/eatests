@@ -1,5 +1,5 @@
 import { route } from '@/server/http/route'
-import { getDeliveryNote } from '@/server/services/purchasing'
+import { deleteDeliveryNote, deliveryNoteHeaderSchema, getDeliveryNote, updateDeliveryNote } from '@/server/services/purchasing'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,3 +12,9 @@ export const GET = route({}, ({ ctx, params }) => {
                                     WHERE m.org_id = ? AND m.source_type = 'delivery_note' AND m.source_id = ?`).all(ctx.orgId, note.id)
   return { ...note, image, impact: { prices, movements } }
 })
+
+// Corregir cabecera (número, fecha, importes) mientras no esté validado.
+export const PATCH = route({ body: deliveryNoteHeaderSchema }, ({ ctx, params, body }) => updateDeliveryNote(ctx, Number(params.id), body))
+
+// Solo albaranes sin validar: los validados ya movieron precios y stock.
+export const DELETE = route({}, ({ ctx, params }) => { deleteDeliveryNote(ctx, Number(params.id)); return { ok: true } })

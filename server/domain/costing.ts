@@ -13,7 +13,7 @@ import { ConflictError } from './errors'
 import { round4 } from './money'
 import { conversionFactor, compatible, type Unit } from './units'
 
-export interface IngredientRef { id: number; name: string; baseUnit: Unit; cost: number | null; avgUnitWeightG?: number | null }
+export interface IngredientRef { id: number; name: string; baseUnit: Unit; cost: number | null; avgUnitWeightG?: number | null; priceDate?: string | null }
 export interface RecipeRef {
   id: number; name: string; kind: 'dish' | 'preparation'
   portions: number; yieldQty: number | null; yieldUnit: Unit | null; salePrice: number | null
@@ -35,6 +35,7 @@ export interface LineCost {
   unitCost: number          // € por unidad de la línea
   cost: number
   warning: string | null    // por qué no suma
+  priceDate: string | null  // fecha del precio usado (ingredientes)
 }
 
 export interface RecipeCost {
@@ -134,7 +135,7 @@ export function costRecipes(
     const gross = l.qty * wasteFactor(l.wastePct)
     const base: LineCost = {
       lineId: l.id, kind: 'free', name: l.freeName ?? '', qty: l.qty, unit: l.unit, wastePct: l.wastePct,
-      grossQty: gross, unitCost: 0, cost: 0, warning: null,
+      grossQty: gross, unitCost: 0, cost: 0, warning: null, priceDate: null,
     }
     if (l.subRecipeId != null) {
       base.kind = 'preparation'
@@ -155,6 +156,7 @@ export function costRecipes(
       const ing = ingById.get(l.ingredientId)
       if (!ing) return { ...base, warning: 'El ingrediente ya no existe' }
       base.name = ing.name
+      base.priceDate = ing.priceDate ?? null
       if (ing.cost == null || ing.cost <= 0) return { ...base, warning: `"${ing.name}" no tiene precio de compra` }
       const f = lineToIngredientFactor(l, ing)
       if (f == null) return { ...base, warning: `"${ing.name}" se compra en ${ing.baseUnit} y la línea está en ${l.unit}` }

@@ -5,12 +5,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '@/lib/api'
 import { tk, ff } from '@/lib/design'
-import { eur, num, pct } from '@/lib/format'
+import { eur, fecha, num, pct } from '@/lib/format'
 import { UNIT_OPTIONS, unitsCompatibleWith } from '@/lib/units-ui'
 import { Btn, Field, Input, Note, Select } from './ui'
 
 type Line = { id: number; ingredient_id: number | null; sub_recipe_id: number | null; free_name: string | null; free_unit_cost: number | null; qty: number; unit: string; waste_pct: number; note: string | null; ingredient_name: string | null; ingredient_unit: string | null; ingredient_cost: number | null; sub_recipe_name: string | null; sub_recipe_yield_unit: string | null }
-type LineCost = { lineId: number; kind: 'ingredient' | 'preparation' | 'free'; name: string; qty: number; unit: string; wastePct: number; grossQty: number; unitCost: number; cost: number; warning: string | null }
+type LineCost = { lineId: number; kind: 'ingredient' | 'preparation' | 'free'; name: string; qty: number; unit: string; wastePct: number; grossQty: number; unitCost: number; cost: number; warning: string | null; priceDate: string | null }
 type Cost = { lines: LineCost[]; total: number; perPortion: number; perYieldUnit: number | null; yieldUnit: string | null; salePrice: number | null; foodCostPct: number | null; incomplete: number; cycle: boolean }
 type Recipe = { id: number; name: string; kind: 'dish' | 'preparation'; portions: number; yield_qty: number | null; yield_unit: string | null; sale_price: number | null; general_waste_pct: number | null }
 
@@ -131,7 +131,7 @@ export default function FoodCostCalculator({ recipeId, onOpenPreparation, onSave
                 <td style={td}>{l.unit}</td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}><input type="number" min={0} max={95} step="0.1" defaultValue={l.waste_pct || 0} onBlur={e => { if (Number(e.target.value || 0) !== (l.waste_pct || 0)) setWaste(l.id, e.target.value) }} style={{ width: 52, fontFamily: ff.mono, fontSize: 11, padding: '3px 5px', border: `1px solid ${tk.iron20}`, background: '#fff' }} /><span style={{ marginLeft: 3, opacity: 0.45 }}>%</span></td>
                 <td style={{ ...td, opacity: l.waste_pct > 0 ? 1 : 0.35 }}>{num(c?.grossQty ?? l.qty)}</td>
-                <td style={td}>{c && c.unitCost > 0 ? `${eur(c.unitCost)}/${l.unit}` : '—'}</td>
+                <td style={td}>{c && c.unitCost > 0 ? `${eur(c.unitCost)}/${l.unit}` : '—'}{c?.priceDate && <span style={{ display: 'block', fontFamily: ff.mono, fontSize: 9.5, color: tk.iron60, marginTop: 2 }}>precio del {fecha(c.priceDate)}</span>}</td>
                 <td style={{ ...td, fontWeight: 700 }}>{c && c.cost > 0 ? eur(c.cost) : '—'}</td>
                 <td style={td}><button onClick={() => removeLine(l.id)} disabled={busy} style={{ background: tk.terraSoft, border: 'none', padding: '3px 8px', cursor: 'pointer', color: tk.terra, fontFamily: ff.mono, fontSize: 12, fontWeight: 700 }}>×</button></td>
               </tr>

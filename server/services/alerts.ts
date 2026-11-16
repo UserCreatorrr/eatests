@@ -4,6 +4,7 @@
 import { addDays, today } from '@/server/domain/dates'
 import { fromCents } from '@/server/domain/money'
 import type { Ctx } from '@/server/http/context'
+import { listInvoices } from './purchasing'
 import { criticalRecipes } from './recipes'
 import { priceDeviations } from './analytics'
 import { wasteInPeriod } from './waste'
@@ -45,6 +46,11 @@ export function computeAlerts(ctx: Ctx, ref = today()): Alert[] {
   const review = q(`SELECT COUNT(*) AS c FROM delivery_notes WHERE org_id = ? AND status IN ('draft','review')`)
   if (review.c > 0) alerts.push({ id: 'albaranes_revision', tipo: 'info', titulo: plural(review.c, 'albarán sin validar', 'albaranes sin validar'), detalle: 'Hasta validarlos no actualizan precios ni stock',
     chat: 'Qué albaranes tengo pendientes de validar', href: '/dashboard/compras/albaranes', count: review.c })
+
+  // La factura concilia lo recibido: sin albaranes (o si no le suman) no se sabe qué se paga.
+  const toReview = listInvoices(ctx).filter(v => v.review).length
+  if (toReview > 0) alerts.push({ id: 'facturas_revisar', tipo: 'info', titulo: plural(toReview, 'factura por revisar', 'facturas por revisar'), detalle: 'Sin albaranes vinculados, o sus albaranes no suman la base',
+    chat: 'Qué facturas tengo por revisar', href: '/dashboard/compras/facturas?filtro=revisar', count: toReview })
 
   // Reposición: por frecuencia habitual de compra, no por existencias.
   const fresh = new Set(['pescado', 'marisco', 'carne', 'verdura', 'hongo', 'lácteo', 'lacteo', 'fruta', 'hierba', 'charcutería', 'charcuteria', 'panadería', 'panaderia'])

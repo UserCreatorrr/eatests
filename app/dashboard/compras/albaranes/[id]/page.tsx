@@ -3,18 +3,20 @@ export const dynamic = 'force-dynamic'
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { api, errorMessage } from '@/lib/api'
 import { tk, ff } from '@/lib/design'
 import { ESTADO_ALBARAN, eur, fecha, num } from '@/lib/format'
 import { IVA_OPTIONS, UNIT_OPTIONS, unitsCompatibleWith } from '@/lib/units-ui'
-import { Badge, Btn, Delta, Empty, Field, Input, Loading, Note, Page, Panel, Select, Table, Td, Tr } from '@/components/ui'
+import { Badge, Btn, Delta, Empty, Field, Input, Loading, Modal, Note, Page, Panel, Select, Table, Td, Tr } from '@/components/ui'
 
 const TONE: Record<string, 'ok' | 'warn' | 'crit' | 'neutral' | 'info'> = { draft: 'neutral', review: 'warn', validated: 'ok', invoiced: 'info' }
 const EMPTY_LINE = { ingredientId: '', description: '', qty: '', unit: 'kg', unitPrice: '', lineTotal: '', vatRate: '' }
 
 export default function AlbaranDetallePage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
+  const [head, setHead] = useState<null | Record<string, string>>(null)
   const [d, setD] = useState<any>(null)
   const [ings, setIngs] = useState<any[]>([])
   const [err, setErr] = useState('')
@@ -40,6 +42,16 @@ export default function AlbaranDetallePage() {
   const validate = (force = false) => run(async () => { setResult(await api.post(`/api/delivery-notes/${id}/validate`, { applyPrices, force })) })
   const toReview = () => run(() => api.post(`/api/delivery-notes/${id}/status`, { status: 'review' }))
 
+  const saveHeader = () => run(async () => {
+    const h = head!
+    await api.patch(`/api/delivery-notes/${id}`, { number: h.number, deliveryDate: h.deliveryDate, base: h.base === '' ? null : Number(h.base), vat: h.vat === '' ? null : Number(h.vat), total: h.total === '' ? null : Number(h.total) })
+    setHead(null)
+  })
+  async function remove() {
+    if (!confirm(`¿Borrar el albarán ${d.number}? Úsalo solo para duplicados o escaneos erróneos: no ha movido precios ni stock.`)) return
+    try { await api.del(`/api/delivery-notes/${id}`); router.push('/dashboard/compras/albaranes') } catch (e) { setMsg(errorMessage(e)) }
+  }
+
   function startEdit(l: any) { setEditing(l.id); setLine({ ingredientId: l.ingredient_id ? String(l.ingredient_id) : '', description: l.description, qty: l.qty != null ? String(l.qty) : '', unit: l.unit ?? 'kg', unitPrice: l.unit_price != null ? String(l.unit_price) : '', lineTotal: l.line_total_cents != null ? String(l.line_total_cents / 100) : '', vatRate: l.vat_rate != null ? String(l.vat_rate) : '' }) }
 
   if (err) return <div style={{ padding: 36, fontFamily: ff.mono, color: tk.terra }}>{err}</div>
@@ -58,7 +70,24 @@ export default function AlbaranDetallePage() {
         {editable && <label style={{ fontFamily: ff.mono, fontSize: 11, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={applyPrices} onChange={e => setApplyPrices(e.target.checked)} /> actualizar costes</label>}
         {editable && <Btn onClick={() => validate(false)} disabled={busy || !d.lines.length || unmapped > 0}>VALIDAR →</Btn>}
         {d.status === 'draft' && <Btn kind="ghost" onClick={toReview} disabled={busy}>A REVISIÓN</Btn>}
+        {editable && <Btn kind="ghost" onClick={() => setHead({ number: d.number, deliveryDate: d.delivery_date, base: String(d.base_cents / 100), vat: String(d.vat_cents / 100), total: String(d.total_cents / 100) })} disabled={busy}>EDITAR CABECERA</Btn>}
+        {editable && <Btn kind="danger" onClick={remove} disabled={busy}>ELIMINAR</Btn>}
       </>}>
+      {head && (
+        <Modal title="Corregir cabecera del albarán" onClose={() => setHead(null)} width={480}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Nº albarán"><Input value={head.number} onChange={e => setHead(h => ({ ...h!, number: e.target.value }))} /></Field>
+            <Field label="Fecha de entrega"><Input type="date" value={head.deliveryDate} onChange={e => setHead(h => ({ ...h!, deliveryDate: e.target.value }))} /></Field>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
+            <Field label="Base (€)"><Input type="number" step="0.01" value={head.base} onChange={e => setHead(h => ({ ...h!, base: e.target.value }))} /></Field>
+            <Field label="IVA (€)"><Input type="number" step="0.01" value={head.vat} onChange={e => setHead(h => ({ ...h!, vat: e.target.value }))} /></Field>
+            <Field label="Total (€)"><Input type="number" step="0.01" value={head.total} onChange={e => setHead(h => ({ ...h!, total: e.target.value }))} /></Field>
+          </div>
+          {msg && <p style={{ fontFamily: ff.mono, fontSize: 12, color: tk.terra, margin: '14px 0 0' }}>{msg}</p>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}><Btn kind="ghost" onClick={() => setHead(null)}>CANCELAR</Btn><Btn onClick={saveHeader} disabled={busy || !head.number}>GUARDAR</Btn></div>
+        </Modal>
+      )}
       {msg && <Note tone="crit">{msg}{/no cuadra|cuadr/i.test(msg) && editable && <> <button onClick={() => validate(true)} style={{ marginLeft: 8, fontFamily: ff.mono, fontSize: 11, fontWeight: 600, background: 'transparent', border: `1px solid ${tk.terra}`, color: tk.terra, cursor: 'pointer', padding: '2px 8px' }}>Validar de todas formas</button></>}</Note>}
       {result && (
         <Note tone="ok">✓ Validado: {result.pricesUpdated} precio(s) actualizados, {result.stockMovements} entrada(s) de stock{result.affectedRecipes.length ? `, ${result.affectedRecipes.length} escandallo(s) afectado(s): ${result.affectedRecipes.map((r: any) => r.name).join(', ')}` : ''}.

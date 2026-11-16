@@ -219,8 +219,13 @@ function stripUndefined<T extends object>(o: T): Partial<T> {
 function loadRefs(ctx: Ctx) {
   const recipes: RecipeRef[] = (ctx.db.prepare('SELECT id, name, kind, portions, yield_qty, yield_unit, sale_price FROM recipes WHERE org_id = ?').all(ctx.orgId) as any[])
     .map(r => ({ id: r.id, name: r.name, kind: r.kind, portions: r.portions, yieldQty: r.yield_qty, yieldUnit: r.yield_unit, salePrice: r.sale_price }))
-  const ingredients: IngredientRef[] = (ctx.db.prepare('SELECT id, name, base_unit, cost, avg_unit_weight_g FROM ingredients WHERE org_id = ?').all(ctx.orgId) as any[])
-    .map(i => ({ id: i.id, name: i.name, baseUnit: i.base_unit, cost: i.cost, avgUnitWeightG: i.avg_unit_weight_g }))
+  // Fecha del precio en uso: la última observación con ese mismo precio; si el
+  // coste se tecleó a mano sin observación, la fecha en que se cambió.
+  const ingredients: IngredientRef[] = (ctx.db.prepare(`SELECT i.id, i.name, i.base_unit, i.cost, i.avg_unit_weight_g,
+      COALESCE((SELECT MAX(p.observed_on) FROM price_observations p WHERE p.org_id = i.org_id AND p.ingredient_id = i.id AND ABS(p.unit_price - i.cost) < 0.00005),
+               substr(i.cost_updated_at, 1, 10)) AS price_date
+      FROM ingredients i WHERE i.org_id = ?`).all(ctx.orgId) as any[])
+    .map(i => ({ id: i.id, name: i.name, baseUnit: i.base_unit, cost: i.cost, avgUnitWeightG: i.avg_unit_weight_g, priceDate: i.price_date ?? null }))
   return { recipes, lines: allLineRefs(ctx), ingredients }
 }
 

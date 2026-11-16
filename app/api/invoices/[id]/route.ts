@@ -1,5 +1,5 @@
 import { route } from '@/server/http/route'
-import { getInvoice, unbilledDeliveryNotes } from '@/server/services/purchasing'
+import { deleteInvoice, getInvoice, unbilledDeliveryNotes } from '@/server/services/purchasing'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,3 +9,5 @@ export const GET = route({}, ({ ctx, params }) => {
   // Candidatos: albaranes validados del proveedor que aún no están en ninguna factura.
   return { ...invoice, image, candidates: unbilledDeliveryNotes(ctx, invoice.supplier_id) }
 })
+
+export const DELETE = route({}, ({ ctx, params }) => { deleteInvoice(ctx, Number(params.id)); return { ok: true } })

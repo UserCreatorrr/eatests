@@ -22,7 +22,7 @@ export default function FacturasPage() {
   const [rows, setRows] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'' | 'pending' | 'overdue' | 'paid'>('')
+  const [filter, setFilter] = useState<'' | 'pending' | 'overdue' | 'paid' | 'review'>('')
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState({ supplierId: '', number: '', invoiceDate: hoyIso(), dueDate: '', base: '', vat: '', total: '' })
   const [candidates, setCandidates] = useState<any[]>([])
@@ -36,6 +36,7 @@ export default function FacturasPage() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('filtro') === 'revisar') setFilter('review') }, [])
 
   useEffect(() => {
     if (!form.supplierId) { setCandidates([]); setPicked([]); return }
@@ -54,7 +55,7 @@ export default function FacturasPage() {
   async function pay(f: any, paid: boolean) { try { await api.post(`/api/invoices/${f.id}/paid`, { paid }); await load() } catch (e) { alert(errorMessage(e)) } }
 
   const today = hoyIso()
-  const visible = rows.filter(r => filter === '' ? true : filter === 'paid' ? r.status === 'paid' : filter === 'overdue' ? r.status === 'pending' && r.due_date && r.due_date < today : r.status === 'pending')
+  const visible = rows.filter(r => filter === '' ? true : filter === 'review' ? !!r.review : filter === 'paid' ? r.status === 'paid' : filter === 'overdue' ? r.status === 'pending' && r.due_date && r.due_date < today : r.status === 'pending')
   const pending = rows.filter(r => r.status === 'pending'), overdue = pending.filter(r => r.due_date && r.due_date < today)
   const sum = (xs: any[]) => xs.reduce((s, x) => s + x.total_cents, 0) / 100
 
@@ -70,6 +71,7 @@ export default function FacturasPage() {
         <Chip active={filter === 'pending'} color={tk.clay} onClick={() => setFilter('pending')}>Pendientes · {pending.length}</Chip>
         <Chip active={filter === 'overdue'} color={tk.terra} onClick={() => setFilter('overdue')}>Vencidas · {overdue.length}</Chip>
         <Chip active={filter === 'paid'} color={tk.appleDeep} onClick={() => setFilter('paid')}>Pagadas · {rows.length - pending.length}</Chip>
+        <Chip active={filter === 'review'} color={tk.clay} onClick={() => setFilter('review')}>Por revisar · {rows.filter(r => r.review).length}</Chip>
       </div>
       <Panel>
         {loading ? <Loading /> : visible.length === 0 ? <Empty>Sin facturas.</Empty> : (
@@ -81,7 +83,7 @@ export default function FacturasPage() {
                 <Td>{fecha(f.invoice_date)}</Td><Td>{fecha(f.due_date)}</Td>
                 <Td right>{f.delivery_note_count ?? '—'}</Td>
                 <Td right>{eur(f.base_cents / 100)}</Td><Td right>{eur(f.vat_cents / 100)}</Td><Td right style={{ fontWeight: 600 }}>{eur(f.total_cents / 100)}</Td>
-                <Td>{dueBadge(f)}</Td>
+                <Td><span style={{ display: 'inline-flex', gap: 4 }} title={f.review ?? undefined}>{dueBadge(f)}{f.review && <Badge tone="warn">Revisar</Badge>}</span></Td>
                 <Td right>{f.status === 'pending' ? <Btn small onClick={() => pay(f, true)}>PAGADA</Btn> : <Btn small kind="ghost" onClick={() => pay(f, false)}>DESHACER</Btn>}</Td>
               </Tr>
             ))}

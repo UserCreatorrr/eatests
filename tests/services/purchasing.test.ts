@@ -122,13 +122,13 @@ describe('factura', () => {
     const [a] = unbilledDeliveryNotes(ctx, makro)
     expect(() => attachDeliveryNotes(ctx, inv.id, [a.id])).toThrow(ValidationError)
   })
-  it('un albarán no se cuela en la factura de otro proveedor y la suma tiene que cuadrar', () => {
+  it('un albarán no se cuela en la factura de otro proveedor ni puede superar su base', () => {
     const otro = createSupplier(ctx, { name: 'Prodesco' }).id
     const a = validatedNote('A1', '2026-08-13', 42.5)
     const inv = createInvoice(ctx, { supplierId: otro, number: 'F-1', invoiceDate: '2026-08-31' })
     expect(() => attachDeliveryNotes(ctx, inv.id, [a.id])).toThrow(/otro proveedor/)
-    const inv2 = createInvoice(ctx, { supplierId: makro, number: 'F-9', invoiceDate: '2026-08-31', base: 100 })
-    expect(() => attachDeliveryNotes(ctx, inv2.id, [a.id])).toThrow(/no cuadra con la base de la factura/)
+    const inv2 = createInvoice(ctx, { supplierId: makro, number: 'F-9', invoiceDate: '2026-08-31', base: 30 })
+    expect(() => attachDeliveryNotes(ctx, inv2.id, [a.id])).toThrow(/superan la base de la factura/)
     expect(getDeliveryNote(ctx, a.id).status).toBe('validated')   // la transacción deshizo el enlace
   })
   it('pagar y despagar', () => {

@@ -97,6 +97,41 @@ export function updateSupplier(ctx: Ctx, id: number, input: unknown): Supplier {
 }
 
 /** Los proveedores no se borran (tienen documentos): se desactivan. */
+/**
+ * Fusiona dos fichas del mismo proveedor (p. ej. un NIF mal leído por OCR).
+ * Todo lo de `dropId` pasa a `keepId`: ingredientes, pedidos, albaranes,
+ * facturas y precios; los datos que le falten a `keepId` se toman de la otra
+ * ficha, y esa se borra. Si hay documentos con el mismo número en ambas, son
+ * duplicados y hay que resolverlos antes: no se adivina cuál vale.
+ */
+export function mergeSuppliers(ctx: Ctx, keepId: number, dropId: number): Supplier {
+  if (keepId === dropId) throw new ValidationError('Elige dos proveedores distintos')
+  const keep = getSupplier(ctx, keepId), drop = getSupplier(ctx, dropId)
+  const clash = (table: 'delivery_notes' | 'invoices') => (ctx.db.prepare(
+    `SELECT a.number FROM ${table} a JOIN ${table} b ON b.org_id = a.org_id AND b.number = a.number WHERE a.org_id = ? AND a.supplier_id = ? AND b.supplier_id = ?`)
+    .all(ctx.orgId, dropId, keepId) as { number: string }[]).map(r => r.number)
+  const dupNotes = clash('delivery_notes'), dupInvoices = clash('invoices')
+  if (dupNotes.length || dupInvoices.length) {
+    throw new ConflictError(`Los dos proveedores tienen documentos con el mismo número: ${[...dupNotes.map(n => 'albarán ' + n), ...dupInvoices.map(n => 'factura ' + n)].join(', ')}. Borra o renombra los duplicados antes de fusionar.`,
+      { deliveryNotes: dupNotes, invoices: dupInvoices })
+  }
+  return ctx.db.transaction(() => {
+    for (const t of ['ingredients', 'purchase_orders', 'delivery_notes', 'invoices', 'price_observations']) {
+      ctx.db.prepare(`UPDATE ${t} SET supplier_id = ? WHERE org_id = ? AND supplier_id = ?`).run(keepId, ctx.orgId, dropId)
+    }
+    const fill = (k: keyof Supplier) => (keep[k] ?? drop[k]) as any
+    const note = [keep.notes, drop.name !== keep.name || drop.tax_id !== keep.tax_id ? `Antes también: ${drop.name}${drop.tax_id && drop.tax_id !== keep.tax_id ? ` (NIF ${drop.tax_id})` : ''}` : null].filter(Boolean).join('\n') || null
+    ctx.db.prepare('DELETE FROM suppliers WHERE org_id = ? AND id = ?').run(ctx.orgId, dropId)
+    ctx.db.prepare(`UPDATE suppliers SET tax_id = ?, contact_name = ?, email = ?, phone = ?, address = ?, city = ?, postal_code = ?, website = ?, preferred_channel = ?,
+                    notes = ?, updated_at = ? WHERE org_id = ? AND id = ?`)
+      .run(fill('tax_id'), fill('contact_name'), fill('email'), fill('phone'), fill('address'), fill('city'), fill('postal_code'), fill('website'), fill('preferred_channel'),
+           note, new Date().toISOString(), ctx.orgId, keepId)
+    ctx.db.prepare('INSERT INTO audit_log (org_id, user_id, action, entity, entity_id, data_json) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(ctx.orgId, ctx.userId, 'merge', 'supplier', String(keepId), JSON.stringify({ absorbed: { id: drop.id, name: drop.name, tax_id: drop.tax_id } }))
+    return getSupplier(ctx, keepId)
+  })()
+}
+
 export function deactivateSupplier(ctx: Ctx, id: number): void {
   const r = ctx.db.prepare('UPDATE suppliers SET active = 0, updated_at = ? WHERE org_id = ? AND id = ?').run(nowIso(), ctx.orgId, id)
   if (!r.changes) throw new NotFoundError('Proveedor no encontrado')
